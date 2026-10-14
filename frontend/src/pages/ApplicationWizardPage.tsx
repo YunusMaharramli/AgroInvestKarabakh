@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Competition, Application } from '../types/index.js';
+import { InvestmentOpportunity, Proposal } from '../types/index.js';
+import { normalizeAzPhone } from '../lib/applicationStatus.js';
 import { useAuth } from '../context/AuthContext.js';
 import {
   CheckCircle2, ArrowRight, ArrowLeft, Upload, FileText, Trash2, ShieldCheck, AlertCircle, Check, Phone, Info,
@@ -8,7 +9,7 @@ import { formatManat, formatDateAz } from '../lib/landImages.js';
 import { HELP_LINE } from '../components/Header.js';
 
 interface ApplicationWizardPageProps {
-  competitionId: string;
+  opportunityId: string;
   navigate: (route: string) => void;
 }
 
@@ -62,15 +63,15 @@ const SummaryRow: React.FC<{ label: string; value: React.ReactNode; onEdit?: () 
   </div>
 );
 
-export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ competitionId, navigate }) => {
-  const { user, profile, token, isLoading: authLoading } = useAuth();
-  const [competition, setCompetition] = useState<Competition | null>(null);
+export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ opportunityId, navigate }) => {
+  const { user, profile, token, isLoading: authLoading, refreshUser } = useAuth();
+  const [opportunity, setOpportunity] = useState<InvestmentOpportunity | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [fileError, setFileError] = useState('');
-  const [submittedApp, setSubmittedApp] = useState<Application | null>(null);
+  const [submittedApp, setSubmittedApp] = useState<Proposal | null>(null);
 
   const [applicantName, setApplicantName] = useState('');
   const [applicantEmail, setApplicantEmail] = useState('');
@@ -82,7 +83,9 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
   const [implementationPeriod, setImplementationPeriod] = useState('24 ay');
   const [businessPlanSummary, setBusinessPlanSummary] = useState('');
 
-  const [uploadedDocs, setUploadedDocs] = useState<{ fileName: string; mimeType: string; fileSize: number; fileData?: string }[]>([]);
+  const [uploadedDocs, setUploadedDocs] = useState<{ fileName: string; fileSize: number; file: File }[]>([]);
+  // The phone is asked only if the profile has no valid Azerbaijani number; it is saved with the proposal.
+  const profilePhone = normalizeAzPhone(user?.phone);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
@@ -90,29 +93,29 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
     // would send a logged-in person to the login page.
     if (authLoading) return;
     if (!user) {
-      navigate(`/login?next=${encodeURIComponent(`/applications/new/${competitionId}`)}`);
+      navigate(`/login?next=${encodeURIComponent(`/proposals/new/${opportunityId}`)}`);
       return;
     }
 
     setApplicantName(`${user.firstName} ${user.lastName}`);
     setApplicantEmail(user.email);
-    setApplicantPhone(user.phone || '');
+    setApplicantPhone(normalizeAzPhone(user.phone) ?? '');
     if (profile) {
       setCompanyName(profile.companyName || '');
       setTaxNumber(profile.taxIdentificationNumber || '');
     }
 
-    fetch(`/api/competitions/${competitionId}`)
+    fetch(`/api/opportunities/${opportunityId}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
-        setCompetition(data);
+        setOpportunity(data);
         if (data?.land) {
           setProposedAmount(data.land.estimatedInvestmentRequirement || 500000);
         }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [competitionId, user, authLoading]);
+  }, [opportunityId, user?.id, authLoading]);
 
   const goToStep = (n: number) => {
     setCurrentStep(n);
@@ -122,28 +125,19 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFileError('');
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 15 * 1024 * 1024) {
-      setFileError(`"${file.name}" çox böyükdür. Faylın həcmi 15 MB-dan artıq ola bilməz.`);
-      e.target.value = '';
-      return;
+    const files = Array.from(e.target.files ?? []);
+    for (const file of files) {
+      const okType = ['application/pdf', 'image/jpeg', 'image/png'].includes(file.type) || /\.(pdf|jpe?g|png)$/i.test(file.name);
+      if (!okType) {
+        setFileError(`"${file.name}" qəbul edilmir. Yalnız PDF, JPG və ya PNG fayl yükləyin.`);
+        continue;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        setFileError(`"${file.name}" çox böyükdür. Faylın həcmi 10 MB-dan artıq ola bilməz.`);
+        continue;
+      }
+      setUploadedDocs(prev => (prev.length >= 10 ? prev : [...prev, { fileName: file.name, fileSize: file.size, file }]));
     }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setUploadedDocs(prev => [
-        ...prev,
-        {
-          fileName: file.name,
-          mimeType: file.type || 'application/pdf',
-          fileSize: file.size,
-          fileData: (reader.result as string)?.slice(0, 100), // snippet for demo storage
-        },
-      ]);
-    };
-    reader.readAsDataURL(file);
     e.target.value = ''; // allow choosing the same file name again
   };
 
@@ -161,26 +155,26 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
     setErrorMessage('');
 
     try {
-      const res = await fetch('/api/applications', {
+      const form = new FormData();
+      form.append('opportunityId', opportunityId);
+      form.append('proposedInvestmentAmount', String(Number(proposedAmount)));
+      form.append('businessPlanSummary', businessPlanSummary);
+      form.append('estimatedImplementationPeriod', implementationPeriod);
+      if (!profilePhone) form.append('contactPhone', applicantPhone);
+      uploadedDocs.forEach(d => form.append('documents', d.file, d.fileName));
+
+      const res = await fetch('/api/proposals', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          competitionId,
-          proposedInvestmentAmount: Number(proposedAmount),
-          businessPlanSummary,
-          estimatedImplementationPeriod: implementationPeriod,
-          documents: uploadedDocs,
-        }),
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
       });
 
       const data = await res.json();
       if (!res.ok) {
-        setErrorMessage(data.error || 'Müraciət göndərilərkən xəta baş verdi. Bir az sonra yenidən cəhd edin.');
+        setErrorMessage(data.error || 'Təklif göndərilərkən xəta baş verdi. Bir az sonra yenidən cəhd edin.');
       } else {
         setSubmittedApp(data);
+        if (!profilePhone) refreshUser();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch {
@@ -193,27 +187,51 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center text-lg text-muted" role="status">
-        Müsabiqə məlumatları yüklənir…
+        Elan məlumatları yüklənir…
       </div>
     );
   }
 
-  if (!competition) {
+  if (!opportunity) {
     return (
       <div className="max-w-xl mx-auto px-4 py-20 text-center">
-        <h1 className="font-display font-extrabold text-2xl text-brand-900">Müsabiqə tapılmadı</h1>
-        <p className="text-lg text-muted mt-3">Bu müsabiqə bağlanıb və ya mövcud deyil.</p>
+        <h1 className="font-display font-extrabold text-2xl text-brand-900">Elan tapılmadı</h1>
+        <p className="text-lg text-muted mt-3">Bu investisiya elanı mövcud deyil.</p>
         <button type="button" onClick={() => navigate('/opportunities')} className="mt-8 min-h-14 px-7 rounded-xl bg-brand-700 text-white font-display font-bold">
-          Torpaq sahələrinə qayıt
+          İnvestisiya imkanlarına qayıt
         </button>
       </div>
     );
   }
 
-  const land = competition.land;
+  if (!submittedApp && (opportunity.myProposal || !opportunity.acceptingProposals || opportunity.isResponsibleParty)) {
+    const title = opportunity.myProposal
+      ? 'Bu elana artıq təklif göndərmisiniz'
+      : opportunity.isResponsibleParty ? 'Bu sizin öz elanınızdır' : 'Bu elan təklif qəbul etmir';
+    const text = opportunity.myProposal
+      ? `Təklif nömrəniz: ${opportunity.myProposal.referenceNumber}. Vəziyyətini kabinetinizdə görə bilərsiniz.`
+      : opportunity.isResponsibleParty ? 'Öz elanınıza təklif göndərə bilməzsiniz.' : 'Elan bağlanıb və ya son tarix keçib.';
+    return (
+      <div className="max-w-xl mx-auto px-4 py-20 text-center">
+        <h1 className="font-display font-extrabold text-2xl text-brand-900">{title}</h1>
+        <p className="text-lg text-muted mt-3">{text}</p>
+        <button
+          type="button"
+          onClick={() => navigate(opportunity.myProposal ? '/dashboard?tab=sent' : `/opportunities/${opportunity.landId}`)}
+          className="mt-8 min-h-14 px-7 rounded-xl bg-brand-700 text-white font-display font-bold"
+        >
+          {opportunity.myProposal ? 'Təkliflərimə baxın' : 'Sahəyə qayıdın'}
+        </button>
+      </div>
+    );
+  }
+
+  const land = opportunity.land;
   const minRequired = land?.estimatedInvestmentRequirement ?? 0;
   const belowMinimum = minRequired > 0 && proposedAmount > 0 && proposedAmount < minRequired;
-  const step1Missing = !applicantName.trim() || !applicantPhone.trim();
+  const phoneOk = Boolean(profilePhone) || Boolean(normalizeAzPhone(applicantPhone));
+  const step1Missing = !applicantName.trim() || !phoneOk;
+  const docsMissing = opportunity.proposalDocumentsRequired && uploadedDocs.length === 0;
   const step3Missing = !proposedAmount || !businessPlanSummary.trim();
 
   // SUCCESS SCREEN
@@ -225,13 +243,13 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
             <div className="w-20 h-20 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-5 text-brand-700">
               <CheckCircle2 className="w-11 h-11" aria-hidden="true" />
             </div>
-            <h1 className="font-display font-extrabold text-3xl text-brand-900">Müraciətiniz qəbul edildi</h1>
-            <p className="text-lg text-[#3E4F45] mt-3">Müraciət nömrəniz:</p>
+            <h1 className="font-display font-extrabold text-3xl text-brand-900">Təklifiniz göndərildi</h1>
+            <p className="text-lg text-[#3E4F45] mt-3">Təklif nömrəniz:</p>
             <p className="font-display font-extrabold text-4xl text-brand-900 mt-1 tracking-wide">{submittedApp.referenceNumber}</p>
             <p className="text-base text-muted mt-2">Bu nömrəni yazın və ya ekranın şəklini çəkin. Zəng edəndə lazım olacaq.</p>
 
             <dl className="mt-7 text-left bg-cream rounded-2xl border border-line px-5">
-              <SummaryRow label="Müsabiqə" value={competition.title} />
+              <SummaryRow label="İnvestisiya elanı" value={opportunity.title} />
               <SummaryRow label="Rayon və sahə" value={`${land?.region ?? ''} (${land?.areaHectares ?? ''} ha)`} />
               <SummaryRow label="Təklif etdiyiniz sərmayə" value={formatManat(submittedApp.proposedInvestmentAmount)} />
               <SummaryRow label="Vəziyyəti" value="Qəbul edilib — baxılmağa göndərilib" />
@@ -247,7 +265,7 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
                 onClick={() => navigate('/dashboard')}
                 className="min-h-14 px-7 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-extrabold"
               >
-                Müraciətlərimə baxın
+                Təkliflərimə baxın
               </button>
               <button
                 type="button"
@@ -261,7 +279,7 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
                 onClick={() => navigate('/opportunities')}
                 className="min-h-14 px-6 rounded-xl border-2 border-line text-brand-900 font-display font-bold"
               >
-                Torpaq sahələrinə qayıt
+                İnvestisiya imkanlarına qayıt
               </button>
             </div>
           </div>
@@ -277,22 +295,22 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <button
           type="button"
-          onClick={() => navigate(`/opportunities/${competition.landId}`)}
+          onClick={() => navigate(`/opportunities/${opportunity.landId}`)}
           className="inline-flex items-center gap-2 min-h-[3.25rem] px-5 rounded-xl border-2 border-brand-900 text-brand-900 font-display font-bold hover:bg-white mb-6"
         >
           <ArrowLeft className="w-6 h-6" aria-hidden="true" />
           Sahənin səhifəsinə qayıt
         </button>
 
-        <h1 className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900">Müraciət forması</h1>
-        <p className="text-lg text-[#3E4F45] mt-2">{competition.title}</p>
+        <h1 className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900">İnvestisiya təklifi</h1>
+        <p className="text-lg text-[#3E4F45] mt-2">{opportunity.title}</p>
 
         {/* Progress */}
         <div className="mt-7 mb-7">
           <p className="font-display font-bold text-lg text-brand-900 mb-3" aria-live="polite">
             Addım {currentStep} / {STEPS.length}: {stepTitle}
           </p>
-          <ol className="grid grid-cols-5 gap-2" aria-label="Müraciətin addımları">
+          <ol className="grid grid-cols-5 gap-2" aria-label="Təklifin addımları">
             {STEPS.map(s => {
               const done = currentStep > s.num;
               const now = currentStep === s.num;
@@ -332,8 +350,26 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
                 </div>
                 <div>
                   <label htmlFor="w-phone" className={labelClass}>Telefon nömrəniz</label>
-                  <input id="w-phone" type="tel" autoComplete="tel" value={applicantPhone} onChange={e => setApplicantPhone(e.target.value)} placeholder="+994 50 000 00 00" className={inputClass} />
-                  <p className={hintClass}>Məsləhətçimiz bu nömrə ilə sizinlə əlaqə saxlayacaq.</p>
+                  <input
+                    id="w-phone"
+                    type="tel"
+                    autoComplete="tel"
+                    value={applicantPhone}
+                    onChange={e => setApplicantPhone(e.target.value)}
+                    disabled={Boolean(profilePhone)}
+                    required={!profilePhone}
+                    aria-invalid={!phoneOk && applicantPhone.length > 0}
+                    placeholder="+994 50 000 00 00"
+                    className={inputClass}
+                  />
+                  <p className={hintClass}>
+                    {profilePhone
+                      ? 'Profilinizdəki nömrə təklifinizlə birlikdə elan sahibinə göndəriləcək.'
+                      : 'Profilinizdə telefon yoxdur. Azərbaycan nömrəsi yazın, məsələn: 050 123 45 67.'}
+                  </p>
+                  {!profilePhone && applicantPhone.length > 0 && !phoneOk && (
+                    <p role="alert" className="text-[#7A1A10] font-semibold mt-1">Nömrə düzgün deyil. Məsələn: +994 50 123 45 67</p>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="w-email" className={labelClass}>Elektron poçt</label>
@@ -363,21 +399,21 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
           {currentStep === 2 && (
             <div className="flex flex-col gap-6">
               <div>
-                <h2 className="font-display font-extrabold text-2xl text-brand-900">Müraciət etdiyiniz torpaq sahəsi</h2>
+                <h2 className="font-display font-extrabold text-2xl text-brand-900">Təklif göndərdiyiniz torpaq sahəsi</h2>
                 <p className="text-base text-muted mt-1">Doğru sahəni seçdiyinizə əmin olun.</p>
               </div>
               <dl className="bg-cream rounded-2xl border border-line px-5">
-                <SummaryRow label="Müsabiqə" value={competition.title} />
+                <SummaryRow label="İnvestisiya elanı" value={opportunity.title} />
                 <SummaryRow label="Torpaq sahəsi" value={land?.title ?? '—'} />
                 <SummaryRow label="Rayon və ölçü" value={`${land?.region ?? ''} rayonu, ${land?.areaHectares ?? ''} hektar`} />
                 <SummaryRow label="Minimal sərmayə" value={formatManat(minRequired)} />
-                <SummaryRow label="Son müraciət tarixi" value={formatDateAz(competition.applicationDeadline)} />
+                {opportunity.applicationDeadline && <SummaryRow label="Son təklif tarixi" value={formatDateAz(opportunity.applicationDeadline)} />}
               </dl>
-              {competition.eligibilityConditions?.length > 0 && (
+              {opportunity.eligibilityConditions?.length > 0 && (
                 <div>
                   <h3 className="font-display font-bold text-lg text-brand-900 mb-3">Şərtlər</h3>
                   <ul className="flex flex-col gap-2">
-                    {competition.eligibilityConditions.map((c, i) => (
+                    {opportunity.eligibilityConditions.map((c, i) => (
                       <li key={i} className="flex gap-3 items-start">
                         <Check className="w-6 h-6 text-brand-700 shrink-0" aria-hidden="true" />
                         <span>{c}</span>
@@ -419,7 +455,7 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
                 {belowMinimum && (
                   <p className="mt-2 flex items-start gap-2 text-gold-900 font-semibold">
                     <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" aria-hidden="true" />
-                    Məbləğ tələb olunan minimumdan azdır. Belə müraciətə baxılmaya bilər.
+                    Məbləğ tələb olunan minimumdan azdır. Belə təklif seçilməyə bilər.
                   </p>
                 )}
               </div>
@@ -461,14 +497,14 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
             <div className="flex flex-col gap-6">
               <div>
                 <h2 className="font-display font-extrabold text-2xl text-brand-900">Sənədləri əlavə edin</h2>
-                <p className="text-base text-muted mt-1">PDF və ya Word faylı (ən çox 15 MB). Sənədləri bir-bir əlavə edə bilərsiniz.</p>
+                <p className="text-base text-muted mt-1">{opportunity.proposalDocumentsRequired ? "Bu elan üçün sənəd tələb olunur." : "Bu elan üçün sənəd məcburi deyil — istəsəniz əlavə edə bilərsiniz."} PDF, JPG və ya PNG (hər biri ən çox 10 MB).</p>
               </div>
 
-              {competition.requiredDocuments?.length > 0 && (
+              {opportunity.requiredDocuments?.length > 0 && (
                 <div className="bg-cream rounded-2xl border border-line p-5">
                   <h3 className="font-display font-bold text-lg text-brand-900 mb-3">Lazım olan sənədlər</h3>
                   <ul className="flex flex-col gap-2">
-                    {competition.requiredDocuments.map((d, i) => (
+                    {opportunity.requiredDocuments.map((d, i) => (
                       <li key={i} className="flex gap-3 items-start">
                         <FileText className="w-6 h-6 text-brand-700 shrink-0" aria-hidden="true" />
                         <span>{d}</span>
@@ -489,7 +525,7 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
                     <span className="text-muted">Bu sahəyə basın və faylı seçin</span>
                   </span>
                 </label>
-                <input id="w-file" type="file" accept=".pdf,.doc,.docx" onChange={handleFileUpload} className="sr-only" />
+                <input id="w-file" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={handleFileUpload} className="sr-only" />
               </div>
 
               {fileError && (
@@ -556,7 +592,9 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
               {uploadedDocs.length === 0 && (
                 <p className="flex items-start gap-2 text-gold-900 font-semibold">
                   <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" aria-hidden="true" />
-                  Sənəd əlavə etməmisiniz. Göndərə bilərsiniz, amma komissiya sizdən sənədləri sonra istəyəcək.
+                  {docsMissing
+                    ? 'Bu elan üçün sənəd tələb olunur. Göndərməzdən əvvəl ən azı bir sənəd əlavə edin.'
+                    : 'Sənəd əlavə etməmisiniz. Bu elan üçün sənəd məcburi deyil.'}
                 </p>
               )}
 
@@ -568,7 +606,7 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
                   className="mt-1 w-7 h-7 shrink-0 accent-[#1F6B3C]"
                 />
                 <span className="text-[1.05rem] leading-relaxed">
-                  Yazdığım məlumatların və sənədlərin düzgün olduğunu təsdiq edirəm. Müsabiqənin qaydaları ilə razıyam.
+                  Yazdığım məlumatların və sənədlərin düzgün olduğunu təsdiq edirəm. Elanın şərtləri ilə razıyam.
                 </span>
               </label>
 
@@ -576,12 +614,12 @@ export const ApplicationWizardPage: React.FC<ApplicationWizardPageProps> = ({ co
                 <BackButton onClick={() => goToStep(4)} />
                 <button
                   type="button"
-                  disabled={submitting || !termsAccepted}
+                  disabled={submitting || !termsAccepted || docsMissing}
                   onClick={handleSubmit}
                   className="min-h-16 px-8 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-extrabold text-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ShieldCheck className="w-7 h-7" aria-hidden="true" />
-                  {submitting ? 'Göndərilir…' : 'Müraciəti göndərin'}
+                  {submitting ? 'Göndərilir…' : 'Təklifi göndərin'}
                 </button>
               </div>
               {!termsAccepted && (

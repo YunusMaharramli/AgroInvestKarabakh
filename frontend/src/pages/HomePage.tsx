@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AgriculturalLand, Competition } from '../types/index.js';
+import { AgriculturalLand, InvestmentOpportunity } from '../types/index.js';
 import { Search, Map as MapIcon, ArrowRight, ChevronDown, Heart, MessageCircle, Phone } from 'lucide-react';
 import { useFavorites } from '../context/FavoritesContext.js';
 import { PHOTOS, landImage, formatManat } from '../lib/landImages.js';
@@ -23,18 +23,18 @@ const STEPS: { title: string; text: string }[] = [
   { title: 'Qeydiyyat', text: 'Portalda sahibkar və ya şirkət kimi qeydiyyatdan keçin.' },
   { title: 'Sahəni seçin', text: 'Siyahıdan və ya xəritədən sizə uyğun torpağı tapın.' },
   { title: 'Təklifinizi yazın', text: 'Sərmayə məbləğini və icra müddətini qeyd edin.' },
-  { title: 'Sənədləri yükləyin', text: 'Biznes plan və bank zəmanətini PDF kimi əlavə edin.' },
-  { title: 'Göndərin', text: 'Təsdiq edin və müraciət kodunuzu dərhal alın.' },
+  { title: 'Sənədləri yükləyin', text: 'Elan tələb edirsə, biznes plan və digər sənədləri əlavə edin.' },
+  { title: 'Göndərin', text: 'Təsdiq edin və təklif nömrənizi dərhal alın.' },
 ];
 
 const FAQS: { q: string; a: string }[] = [
   {
-    q: 'Müsabiqədə kimlər iştirak edə bilər?',
-    a: 'Azərbaycan Respublikasında qeydiyyatdan keçmiş hüquqi şəxslər və fərdi sahibkarlar iştirak edə bilər. Hər müsabiqənin öz tələbləri (maliyyə zəmanəti, təcrübə və s.) müsabiqə səhifəsində açıq yazılır.',
+    q: 'Kimlər təklif göndərə bilər?',
+    a: 'Portalda qeydiyyatdan keçən hər kəs. Hər elanın öz tələbləri (maliyyə imkanı, təcrübə, sənədlər və s.) sahənin səhifəsində açıq yazılır. Torpaq sahibləri də öz torpaqlarını portalda yerləşdirib investor tapa bilər.',
   },
   {
-    q: 'Müraciətimin vəziyyətini necə yoxlaya bilərəm?',
-    a: 'Müraciəti göndərdikdən dərhal sonra sizə AGRO-2026-XXXX formatında müraciət nömrəsi verilir. Şəxsi kabinetinizdəki "Müraciətlərim" bölməsində hər mərhələni və ekspert qeydlərini görə bilərsiniz.',
+    q: 'Təklifimin vəziyyətini necə yoxlaya bilərəm?',
+    a: 'Təklifi göndərdikdən dərhal sonra sizə AGRO-2026-XXXX formatında təklif nömrəsi verilir. Şəxsi kabinetinizdəki "Göndərdiyim təkliflər" bölməsində vəziyyəti görə bilərsiniz. Elan sahibi qalibi seçəndə bildiriş gələcək.',
   },
   {
     q: 'Torpaq ayrıldıqdan sonra dövlət dəstəyi varmı?',
@@ -42,7 +42,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: '"Mənə uyğun sahə" necə işləyir?',
-    a: 'Bir neçə suala cavab verirsiniz (rayon, büdcə, fəaliyyət növü, sahə ölçüsü). Sistem bunlara əsasən sizə ən yaxın torpaq sahələrini faizlə göstərir. Bu, köməkçi tövsiyədir və müsabiqədə qalibiyyətə zəmanət vermir.',
+    a: 'Bir neçə suala cavab verirsiniz (rayon, büdcə, fəaliyyət növü, sahə ölçüsü). Sistem bunlara əsasən sizə ən yaxın torpaq sahələrini faizlə göstərir. Bu, köməkçi tövsiyədir və təklifinizin seçiləcəyinə zəmanət vermir.',
   },
 ];
 
@@ -51,7 +51,7 @@ const selectClass =
 
 export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
   const [lands, setLands] = useState<AgriculturalLand[]>([]);
-  const [competitions, setCompetitions] = useState<Competition[]>([]);
+  const [opportunities, setOpportunities] = useState<InvestmentOpportunity[]>([]);
   const [searchRegion, setSearchRegion] = useState('all');
   const [searchSector, setSearchSector] = useState('all');
   const [searchMinArea, setSearchMinArea] = useState('');
@@ -64,9 +64,9 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
       .then(data => { if (Array.isArray(data)) setLands(data); })
       .catch(console.error);
 
-    fetch('/api/competitions')
+    fetch('/api/opportunities')
       .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setCompetitions(data); })
+      .then(data => { if (Array.isArray(data)) setOpportunities(data); })
       .catch(console.error);
   }, []);
 
@@ -76,7 +76,7 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
     return m;
   }, [lands]);
 
-  const activeCompetitions = competitions.filter(c => c.status === 'ACTIVE').length;
+  const activeCompetitions = opportunities.filter(c => c.status === 'ACTIVE').length;
   const totalInvestment = lands.reduce((sum, l) => sum + (l.estimatedInvestmentRequirement || 0), 0);
   const regionCount = new Set(lands.map(l => l.region)).size;
   const featured = lands.slice(0, 3);
@@ -108,7 +108,7 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
               Qarabağın torpağına sərmayə yatırın
             </h1>
             <p className="mt-5 text-lg leading-relaxed text-[#EEF3EF]">
-              Münbit torpaq sahələrini tapın, şərtləri asanlıqla müqayisə edin və müsabiqəyə bir yerdən, onlayn müraciət edin.
+              Münbit torpaq sahələrini tapın, şərtləri asanlıqla müqayisə edin və investisiya təklifinizi onlayn göndərin.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <button
@@ -116,7 +116,7 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
                 onClick={() => navigate('/opportunities')}
                 className="inline-flex items-center gap-3 min-h-14 px-7 rounded-2xl bg-gold-500 hover:bg-gold-400 text-ink font-display font-extrabold text-base transition-colors"
               >
-                Torpaq sahələrinə baxın
+                İnvestisiya imkanlarına baxın
                 <ArrowRight className="w-6 h-6" aria-hidden="true" />
               </button>
               <button
@@ -182,7 +182,7 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
           <div className="max-w-2xl">
             <p className="font-display font-bold text-sm tracking-[0.14em] uppercase text-gold-800 mb-2">Sadə addımlar</p>
             <h2 id="steps-title" className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900">
-              Müraciət 5 addımdan ibarətdir
+              Təklif göndərmək 5 addımdır
             </h2>
           </div>
         </div>
@@ -234,7 +234,7 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="flex flex-wrap items-end justify-between gap-4 mb-9">
             <div>
-              <p className="font-display font-bold text-sm tracking-[0.14em] uppercase text-gold-800 mb-2">Aktiv müsabiqələr</p>
+              <p className="font-display font-bold text-sm tracking-[0.14em] uppercase text-gold-800 mb-2">Açıq investisiya elanları</p>
               <h2 id="lands-title" className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900">
                 Seçilmiş torpaq sahələri
               </h2>
@@ -301,7 +301,7 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7">
           {[
             { value: String(lands.length || '—'), label: 'dərc olunmuş torpaq sahəsi' },
-            { value: String(activeCompetitions || '—'), label: 'aktiv investisiya müsabiqəsi' },
+            { value: String(activeCompetitions || '—'), label: 'açıq investisiya elanı' },
             { value: String(regionCount || '—'), label: 'Qarabağ rayonu əhatə olunur' },
             { value: totalInvestment ? `${(totalInvestment / 1_000_000).toFixed(1).replace('.', ',')} mln ₼` : '—', label: 'gözlənilən sərmayə həcmi' },
           ].map(s => (
@@ -374,7 +374,7 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
           <div className="bg-white border border-line rounded-3xl p-8 sm:p-10 flex flex-col gap-4">
             <h2 id="help-title" className="font-display font-extrabold text-2xl sm:text-3xl text-brand-900">Sualınız var? Biz kömək edirik</h2>
             <p className="text-lg text-[#3E4F45]">
-              AgroKöməkçi suallarınıza dərhal cavab verir: hansı sənədlər lazımdır, müraciət necə edilir, müraciətiniz hansı mərhələdədir.
+              AgroKöməkçi suallarınıza dərhal cavab verir: hansı sənədlər lazımdır, təklif necə göndərilir, torpağınızı necə yerləşdirmək olar.
             </p>
             <p className="flex items-center gap-3 font-bold text-brand-900 mt-2">
               <MessageCircle className="w-6 h-6" aria-hidden="true" />
@@ -383,7 +383,7 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
           </div>
           <div className="bg-gold-100 rounded-3xl p-8 sm:p-10 flex flex-col gap-3">
             <h2 className="font-display font-extrabold text-2xl sm:text-3xl text-brand-900">Zəng etməyi üstün tutursunuz?</h2>
-            <p className="text-lg text-[#3E3A2A]">Məsləhətçimiz sizə telefonla addım-addım kömək edəcək. Müraciəti birlikdə doldura bilərik.</p>
+            <p className="text-lg text-[#3E3A2A]">Məsləhətçimiz sizə telefonla addım-addım kömək edəcək. Təklif formasını birlikdə doldura bilərik.</p>
             <p className="flex items-center gap-3 font-display font-extrabold text-3xl text-brand-900 mt-2">
               <Phone className="w-8 h-8" aria-hidden="true" />
               {HELP_LINE}

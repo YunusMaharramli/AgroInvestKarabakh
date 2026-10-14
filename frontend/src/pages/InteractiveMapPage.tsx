@@ -208,7 +208,7 @@ export const InteractiveMapPage: React.FC<InteractiveMapPageProps> = ({ navigate
                 ref={mapContainerRef}
                 className="w-full h-[60vh] min-h-[22rem] z-0"
                 role="region"
-                aria-label="Torpaq sahələrinin xəritəsi"
+                aria-label="İnvestisiya imkanlarının xəritəsi"
               />
               {loadError && (
                 <div className="absolute inset-0 flex items-center justify-center bg-white/90 p-6 text-center text-lg">

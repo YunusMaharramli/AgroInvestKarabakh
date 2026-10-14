@@ -27,10 +27,11 @@ interface AgroAssistantProps {
 
 const STORAGE_KEY = 'agro_chat_v2';
 const TOPICS = [
-  { emoji: '📝', text: 'Necə müraciət edim?' },
+  { emoji: '📝', text: 'Necə təklif göndərim?' },
   { emoji: '📄', text: 'Hansı sənədlər lazımdır?' },
   { emoji: '🌾', text: 'Mənə uyğun sahə tapın' },
-  { emoji: '🔎', text: 'Müraciətimin vəziyyəti necədir?' },
+  { emoji: '🏡', text: 'Torpağımı necə yerləşdirim?' },
+  { emoji: '🔎', text: 'Təkliflərimin vəziyyəti necədir?' },
 ];
 
 const newId = () => Math.random().toString(36).slice(2);
@@ -292,7 +293,7 @@ export const AgroAssistant: React.FC<AgroAssistantProps> = ({ navigate, currentR
             {/* Welcome (always first) */}
             <div className="bg-white rounded-2xl rounded-tl-md border border-line px-4 py-3.5 text-[1.05rem] leading-relaxed max-w-[92%]">
               <p className="font-bold">{greeting} Mən AgroKöməkçiyəm.</p>
-              <p className="mt-1">Torpaq sahəsi seçməyə, müraciət etməyə və müraciətinizin vəziyyətini öyrənməyə kömək edirəm.</p>
+              <p className="mt-1">Sahə seçməyə, investisiya təklifi göndərməyə və torpağınızı yerləşdirməyə kömək edirəm.</p>
             </div>
 
             {messages.length === 0 && (

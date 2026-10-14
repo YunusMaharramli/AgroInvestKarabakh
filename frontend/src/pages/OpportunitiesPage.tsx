@@ -108,14 +108,14 @@ export const OpportunitiesPage: React.FC<OpportunitiesPageProps> = ({ navigate, 
         <nav aria-label="Səhifə yolu" className="text-[0.95rem] text-muted mb-3">
           <button type="button" onClick={() => navigate('/')} className="underline underline-offset-4 text-brand-900">Ana səhifə</button>
           <span aria-hidden="true"> › </span>
-          <span aria-current="page">Torpaq sahələri</span>
+          <span aria-current="page">İnvestisiya imkanları</span>
         </nav>
 
         <div className="flex flex-wrap items-end justify-between gap-4 mb-7">
           <div className="max-w-3xl">
-            <h1 className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900">Torpaq sahələri</h1>
+            <h1 className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900">İnvestisiya imkanları</h1>
             <p className="text-lg text-[#3E4F45] mt-2">
-              Qarabağda investisiya üçün təklif olunan kənd təsərrüfatı torpaqları. Rayon və fəaliyyət növünü seçin, sizə uyğun sahələri görün.
+              Torpaq sahiblərinin və dövlətin investor axtardığı kənd təsərrüfatı torpaqları. Rayon və fəaliyyət növünü seçin, sizə uyğun sahələri görün.
             </p>
           </div>
           <button
@@ -241,6 +241,11 @@ export const OpportunitiesPage: React.FC<OpportunitiesPageProps> = ({ navigate, 
                     <div className="flex flex-wrap gap-2">
                       <span className="bg-brand-50 text-brand-900 font-bold text-sm px-3 py-1 rounded-full">{land.region}</span>
                       <span className="bg-gold-100 text-gold-900 font-bold text-sm px-3 py-1 rounded-full">{land.agricultureType}</span>
+                      {land.hasActiveOpportunity ? (
+                        <span className="bg-brand-700 text-white font-bold text-sm px-3 py-1 rounded-full">Təklif qəbul edilir</span>
+                      ) : (
+                        <span className="bg-sand text-muted font-bold text-sm px-3 py-1 rounded-full">Hazırda açıq elan yoxdur</span>
+                      )}
                     </div>
                     <h2 className="font-display font-extrabold text-xl leading-snug text-brand-900">{land.title}</h2>
                     <p className="text-[0.98rem] text-[#3E4F45] line-clamp-3">{land.description}</p>

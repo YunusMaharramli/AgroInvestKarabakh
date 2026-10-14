@@ -1,13 +1,13 @@
-export type UserRole = 'ENTREPRENEUR' | 'ADMIN';
+/** Only two roles. A USER can list their own land and also invest in other people's land. */
+export type UserRole = 'USER' | 'ADMIN';
 
 export interface User {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
+  phone: string | null;
   role: UserRole;
-  passwordHash?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -22,7 +22,16 @@ export interface EntrepreneurProfile {
   updatedAt: string;
 }
 
-export type LandStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+/** Another person as shown to the listing owner (e.g. an investor). */
+export interface Person {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+/** Owner-submitted land is reviewed by an admin. Only APPROVED land has a public profile. */
+export type LandStatus = 'PENDING_REVIEW' | 'DOCUMENTS_REQUESTED' | 'APPROVED' | 'REJECTED';
 export type AgricultureType = 'Əkinçilik' | 'Heyvandarlıq' | 'Bağçılıq' | 'İstixana təsərrüfatı' | 'Arıçılıq';
 
 export interface AgriculturalLand {
@@ -38,72 +47,124 @@ export interface AgriculturalLand {
   estimatedInvestmentRequirement: number;
   imageUrl: string;
   status: LandStatus;
-  soilQuality?: string;
-  waterSupply?: string;
+  soilQuality?: string | null;
+  waterSupply?: string | null;
+  ownerId?: string | null;
+  isOwnerListing?: boolean;
+  /** True while the land has a published listing accepting proposals. */
+  hasActiveOpportunity?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export type CompetitionStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED' | 'ARCHIVED';
+/** DRAFT: land still under review. ACTIVE: published, accepting proposals. CLOSED: no new proposals. */
+export type OpportunityStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED';
+/** OWNER listings are managed by the land owner; ADMIN listings (older demo data) by administrators. */
+export type OpportunitySource = 'OWNER' | 'ADMIN';
 
-export interface Competition {
+export interface MyProposalSummary {
+  id: string;
+  referenceNumber: string;
+  status: ProposalStatus;
+}
+
+/** An investment opportunity (listing) for a piece of land. */
+export interface InvestmentOpportunity {
   id: string;
   landId: string;
   title: string;
   description: string;
   eligibilityConditions: string[];
   requiredDocuments: string[];
-  openingDate: string;
-  applicationDeadline: string;
-  status: CompetitionStatus;
+  openingDate: string | null;
+  applicationDeadline: string | null;
+  status: OpportunityStatus;
+  source: OpportunitySource;
+  acceptingProposals: boolean;
+  proposalDocumentsRequired: boolean;
+  proposalCount: number;
+  winnerProposalId: string | null;
+  closedAt: string | null;
+  /** Only filled for users who sent a proposal, the responsible party and admins. */
+  contactPhone: string | null;
+  isResponsibleParty: boolean;
+  myProposal: MyProposalSummary | null;
+  land?: AgriculturalLand | null;
   createdAt: string;
   updatedAt: string;
-  land?: AgriculturalLand;
 }
 
-export type ApplicationStatus = 'RECEIVED' | 'UNDER_REVIEW' | 'ADDITIONAL_INFORMATION_REQUIRED' | 'DECIDED';
-export type DecisionOutcome = 'NONE' | 'APPROVED' | 'REJECTED';
-
-export interface Application {
-  id: string;
-  referenceNumber: string; // e.g. AGRO-2026-0001
-  userId: string;
-  competitionId: string;
-  proposedInvestmentAmount: number;
-  businessPlanSummary: string;
-  estimatedImplementationPeriod: string; // e.g. "24 ay"
-  status: ApplicationStatus;
-  decisionOutcome: DecisionOutcome;
-  adminDecisionNote?: string;
-  submittedAt: string;
-  updatedAt: string;
-  user?: User;
-  competition?: Competition;
-  land?: AgriculturalLand;
-  documents?: ApplicationDocument[];
-  statusHistory?: ApplicationStatusHistory[];
-  infoRequests?: AdditionalInformationRequest[];
+export interface LandDetail {
+  land: AgriculturalLand;
+  opportunities: InvestmentOpportunity[];
+  activeOpportunity: InvestmentOpportunity | null;
 }
 
-export interface ApplicationStatusHistory {
+export interface LandDocument {
   id: string;
-  applicationId: string;
-  previousStatus: ApplicationStatus;
-  newStatus: ApplicationStatus;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  url: string;
+}
+
+/** A land as its owner sees it ("Torpaqlarım"). */
+export interface MyLand {
+  land: AgriculturalLand;
+  reviewNote: string | null;
+  ownerNote: string | null;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  documents: LandDocument[];
+  opportunity: InvestmentOpportunity | null;
+}
+
+/** A land submission in the admin review queue. */
+export interface LandReview extends MyLand {
+  owner: Person | null;
+  ownerPhone: string | null;
+}
+
+export type ProposalStatus = 'OPEN' | 'SELECTED' | 'NOT_SELECTED';
+
+export interface ProposalDocument {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedAt: string;
+  url: string;
+}
+
+export interface ProposalHistoryEntry {
+  id: string;
+  newStatus: string;
   changedBy: string;
   comment: string;
   createdAt: string;
 }
 
-export interface ApplicationDocument {
+/** An investor's proposal for an investment opportunity. */
+export interface Proposal {
   id: string;
-  applicationId: string;
-  fileName: string;
-  storageKey: string;
-  mimeType: string;
-  fileSize: number;
-  uploadedAt: string;
-  fileData?: string; // Base64 data for demonstration downloads
+  referenceNumber: string;
+  userId: string;
+  opportunityId: string;
+  proposedInvestmentAmount: number;
+  businessPlanSummary: string;
+  estimatedImplementationPeriod: string;
+  contactPhone: string;
+  status: ProposalStatus;
+  submittedAt: string;
+  updatedAt: string;
+  decidedAt: string | null;
+  user: Person | null;
+  opportunity: InvestmentOpportunity | null;
+  land: AgriculturalLand | null;
+  documents: ProposalDocument[];
+  statusHistory: ProposalHistoryEntry[];
+  canSelectWinner: boolean;
 }
 
 export interface Favorite {
@@ -121,17 +182,6 @@ export interface Notification {
   message: string;
   isRead: boolean;
   createdAt: string;
-}
-
-export interface AdditionalInformationRequest {
-  id: string;
-  applicationId: string;
-  requestedBy: string;
-  message: string;
-  response?: string;
-  status: 'PENDING' | 'ANSWERED';
-  createdAt: string;
-  respondedAt?: string;
 }
 
 export interface IntegrationLog {
@@ -153,7 +203,7 @@ export interface RecommendationRequest {
 
 export interface RecommendationResult {
   land: AgriculturalLand;
-  competition?: Competition;
+  opportunity: InvestmentOpportunity;
   matchScore: number;
   matchBreakdown: {
     locationScore: number;
@@ -170,12 +220,11 @@ export interface AnalyticsSummary {
   totalApplications: number;
   activeCompetitions: number;
   publishedLands: number;
-  underReviewApplications: number;
-  decidedApplications: number;
-  approvedApplications: number;
-  rejectedApplications: number;
+  pendingLandReviews: number;
+  openProposals: number;
+  selectedProposals: number;
+  notSelectedProposals: number;
   totalProposedInvestment: number;
-  averageProcessingDays: number;
   applicationsByRegion: { region: string; count: number; investment: number }[];
   applicationsBySector: { sector: string; count: number }[];
   applicationsByStatus: { status: string; label: string; count: number }[];

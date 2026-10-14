@@ -46,7 +46,7 @@ export const ComparePage: React.FC<ComparePageProps> = ({ navigate }) => {
     <nav aria-label="Səhifə yolu" className="text-[0.95rem] text-muted mb-3">
       <button type="button" onClick={() => navigate('/')} className="underline underline-offset-4 text-brand-900">Ana səhifə</button>
       <span aria-hidden="true"> › </span>
-      <button type="button" onClick={() => navigate('/opportunities')} className="underline underline-offset-4 text-brand-900">Torpaq sahələri</button>
+      <button type="button" onClick={() => navigate('/opportunities')} className="underline underline-offset-4 text-brand-900">İnvestisiya imkanları</button>
       <span aria-hidden="true"> › </span>
       <span aria-current="page">Müqayisə</span>
     </nav>
@@ -70,7 +70,7 @@ export const ComparePage: React.FC<ComparePageProps> = ({ navigate }) => {
               onClick={() => navigate('/opportunities')}
               className="mt-7 min-h-14 px-8 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-bold text-lg inline-flex items-center gap-2"
             >
-              Torpaq sahələrinə baxın
+              İnvestisiya imkanlarına baxın
               <ArrowRight className="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
@@ -155,7 +155,7 @@ export const ComparePage: React.FC<ComparePageProps> = ({ navigate }) => {
                       onClick={() => navigate(`/opportunities/${land.id}`)}
                       className="w-full min-h-14 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-bold flex items-center justify-center gap-2"
                     >
-                      Ətraflı və müraciət
+                      Ətraflı baxın
                       <ArrowRight className="w-5 h-5" aria-hidden="true" />
                     </button>
                   </td>
@@ -187,7 +187,7 @@ export const ComparePage: React.FC<ComparePageProps> = ({ navigate }) => {
                     onClick={() => navigate(`/opportunities/${land.id}`)}
                     className="min-h-14 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-bold flex items-center justify-center gap-2"
                   >
-                    Ətraflı və müraciət
+                    Ətraflı baxın
                     <ArrowRight className="w-5 h-5" aria-hidden="true" />
                   </button>
                   <button

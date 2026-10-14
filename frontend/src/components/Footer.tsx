@@ -6,7 +6,7 @@ interface FooterProps {
 }
 
 const LINKS: { route: string; label: string }[] = [
-  { route: '/opportunities', label: 'Torpaq sahələri' },
+  { route: '/opportunities', label: 'İnvestisiya imkanları' },
   { route: '/map', label: 'Xəritə' },
   { route: '/agromatch', label: 'Mənə uyğun sahə' },
   { route: '/login', label: 'Kabinetə daxil ol' },
@@ -20,7 +20,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
           <div className="space-y-4">
             <img src="/brand/logo-horizontal-white.svg" alt="AgroInvest Qarabağ" className="h-14 w-auto" />
             <p className="text-[0.95rem] leading-relaxed">
-              Qarabağ regionunda kənd təsərrüfatı torpaqları və investisiya müsabiqələri üçün vahid rəqəmsal platforma.
+              Qarabağ regionunda torpaq sahiblərini və investorları birləşdirən vahid rəqəmsal platforma.
             </p>
           </div>
 

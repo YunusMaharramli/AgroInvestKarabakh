@@ -1,23 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-  <ItemGroup>
-    <ProjectReference Include="..\Modules\Identity\QarabagInvestmentPortal.Modules.Identity\QarabagInvestmentPortal.Modules.Identity.csproj" />
-    <ProjectReference Include="..\Modules\Applicants\QarabagInvestmentPortal.Modules.Applicants\QarabagInvestmentPortal.Modules.Applicants.csproj" />
-    <ProjectReference Include="..\Modules\Lands\QarabagInvestmentPortal.Modules.Lands\QarabagInvestmentPortal.Modules.Lands.csproj" />
-    <ProjectReference Include="..\Modules\Competitions\QarabagInvestmentPortal.Modules.Competitions\QarabagInvestmentPortal.Modules.Competitions.csproj" />
-    <ProjectReference Include="..\Modules\Applications\QarabagInvestmentPortal.Modules.Applications\QarabagInvestmentPortal.Modules.Applications.csproj" />
-    <ProjectReference Include="..\Modules\Documents\QarabagInvestmentPortal.Modules.Documents\QarabagInvestmentPortal.Modules.Documents.csproj" />
-    <ProjectReference Include="..\Modules\Notifications\QarabagInvestmentPortal.Modules.Notifications\QarabagInvestmentPortal.Modules.Notifications.csproj" />
-    <ProjectReference Include="..\Modules\Audit\QarabagInvestmentPortal.Modules.Audit\QarabagInvestmentPortal.Modules.Audit.csproj" />
-    <ProjectReference Include="..\Modules\Integrations\QarabagInvestmentPortal.Modules.Integrations\QarabagInvestmentPortal.Modules.Integrations.csproj" />
-    <ProjectReference Include="..\Modules\Recommendations\QarabagInvestmentPortal.Modules.Recommendations\QarabagInvestmentPortal.Modules.Recommendations.csproj" />
-    <ProjectReference Include="..\BuildingBlocks\QarabagInvestmentPortal.BuildingBlocks\QarabagInvestmentPortal.BuildingBlocks.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
-  </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>QarabagInvestmentPortal.Api</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="QarabagInvestmentPortal.UnitTests" />
+    <InternalsVisibleTo Include="QarabagInvestmentPortal.IntegrationTests" />
+    <InternalsVisibleTo Include="QarabagInvestmentPortal.ArchitectureTests" />
+  </ItemGroup>
 </Project>

@@ -157,8 +157,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
               {mode === 'login' ? 'Xoş gəlmisiniz!' : 'Qeydiyyat pulsuzdur və bir neçə dəqiqə çəkir'}
             </h2>
             <ul className="flex flex-col gap-3 text-lg text-[#DCE8E0]">
-              <li>✓ Torpaq sahələrinə müraciət edin</li>
-              <li>✓ Müraciətinizin vəziyyətini izləyin</li>
+              <li>✓ İnvestisiya elanlarına təklif göndərin</li>
+              <li>✓ Öz torpağınız üçün investor tapın</li>
               <li>✓ Bəyəndiyiniz sahələri yadda saxlayın</li>
             </ul>
             <div className="mt-2 p-5 rounded-2xl bg-white/10">
@@ -180,8 +180,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
             {next
               ? 'Davam etmək üçün əvvəlcə daxil olun. Sonra sizi qaldığınız yerə qaytaracağıq.'
               : mode === 'login'
-                ? 'Müraciətlərinizi görmək və yeni müraciət etmək üçün daxil olun.'
-                : 'Müsabiqələrə müraciət etmək üçün hesab yaradın.'}
+                ? 'Təkliflərinizi və torpaqlarınızı görmək üçün daxil olun.'
+                : 'Təklif göndərmək və ya torpağınızı yerləşdirmək üçün hesab yaradın.'}
           </p>
 
           {/* Two big tabs */}

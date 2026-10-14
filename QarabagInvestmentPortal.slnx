@@ -2,40 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/QarabagInvestmentPortal.Api/QarabagInvestmentPortal.Api.csproj" />
   </Folder>
-  <Folder Name="/src/BuildingBlocks/">
-    <Project Path="src/BuildingBlocks/QarabagInvestmentPortal.BuildingBlocks/QarabagInvestmentPortal.BuildingBlocks.csproj" />
-  </Folder>
-  <Folder Name="/src/Modules/" />
-  <Folder Name="/src/Modules/Applicants/">
-    <Project Path="src/Modules/Applicants/QarabagInvestmentPortal.Modules.Applicants/QarabagInvestmentPortal.Modules.Applicants.csproj" />
-  </Folder>
-  <Folder Name="/src/Modules/Applications/">
-    <Project Path="src/Modules/Applications/QarabagInvestmentPortal.Modules.Applications/QarabagInvestmentPortal.Modules.Applications.csproj" />
-  </Folder>
-  <Folder Name="/src/Modules/Audit/">
-    <Project Path="src/Modules/Audit/QarabagInvestmentPortal.Modules.Audit/QarabagInvestmentPortal.Modules.Audit.csproj" />
-  </Folder>
-  <Folder Name="/src/Modules/Competitions/">
-    <Project Path="src/Modules/Competitions/QarabagInvestmentPortal.Modules.Competitions/QarabagInvestmentPortal.Modules.Competitions.csproj" />
-  </Folder>
-  <Folder Name="/src/Modules/Documents/">
-    <Project Path="src/Modules/Documents/QarabagInvestmentPortal.Modules.Documents/QarabagInvestmentPortal.Modules.Documents.csproj" />
-  </Folder>
-  <Folder Name="/src/Modules/Identity/">
-    <Project Path="src/Modules/Identity/QarabagInvestmentPortal.Modules.Identity/QarabagInvestmentPortal.Modules.Identity.csproj" />
-  </Folder>
-  <Folder Name="/src/Modules/Integrations/">
-    <Project Path="src/Modules/Integrations/QarabagInvestmentPortal.Modules.Integrations/QarabagInvestmentPortal.Modules.Integrations.csproj" />
-  </Folder>
-  <Folder Name="/src/Modules/Lands/">
-    <Project Path="src/Modules/Lands/QarabagInvestmentPortal.Modules.Lands/QarabagInvestmentPortal.Modules.Lands.csproj" />
-  </Folder>
-  <Folder Name="/src/Modules/Notifications/">
-    <Project Path="src/Modules/Notifications/QarabagInvestmentPortal.Modules.Notifications/QarabagInvestmentPortal.Modules.Notifications.csproj" />
-  </Folder>
-  <Folder Name="/src/Modules/Recommendations/">
-    <Project Path="src/Modules/Recommendations/QarabagInvestmentPortal.Modules.Recommendations/QarabagInvestmentPortal.Modules.Recommendations.csproj" />
-  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/QarabagInvestmentPortal.ArchitectureTests/QarabagInvestmentPortal.ArchitectureTests.csproj" />
     <Project Path="tests/QarabagInvestmentPortal.IntegrationTests/QarabagInvestmentPortal.IntegrationTests.csproj" />

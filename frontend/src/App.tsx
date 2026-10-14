@@ -21,6 +21,7 @@ import { AuthPage } from './pages/AuthPage.js';
 import { EntrepreneurDashboardPage } from './pages/EntrepreneurDashboardPage.js';
 import { AdminDashboardPage } from './pages/AdminDashboardPage.js';
 import { ApplicationWizardPage } from './pages/ApplicationWizardPage.js';
+import { LandSubmitPage } from './pages/LandSubmitPage.js';
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname || '/');
@@ -86,9 +87,15 @@ export default function App() {
       return <AdminDashboardPage navigate={navigate} />;
     }
 
-    if (currentPath.startsWith('/applications/new/')) {
-      const compId = currentPath.replace('/applications/new/', '');
-      return <ApplicationWizardPage competitionId={compId} navigate={navigate} />;
+    // Investor proposal form ("/applications/new/" kept so old links still work)
+    if (currentPath.startsWith('/proposals/new/') || currentPath.startsWith('/applications/new/')) {
+      const oppId = currentPath.replace('/proposals/new/', '').replace('/applications/new/', '');
+      return <ApplicationWizardPage opportunityId={oppId} navigate={navigate} />;
+    }
+
+    // Owner: submit land for review
+    if (currentPath === '/lands/new') {
+      return <LandSubmitPage navigate={navigate} />;
     }
 
     // Default fallback to HomePage

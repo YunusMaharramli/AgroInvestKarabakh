@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { AgriculturalLand, Competition } from '../types/index.js';
+import { LandDetail, InvestmentOpportunity } from '../types/index.js';
+import { statusInfo } from '../lib/applicationStatus.js';
 import { useAuth } from '../context/AuthContext.js';
 import { useFavorites } from '../context/FavoritesContext.js';
 import { useComparison } from '../context/ComparisonContext.js';
@@ -24,21 +25,26 @@ const secondaryBtn =
   'min-h-[3.25rem] px-3 rounded-xl border-2 border-brand-900 bg-white text-brand-900 font-display font-bold text-sm flex items-center justify-center gap-2 hover:bg-brand-50 transition-colors';
 
 export const OpportunityDetailPage: React.FC<OpportunityDetailPageProps> = ({ id, navigate }) => {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { addToCompare, isInCompare, removeFromCompare } = useComparison();
-  const [land, setLand] = useState<(AgriculturalLand & { activeCompetition?: Competition; competitions?: Competition[] }) | null>(null);
+  const [detail, setDetail] = useState<LandDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [shared, setShared] = useState(false);
 
+  // Reload when the login changes: the contact number and "my proposal" depend on who is looking.
   useEffect(() => {
+    if (authLoading) return;
     setLoading(true);
-    fetch(`/api/lands/${id}`)
+    const token = localStorage.getItem('agro_token');
+    fetch(`/api/lands/${id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then(res => (res.ok ? res.json() : null))
-      .then(data => setLand(data))
+      .then(data => setDetail(data))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, user?.id, authLoading]);
+
+  const land = detail?.land ?? null;
 
   if (loading) {
     return (
@@ -63,13 +69,15 @@ export const OpportunityDetailPage: React.FC<OpportunityDetailPageProps> = ({ id
           onClick={() => navigate('/opportunities')}
           className="mt-8 min-h-14 px-7 rounded-xl bg-brand-700 text-white font-display font-bold"
         >
-          Bütün torpaq sahələrinə qayıt
+          Bütün investisiya imkanlarına qayıt
         </button>
       </div>
     );
   }
 
-  const activeComp = land.activeCompetition;
+  const activeComp: InvestmentOpportunity | null = detail?.activeOpportunity ?? null;
+  // The listing to talk about: the open one, otherwise the most recent one (e.g. closed with a winner).
+  const current: InvestmentOpportunity | null = activeComp ?? detail?.opportunities?.find(o => o.status !== 'DRAFT') ?? null;
   const inComp = isInCompare(land.id);
   const fav = isFavorite(land.id);
 
@@ -84,8 +92,8 @@ export const OpportunityDetailPage: React.FC<OpportunityDetailPageProps> = ({ id
 
   const handleApply = () => {
     if (!activeComp) return;
-    if (!user) navigate(`/login?next=${encodeURIComponent(`/applications/new/${activeComp.id}`)}`);
-    else navigate(`/applications/new/${activeComp.id}`);
+    if (!user) navigate(`/login?next=${encodeURIComponent(`/proposals/new/${activeComp.id}`)}`);
+    else navigate(`/proposals/new/${activeComp.id}`);
   };
 
   const handleShare = async () => {
@@ -112,7 +120,7 @@ export const OpportunityDetailPage: React.FC<OpportunityDetailPageProps> = ({ id
           <nav aria-label="Səhifə yolu" className="text-[0.95rem] text-muted">
             <button type="button" onClick={() => navigate('/')} className="underline underline-offset-4 text-brand-900">Ana səhifə</button>
             <span aria-hidden="true"> › </span>
-            <button type="button" onClick={() => navigate('/opportunities')} className="underline underline-offset-4 text-brand-900">Torpaq sahələri</button>
+            <button type="button" onClick={() => navigate('/opportunities')} className="underline underline-offset-4 text-brand-900">İnvestisiya imkanları</button>
             <span aria-hidden="true"> › </span>
             <span aria-current="page">{land.title}</span>
           </nav>
@@ -122,7 +130,7 @@ export const OpportunityDetailPage: React.FC<OpportunityDetailPageProps> = ({ id
           <span className="bg-brand-50 text-brand-900 font-bold text-sm px-4 py-1.5 rounded-full">{land.region} rayonu</span>
           <span className="bg-gold-100 text-gold-900 font-bold text-sm px-4 py-1.5 rounded-full">{land.agricultureType}</span>
           {activeComp && (
-            <span className="bg-brand-700 text-white font-bold text-sm px-4 py-1.5 rounded-full">Müraciət qəbul edilir</span>
+            <span className="bg-brand-700 text-white font-bold text-sm px-4 py-1.5 rounded-full">Təklif qəbul edilir</span>
           )}
         </div>
         <h1 className="font-display font-extrabold text-3xl sm:text-[2.6rem] leading-[1.15] text-brand-900 max-w-4xl">
@@ -177,7 +185,7 @@ export const OpportunityDetailPage: React.FC<OpportunityDetailPageProps> = ({ id
 
           {activeComp && activeComp.eligibilityConditions?.length > 0 && (
             <section aria-labelledby="cond-title" className="flex flex-col gap-4">
-              <h2 id="cond-title" className="font-display font-extrabold text-2xl text-brand-900">Kimlər müraciət edə bilər?</h2>
+              <h2 id="cond-title" className="font-display font-extrabold text-2xl text-brand-900">Kimlər təklif göndərə bilər?</h2>
               <ul className="flex flex-col gap-3">
                 {activeComp.eligibilityConditions.map((c, i) => (
                   <li key={i} className="flex gap-3 items-start bg-white border border-line rounded-2xl p-4">
@@ -213,41 +221,14 @@ export const OpportunityDetailPage: React.FC<OpportunityDetailPageProps> = ({ id
             </p>
           </div>
 
-          {activeComp ? (
-            <>
-              <div className="bg-gold-100 rounded-2xl p-4 flex gap-3 items-start">
-                <Clock className="w-6 h-6 text-gold-900 shrink-0 mt-0.5" aria-hidden="true" />
-                <div>
-                  <p id="apply-title" className="font-bold text-[#3E3A2A]">Müraciət üçün son tarix</p>
-                  <p className="text-[#3E3A2A]">
-                    {formatDateAz(activeComp.applicationDeadline)}
-                    {' · '}<strong>{daysLeft(activeComp.applicationDeadline)} gün qalıb</strong>
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleApply}
-                className="min-h-16 rounded-2xl bg-brand-700 hover:bg-brand-800 text-white font-display font-extrabold text-xl flex items-center justify-center gap-3 transition-colors"
-              >
-                Müraciət edin
-                <ArrowRight className="w-6 h-6" aria-hidden="true" />
-              </button>
-              <p className="-mt-2 text-sm text-muted text-center">
-                {user ? 'Təxminən 15 dəqiqə çəkir.' : 'Müraciət üçün əvvəlcə kabinetə daxil olmalısınız.'}
-              </p>
-            </>
-          ) : (
-            <div className="bg-gold-100 rounded-2xl p-5 flex gap-3 items-start">
-              <AlertCircle className="w-6 h-6 text-gold-900 shrink-0 mt-0.5" aria-hidden="true" />
-              <div>
-                <p id="apply-title" className="font-bold text-[#3E3A2A]">Hazırda aktiv müsabiqə yoxdur</p>
-                <p className="text-[#3E3A2A] text-[0.95rem] mt-1">
-                  Yeni müsabiqə elan edildikdə müraciət qəbulu açılacaq. Sahəni yadda saxlayın ki, unutmayasınız.
-                </p>
-              </div>
-            </div>
-          )}
+          <ListingPanel
+            current={current}
+            active={activeComp}
+            loggedIn={Boolean(user)}
+            isAdmin={user?.role === 'ADMIN'}
+            onApply={handleApply}
+            navigate={navigate}
+          />
 
           <div className="grid grid-cols-2 gap-2.5">
             <button type="button" onClick={() => toggleFavorite(land.id)} aria-pressed={fav} className={secondaryBtn}>
@@ -277,7 +258,7 @@ export const OpportunityDetailPage: React.FC<OpportunityDetailPageProps> = ({ id
             <p className="font-bold">Sualınız var?</p>
             <button
               type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('agro:ask', { detail: `“${land.title}” sahəsi haqqında qısa məlumat verin: kimə uyğundur və necə müraciət edim?` }))}
+              onClick={() => window.dispatchEvent(new CustomEvent('agro:ask', { detail: `“${land.title}” sahəsi haqqında qısa məlumat verin: kimə uyğundur və necə təklif göndərim?` }))}
               className="my-2 min-h-14 px-4 rounded-xl bg-gold-500 hover:bg-gold-400 text-ink font-display font-bold flex items-center justify-center gap-2"
             >
               <MessageCircle className="w-5 h-5" aria-hidden="true" />
@@ -295,7 +276,7 @@ export const OpportunityDetailPage: React.FC<OpportunityDetailPageProps> = ({ id
       {activeComp && activeComp.requiredDocuments?.length > 0 && (
         <section aria-labelledby="docs-title" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
           <h2 id="docs-title" className="font-display font-extrabold text-2xl sm:text-3xl text-brand-900 mb-5">
-            Müraciət üçün lazım olan sənədlər
+            Təklif üçün lazım olan sənədlər
           </h2>
           <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeComp.requiredDocuments.map((doc, i) => (
@@ -307,6 +288,126 @@ export const OpportunityDetailPage: React.FC<OpportunityDetailPageProps> = ({ id
           </ul>
         </section>
       )}
+    </div>
+  );
+};
+
+/** Right-hand panel: what the viewer can do with this listing right now. */
+const ListingPanel: React.FC<{
+  current: InvestmentOpportunity | null;
+  active: InvestmentOpportunity | null;
+  loggedIn: boolean;
+  isAdmin: boolean;
+  onApply: () => void;
+  navigate: (route: string) => void;
+}> = ({ current, active, loggedIn, isAdmin, onApply, navigate }) => {
+  const contact = current?.contactPhone ? (
+    <div className="bg-brand-50 rounded-2xl p-4">
+      <p className="font-bold text-brand-900">Elan sahibinin əlaqə nömrəsi</p>
+      <p className="font-display font-extrabold text-2xl text-brand-900 mt-1">{current.contactPhone}</p>
+      <p className="text-sm text-[#3E4F45] mt-1">Bu nömrəni yalnız təklif göndərənlər görür.</p>
+    </div>
+  ) : null;
+
+  // The owner (or an admin for older admin listings) looking at their own listing.
+  if (current?.isResponsibleParty) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="bg-brand-50 rounded-2xl p-5">
+          <p id="apply-title" className="font-bold text-brand-900 text-lg">
+            {current.source === 'OWNER' ? 'Bu sizin elanınızdır' : 'Bu elanı inzibatçılar idarə edir'}
+          </p>
+          <p className="text-[#3E4F45] mt-1">
+            {current.status === 'ACTIVE'
+              ? `Gələn təkliflər: ${current.proposalCount}. Qalibi kabinetinizdən seçə bilərsiniz.`
+              : current.winnerProposalId ? 'Qalib seçilib, elan bağlanıb.' : 'Elan bağlıdır.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate(current.source === 'OWNER' ? '/dashboard?tab=received' : '/admin?tab=proposals')}
+          className="min-h-14 rounded-2xl bg-brand-700 hover:bg-brand-800 text-white font-display font-bold text-lg flex items-center justify-center gap-2"
+        >
+          Gələn təkliflərə baxın
+          <ArrowRight className="w-5 h-5" aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+
+  // The viewer already sent a proposal.
+  if (current?.myProposal) {
+    const info = statusInfo(current.myProposal);
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="bg-gold-100 rounded-2xl p-5">
+          <p id="apply-title" className="font-bold text-[#3E3A2A]">Təklifiniz göndərilib</p>
+          <p className="text-[#3E3A2A] mt-1">№ <strong>{current.myProposal.referenceNumber}</strong></p>
+          <span className={`inline-block mt-2 font-display font-extrabold text-sm px-3 py-1.5 rounded-full ${info.badge}`}>{info.label}</span>
+        </div>
+        {contact}
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard?tab=sent')}
+          className="min-h-14 rounded-2xl border-2 border-brand-900 text-brand-900 font-display font-bold flex items-center justify-center gap-2 hover:bg-brand-50"
+        >
+          Təkliflərimə baxın
+        </button>
+      </div>
+    );
+  }
+
+  if (active?.acceptingProposals) {
+    return (
+      <div className="flex flex-col gap-4">
+        {active.applicationDeadline && (
+          <div className="bg-gold-100 rounded-2xl p-4 flex gap-3 items-start">
+            <Clock className="w-6 h-6 text-gold-900 shrink-0 mt-0.5" aria-hidden="true" />
+            <div>
+              <p id="apply-title" className="font-bold text-[#3E3A2A]">Təklif üçün son tarix</p>
+              <p className="text-[#3E3A2A]">
+                {formatDateAz(active.applicationDeadline)}
+                {' · '}<strong>{daysLeft(active.applicationDeadline)} gün qalıb</strong>
+              </p>
+            </div>
+          </div>
+        )}
+        {isAdmin ? (
+          <p className="bg-sand rounded-2xl p-4 text-[#3E4F45]">İnzibatçı hesabı ilə investisiya təklifi göndərilmir.</p>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onApply}
+              className="min-h-16 rounded-2xl bg-brand-700 hover:bg-brand-800 text-white font-display font-extrabold text-xl flex items-center justify-center gap-3 transition-colors"
+            >
+              Təklif göndərin
+              <ArrowRight className="w-6 h-6" aria-hidden="true" />
+            </button>
+            <p className="-mt-2 text-sm text-muted text-center">
+              {loggedIn
+                ? 'Təklif göndərəndən sonra elan sahibinin telefon nömrəsini görəcəksiniz.'
+                : 'Təklif üçün əvvəlcə kabinetə daxil olmalısınız.'}
+            </p>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gold-100 rounded-2xl p-5 flex gap-3 items-start">
+      <AlertCircle className="w-6 h-6 text-gold-900 shrink-0 mt-0.5" aria-hidden="true" />
+      <div>
+        <p id="apply-title" className="font-bold text-[#3E3A2A]">
+          {current?.winnerProposalId ? 'Bu elan üzrə investor seçilib' : active ? 'Təklif qəbulu başa çatıb' : 'Hazırda açıq investisiya elanı yoxdur'}
+        </p>
+        <p className="text-[#3E3A2A] text-[0.95rem] mt-1">
+          {current?.winnerProposalId
+            ? 'Yeni təklif qəbul edilmir. Başqa sahələrə baxa bilərsiniz.'
+            : 'Yeni elan dərc ediləndə təklif qəbulu açılacaq. Sahəni yadda saxlayın ki, unutmayasınız.'}
+        </p>
+      </div>
     </div>
   );
 };

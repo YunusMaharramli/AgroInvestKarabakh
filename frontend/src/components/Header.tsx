@@ -29,7 +29,7 @@ function readTextSize(): TextSize {
 
 const NAV_ITEMS: { route: string; label: string; match: (r: string) => boolean }[] = [
   { route: '/', label: 'Ana səhifə', match: r => r === '/' },
-  { route: '/opportunities', label: 'Torpaq sahələri', match: r => r.startsWith('/opportunities') },
+  { route: '/opportunities', label: 'İnvestisiya imkanları', match: r => r.startsWith('/opportunities') },
   { route: '/map', label: 'Xəritə', match: r => r === '/map' },
   { route: '/agromatch', label: 'Mənə uyğun sahə', match: r => r === '/agromatch' },
 ];

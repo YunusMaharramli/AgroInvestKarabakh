@@ -275,7 +275,7 @@ export const AgroMatchPage: React.FC<AgroMatchPageProps> = ({ navigate }) => {
                           onClick={() => navigate(`/opportunities/${res.land.id}`)}
                           className="min-h-14 px-6 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-bold flex items-center justify-center gap-2 sm:self-start"
                         >
-                          Ətraflı baxın və müraciət edin
+                          Ətraflı baxın və təklif göndərin
                           <ArrowRight className="w-5 h-5" aria-hidden="true" />
                         </button>
                       </div>
@@ -286,7 +286,7 @@ export const AgroMatchPage: React.FC<AgroMatchPageProps> = ({ navigate }) => {
             </ol>
 
             <div className="p-5 bg-sand rounded-2xl text-base text-[#3E4F45]">
-              <strong className="text-ink">Qeyd:</strong> Uyğunluq faizi yalnız sizin cavablarınıza əsaslanır. Bu, müsabiqədə qalib gələcəyinizə zəmanət deyil.
+              <strong className="text-ink">Qeyd:</strong> Uyğunluq faizi yalnız sizin cavablarınıza əsaslanır. Bu, təklifinizin seçiləcəyinə zəmanət deyil.
               Sualınız varsa, zəng edin: <strong className="text-ink whitespace-nowrap"><Phone className="inline w-4 h-4" aria-hidden="true" /> {HELP_LINE}</strong>
             </div>
           </div>

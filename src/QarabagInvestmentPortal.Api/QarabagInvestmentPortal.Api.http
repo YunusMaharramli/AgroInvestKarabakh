@@ -1,0 +1,6 @@
+@QarabagInvestmentPortal.Api_HostAddress = http://localhost:5044
+
+GET {{QarabagInvestmentPortal.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -2,22 +2,52 @@ import React, { useState, useEffect } from 'react';
 import { AgriculturalLand } from '../types/index.js';
 import { useFavorites } from '../context/FavoritesContext.js';
 import { useComparison } from '../context/ComparisonContext.js';
-import { Search, Filter, Layers, ArrowUpDown, Check, RefreshCw } from 'lucide-react';
+import { Search, Layers, RotateCcw, Heart, Check, Map as MapIcon, ArrowRight } from 'lucide-react';
+import { landImage, formatManat } from '../lib/landImages.js';
 
 interface OpportunitiesPageProps {
   navigate: (route: string) => void;
   initialQuery?: string;
 }
 
+const REGIONS = ['Ağdam', 'Füzuli', 'Zəngilan', 'Cəbrayıl', 'Qubadlı', 'Xocavənd', 'Kəlbəcər', 'Laçın'];
+const TYPES: { value: string; label: string }[] = [
+  { value: 'Əkinçilik', label: 'Əkinçilik' },
+  { value: 'Bağçılıq', label: 'Bağçılıq' },
+  { value: 'İstixana təsərrüfatı', label: 'İstixana' },
+  { value: 'Heyvandarlıq', label: 'Heyvandarlıq' },
+  { value: 'Arıçılıq', label: 'Arıçılıq' },
+];
+
+/** Area choices in plain words instead of two number boxes. */
+const AREAS: { value: string; label: string; min: string; max: string }[] = [
+  { value: 'any', label: 'İstənilən ölçü', min: '', max: '' },
+  { value: 'small', label: '50 hektara qədər', min: '', max: '50' },
+  { value: 'medium', label: '50 – 200 hektar', min: '50', max: '200' },
+  { value: 'large', label: '200 hektardan çox', min: '200', max: '' },
+];
+
+function areaFromMin(min: string | null): string {
+  const n = Number(min);
+  if (!min || Number.isNaN(n)) return 'any';
+  if (n >= 200) return 'large';
+  return 'medium';
+}
+
+type SortKey = 'default' | 'area-desc' | 'investment-asc' | 'investment-desc';
+
+const fieldClass =
+  'w-full min-h-[3.25rem] px-4 rounded-xl border-2 border-[#9AA89E] bg-white text-ink text-base focus:border-brand-700';
+
 export const OpportunitiesPage: React.FC<OpportunitiesPageProps> = ({ navigate, initialQuery }) => {
+  const initial = new URLSearchParams(initialQuery || '');
   const [lands, setLands] = useState<AgriculturalLand[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [region, setRegion] = useState('all');
-  const [agricultureType, setAgricultureType] = useState('all');
-  const [minArea, setMinArea] = useState('');
-  const [maxArea, setMaxArea] = useState('');
-  const [sortBy, setSortBy] = useState<'default' | 'area-desc' | 'investment-asc' | 'investment-desc'>('default');
+  const [search, setSearch] = useState(initial.get('search') || '');
+  const [region, setRegion] = useState(initial.get('region') || 'all');
+  const [agricultureType, setAgricultureType] = useState(initial.get('sector') || 'all');
+  const [area, setArea] = useState(areaFromMin(initial.get('minArea')));
+  const [sortBy, setSortBy] = useState<SortKey>('default');
 
   const { isFavorite, toggleFavorite } = useFavorites();
   const { addToCompare, removeFromCompare, isInCompare, compareLands } = useComparison();
@@ -26,16 +56,17 @@ export const OpportunitiesPage: React.FC<OpportunitiesPageProps> = ({ navigate, 
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      const a = AREAS.find(x => x.value === area) ?? AREAS[0];
       if (region !== 'all') params.set('region', region);
       if (agricultureType !== 'all') params.set('agricultureType', agricultureType);
-      if (minArea) params.set('minArea', minArea);
-      if (maxArea) params.set('maxArea', maxArea);
+      if (a.min) params.set('minArea', a.min);
+      if (a.max) params.set('maxArea', a.max);
       if (search.trim()) params.set('search', search.trim());
 
       const res = await fetch(`/api/lands?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        setLands(data);
+        setLands(Array.isArray(data) ? data : []);
       }
     } catch (e) {
       console.error('Failed to load lands:', e);
@@ -44,19 +75,10 @@ export const OpportunitiesPage: React.FC<OpportunitiesPageProps> = ({ navigate, 
     }
   };
 
-  useEffect(() => {
-    // Parse query params if available from URL or props
-    if (initialQuery) {
-      const q = new URLSearchParams(initialQuery);
-      if (q.get('region')) setRegion(q.get('region')!);
-      if (q.get('sector')) setAgricultureType(q.get('sector')!);
-      if (q.get('minArea')) setMinArea(q.get('minArea')!);
-    }
-  }, [initialQuery]);
-
+  // Dropdowns apply immediately; the text search applies on "Axtar"
   useEffect(() => {
     fetchLands();
-  }, [region, agricultureType, sortBy]);
+  }, [region, agricultureType, area]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,12 +89,12 @@ export const OpportunitiesPage: React.FC<OpportunitiesPageProps> = ({ navigate, 
     setSearch('');
     setRegion('all');
     setAgricultureType('all');
-    setMinArea('');
-    setMaxArea('');
+    setArea('any');
     setSortBy('default');
   };
 
-  // Sort lands client-side for immediate responsiveness
+  const filtersActive = search !== '' || region !== 'all' || agricultureType !== 'all' || area !== 'any';
+
   const sortedLands = [...lands].sort((a, b) => {
     if (sortBy === 'area-desc') return b.areaHectares - a.areaHectares;
     if (sortBy === 'investment-asc') return a.estimatedInvestmentRequirement - b.estimatedInvestmentRequirement;
@@ -81,247 +103,205 @@ export const OpportunitiesPage: React.FC<OpportunitiesPageProps> = ({ navigate, 
   });
 
   return (
-    <div className="min-h-screen bg-[#F8FAF9] py-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header Breadcrumb & Title */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-              <button onClick={() => navigate('/')} className="hover:text-slate-800">Ana səhifə</button>
-              <span aria-hidden="true">/</span>
-              <span className="text-slate-800 font-medium">İnvestisiya imkanları</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Qarabağ Aqrar Torpaq Fondu Kataloqu
-            </h1>
-          </div>
+    <div className="bg-cream pb-28">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <nav aria-label="Səhifə yolu" className="text-[0.95rem] text-muted mb-3">
+          <button type="button" onClick={() => navigate('/')} className="underline underline-offset-4 text-brand-900">Ana səhifə</button>
+          <span aria-hidden="true"> › </span>
+          <span aria-current="page">Torpaq sahələri</span>
+        </nav>
 
-          {compareLands.length > 0 && (
-            <button
-              onClick={() => navigate('/compare')}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-xs rounded-lg shadow-xs flex items-center gap-2 self-start sm:self-auto"
-            >
-              <Layers className="w-4 h-4" />
-              <span>Müqayisə et ({compareLands.length}/3)</span>
-            </button>
-          )}
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-7">
+          <div className="max-w-3xl">
+            <h1 className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900">Torpaq sahələri</h1>
+            <p className="text-lg text-[#3E4F45] mt-2">
+              Qarabağda investisiya üçün təklif olunan kənd təsərrüfatı torpaqları. Rayon və fəaliyyət növünü seçin, sizə uyğun sahələri görün.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/map')}
+            className="inline-flex items-center gap-2 min-h-14 px-5 rounded-xl border-2 border-brand-900 text-brand-900 font-display font-bold hover:bg-white"
+          >
+            <MapIcon className="w-6 h-6" aria-hidden="true" />
+            Xəritədə göstər
+          </button>
         </div>
 
-        {/* Filter Controls Bar */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-8 shadow-xs">
-          <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-            <div className="lg:col-span-2">
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                Açar Sözlə Axtarış
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Torpağın adı, təyinatı..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                />
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                Region
-              </label>
-              <select
-                value={region}
-                onChange={e => setRegion(e.target.value)}
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-              >
-                <option value="all">Bütün Regionlar</option>
-                <option value="Ağdam">Ağdam</option>
-                <option value="Füzuli">Füzuli</option>
-                <option value="Zəngilan">Zəngilan</option>
-                <option value="Cəbrayıl">Cəbrayıl</option>
-                <option value="Qubadlı">Qubadlı</option>
-                <option value="Xocavənd">Xocavənd</option>
-                <option value="Kəlbəcər">Kəlbəcər</option>
-                <option value="Laçın">Laçın</option>
+        {/* Filters */}
+        <form onSubmit={handleSearchSubmit} className="bg-white rounded-3xl border border-line p-5 sm:p-7 mb-6" aria-label="Axtarış və filtrlər">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="f-region" className="font-bold">Rayon</label>
+              <select id="f-region" value={region} onChange={e => setRegion(e.target.value)} className={fieldClass}>
+                <option value="all">Bütün rayonlar</option>
+                {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                Aqrar Fəaliyyət
-              </label>
-              <select
-                value={agricultureType}
-                onChange={e => setAgricultureType(e.target.value)}
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-              >
-                <option value="all">Bütün İstiqamətlər</option>
-                <option value="Əkinçilik">Əkinçilik</option>
-                <option value="Bağçılıq">Bağçılıq</option>
-                <option value="İstixana təsərrüfatı">İstixana təsərrüfatı</option>
-                <option value="Heyvandarlıq">Heyvandarlıq</option>
-                <option value="Arıçılıq">Arıçılıq</option>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="f-type" className="font-bold">Fəaliyyət növü</label>
+              <select id="f-type" value={agricultureType} onChange={e => setAgricultureType(e.target.value)} className={fieldClass}>
+                <option value="all">Bütün növlər</option>
+                {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                Sıralama
-              </label>
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value as any)}
-                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-              >
-                <option value="default">İlkin düzülüş</option>
-                <option value="area-desc">Sahə (Böyükdən kiçiyə)</option>
-                <option value="investment-asc">İnvestisiya (Aşağıdan yuxarıya)</option>
-                <option value="investment-desc">İnvestisiya (Yuxarıdan aşağıya)</option>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="f-area" className="font-bold">Sahənin ölçüsü</label>
+              <select id="f-area" value={area} onChange={e => setArea(e.target.value)} className={fieldClass}>
+                {AREAS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
               </select>
             </div>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="f-sort" className="font-bold">Necə düzülsün?</label>
+              <select id="f-sort" value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)} className={fieldClass}>
+                <option value="default">Adi qaydada</option>
+                <option value="investment-asc">Ən ucuzdan bahaya</option>
+                <option value="investment-desc">Ən bahadan ucuza</option>
+                <option value="area-desc">Ən böyük sahə əvvəl</option>
+              </select>
+            </div>
+          </div>
 
-            <div className="flex items-end gap-2">
-              <button
-                type="submit"
-                className="flex-1 bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs py-2 px-3 rounded-lg transition-colors shadow-2xs"
-              >
-                Axtar
-              </button>
+          <div className="mt-5 flex flex-col sm:flex-row gap-3 sm:items-end">
+            <div className="flex flex-col gap-2 flex-1">
+              <label htmlFor="f-search" className="font-bold">Adla axtarış <span className="font-normal text-muted">(istəyə görə)</span></label>
+              <input
+                id="f-search"
+                type="search"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Məsələn: nar, buğda, istixana"
+                className={fieldClass}
+              />
+            </div>
+            <button
+              type="submit"
+              className="min-h-[3.25rem] px-8 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-extrabold text-lg flex items-center justify-center gap-3"
+            >
+              <Search className="w-6 h-6" aria-hidden="true" />
+              Axtar
+            </button>
+            {filtersActive && (
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="p-2 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-                title="Sıfırla"
+                className="min-h-[3.25rem] px-5 rounded-xl border-2 border-line text-brand-900 font-display font-bold flex items-center justify-center gap-2 hover:border-brand-900"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-5 h-5" aria-hidden="true" />
+                Filtrləri təmizlə
               </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Results Metadata Bar */}
-        <div className="flex items-center justify-between text-xs text-slate-500 mb-6">
-          <div>
-            <span>Tapılan sahələr:</span> <strong className="text-slate-900 font-mono-numbers">{sortedLands.length}</strong> ədəd
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <span>Müqayisə üçün ən çox 3 sahə seçə bilərsiniz</span>
-          </div>
-        </div>
+        </form>
 
-        {/* Catalog Grid */}
+        <p className="text-lg mb-6" role="status" aria-live="polite">
+          {loading ? 'Axtarılır…' : <><strong className="font-extrabold text-brand-900">{sortedLands.length}</strong> sahə tapıldı</>}
+        </p>
+
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-hidden="true">
             {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="h-72 bg-white rounded-xl border border-slate-200 animate-pulse" />
+              <div key={i} className="h-[30rem] bg-white rounded-3xl border border-line animate-pulse" />
             ))}
           </div>
         ) : sortedLands.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-xl border border-slate-200">
-            <p className="text-sm font-semibold text-slate-700">Seçilmiş filtrlər üzrə heç bir torpaq sahəsi tapılmadı.</p>
-            <p className="text-xs text-slate-400 mt-1">Zəhmət olmasa digər region və ya parametrləri yoxlayın.</p>
+          <div className="text-center py-16 px-6 bg-white rounded-3xl border border-line">
+            <p className="font-display font-extrabold text-2xl text-brand-900">Bu seçimlərə uyğun sahə tapılmadı</p>
+            <p className="text-lg text-muted mt-2">Başqa rayon və ya fəaliyyət növü seçin, ya da bütün sahələrə baxın.</p>
             <button
+              type="button"
               onClick={handleResetFilters}
-              className="mt-4 px-4 py-2 bg-emerald-800 text-white text-xs font-semibold rounded-lg hover:bg-emerald-900 transition-colors"
+              className="mt-6 min-h-14 px-7 rounded-xl bg-brand-700 text-white font-display font-bold hover:bg-brand-800"
             >
               Bütün sahələri göstər
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sortedLands.map(land => {
               const inComp = isInCompare(land.id);
+              const fav = isFavorite(land.id);
+              const compareFull = !inComp && compareLands.length >= 3;
               return (
-                <div
-                  key={land.id}
-                  className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col justify-between group"
-                >
-                  <div>
-                    {/* Image Header with Favorite Button */}
-                    <div className="relative h-48 overflow-hidden bg-slate-100">
-                      <img
-                        src={land.imageUrl}
-                        alt={land.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        referrerPolicy="no-referrer"
-                      />
+                <li key={land.id} className="bg-white rounded-3xl overflow-hidden border border-line flex flex-col">
+                  <div className="relative">
+                    <img src={landImage(land)} alt="" className="w-full h-52 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => toggleFavorite(land.id)}
+                      aria-pressed={fav}
+                      aria-label={`${land.title}: ${fav ? 'yadda saxlanılıb' : 'yadda saxla'}`}
+                      className="absolute top-3 right-3 flex items-center gap-2 min-h-11 px-3 rounded-xl bg-white/95 text-sm font-bold text-ink shadow"
+                    >
+                      <Heart className={`w-5 h-5 ${fav ? 'fill-[#C0392B] text-[#C0392B]' : ''}`} aria-hidden="true" />
+                      {fav ? 'Saxlanıb' : 'Yadda saxla'}
+                    </button>
+                  </div>
+                  <div className="p-6 flex flex-col gap-4 flex-1">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="bg-brand-50 text-brand-900 font-bold text-sm px-3 py-1 rounded-full">{land.region}</span>
+                      <span className="bg-gold-100 text-gold-900 font-bold text-sm px-3 py-1 rounded-full">{land.agricultureType}</span>
+                    </div>
+                    <h2 className="font-display font-extrabold text-xl leading-snug text-brand-900">{land.title}</h2>
+                    <p className="text-[0.98rem] text-[#3E4F45] line-clamp-3">{land.description}</p>
+                    <dl className="grid grid-cols-2 gap-3 py-4 border-y border-line">
+                      <div>
+                        <dt className="text-sm text-muted">Sahə</dt>
+                        <dd className="font-extrabold text-xl">{land.areaHectares} ha</dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted">Minimal sərmayə</dt>
+                        <dd className="font-extrabold text-xl">{formatManat(land.estimatedInvestmentRequirement)}</dd>
+                      </div>
+                    </dl>
+                    <div className="mt-auto flex flex-col gap-2.5">
                       <button
-                        onClick={() => toggleFavorite(land.id)}
-                        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-slate-600 hover:text-rose-600 transition-colors shadow-xs"
+                        type="button"
+                        onClick={() => navigate(`/opportunities/${land.id}`)}
+                        className="min-h-14 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-bold text-base flex items-center justify-center gap-2"
                       >
-                        <span className={`text-base leading-none ${isFavorite(land.id) ? 'text-rose-600' : 'text-slate-400'}`}>♥</span>
+                        Ətraflı baxın
+                        <ArrowRight className="w-5 h-5" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => (inComp ? removeFromCompare(land.id) : addToCompare(land))}
+                        aria-pressed={inComp}
+                        disabled={compareFull}
+                        className={`min-h-12 rounded-xl border-2 font-display font-bold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          inComp ? 'bg-gold-100 border-gold-500 text-gold-900' : 'border-line text-brand-900 hover:border-brand-900'
+                        }`}
+                      >
+                        {inComp ? <Check className="w-5 h-5" aria-hidden="true" /> : <Layers className="w-5 h-5" aria-hidden="true" />}
+                        {inComp ? 'Müqayisəyə əlavə olunub' : compareFull ? 'Ən çox 3 sahə müqayisə olunur' : 'Müqayisəyə əlavə et'}
                       </button>
                     </div>
-
-                    <div className="p-4">
-                      {/* Zero-Pill Typography Metadata */}
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-1.5">
-                        <span className="text-emerald-800 font-semibold">{land.region}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{land.agricultureType}</span>
-                        <span aria-hidden="true">·</span>
-                        <span className="font-mono-numbers">{land.areaHectares} ha</span>
-                      </div>
-
-                      <h3
-                        onClick={() => navigate(`/opportunities/${land.id}`)}
-                        className="text-base font-bold text-slate-900 group-hover:text-emerald-800 cursor-pointer transition-colors line-clamp-1"
-                      >
-                        {land.title}
-                      </h3>
-
-                      <p className="text-xs text-slate-600 mt-2 line-clamp-2 leading-relaxed">
-                        {land.description}
-                      </p>
-
-                      <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Torpaq keyfiyyəti</span>
-                          <span className="text-slate-700 font-medium truncate block">{land.soilQuality || 'Münbit şabalıdı'}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Minimal İnvestisiya</span>
-                          <span className="text-slate-900 font-bold font-mono-numbers">
-                            {land.estimatedInvestmentRequirement.toLocaleString()} ₼
-                          </span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
-
-                  <div className="p-4 pt-0">
-                    <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-100">
-                      {/* Compare toggle */}
-                      <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={inComp}
-                          onChange={() => {
-                            if (inComp) removeFromCompare(land.id);
-                            else addToCompare(land);
-                          }}
-                          className="rounded text-emerald-800 focus:ring-emerald-700"
-                        />
-                        <span className="text-[11px]">Müqayisə et</span>
-                      </label>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => navigate(`/opportunities/${land.id}`)}
-                          className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold transition-colors"
-                        >
-                          Ətraflı bax
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
       </div>
+
+      {/* Compare bar: always visible once something is selected */}
+      {compareLands.length > 0 && (
+        <div className="fixed bottom-0 inset-x-0 z-30 bg-brand-950 text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3 pr-24 sm:pr-28">
+            <p className="text-base">
+              <strong className="text-gold-400 text-xl">{compareLands.length}</strong> sahə müqayisə üçün seçilib <span className="text-[#C9D8CE]">(ən çox 3)</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/compare')}
+              className="min-h-12 px-6 rounded-xl bg-gold-500 hover:bg-gold-400 text-ink font-display font-extrabold flex items-center gap-2"
+            >
+              <Layers className="w-5 h-5" aria-hidden="true" />
+              Müqayisə edin
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

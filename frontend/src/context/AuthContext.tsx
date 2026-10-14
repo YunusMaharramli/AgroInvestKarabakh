@@ -6,8 +6,8 @@ interface AuthContextType {
   profile: EntrepreneurProfile | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (data: any) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: string }>;
+  register: (data: any) => Promise<{ success: boolean; error?: string; role?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (data: any) => Promise<{ success: boolean; error?: string }>;
@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(data.profile);
       setToken(data.token);
       localStorage.setItem('agro_token', data.token);
-      return { success: true };
+      return { success: true, role: data.user?.role };
     } catch (err: any) {
       return { success: false, error: 'Şəbəkə xətası baş verdi.' };
     }
@@ -87,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(data.profile);
       setToken(data.token);
       localStorage.setItem('agro_token', data.token);
-      return { success: true };
+      return { success: true, role: data.user?.role };
     } catch (err: any) {
       return { success: false, error: 'Şəbəkə xətası baş verdi.' };
     }

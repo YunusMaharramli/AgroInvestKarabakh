@@ -1,14 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AgriculturalLand, Competition } from '../types/index.js';
-import { Search, MapPin, ArrowRight, ChevronDown, CheckCircle2, TrendingUp, Sparkles, Filter, Calendar, Sprout } from 'lucide-react';
+import { Search, Map as MapIcon, ArrowRight, ChevronDown, Heart, MessageCircle, Phone } from 'lucide-react';
 import { useFavorites } from '../context/FavoritesContext.js';
+import { PHOTOS, landImage, formatManat } from '../lib/landImages.js';
+import { HELP_LINE } from '../components/Header.js';
 
 interface HomePageProps {
   navigate: (route: string) => void;
 }
 
+const REGIONS = ['Ağdam', 'Füzuli', 'Zəngilan', 'Cəbrayıl', 'Qubadlı', 'Xocavənd', 'Kəlbəcər', 'Laçın'];
+
+const SECTORS: { type: string; title: string; text: string; img: string }[] = [
+  { type: 'Əkinçilik', title: 'Əkinçilik', text: 'Buğda, arpa, qarğıdalı və toxumçuluq', img: PHOTOS.crops },
+  { type: 'Bağçılıq', title: 'Bağçılıq', text: 'Nar, qoz, badam və üzüm bağları', img: PHOTOS.orchard },
+  { type: 'İstixana təsərrüfatı', title: 'İstixana', text: 'Müasir hidroponik istixanalar', img: PHOTOS.greenhouse },
+  { type: 'Heyvandarlıq', title: 'Heyvandarlıq', text: 'Dağ otlaqları və ferma kompleksləri', img: PHOTOS.livestock },
+  { type: 'Arıçılıq', title: 'Arıçılıq', text: 'Dağ balı və arı ailələri', img: PHOTOS.bees },
+];
+
+const STEPS: { title: string; text: string }[] = [
+  { title: 'Qeydiyyat', text: 'Portalda sahibkar və ya şirkət kimi qeydiyyatdan keçin.' },
+  { title: 'Sahəni seçin', text: 'Siyahıdan və ya xəritədən sizə uyğun torpağı tapın.' },
+  { title: 'Təklifinizi yazın', text: 'Sərmayə məbləğini və icra müddətini qeyd edin.' },
+  { title: 'Sənədləri yükləyin', text: 'Biznes plan və bank zəmanətini PDF kimi əlavə edin.' },
+  { title: 'Göndərin', text: 'Təsdiq edin və müraciət kodunuzu dərhal alın.' },
+];
+
+const FAQS: { q: string; a: string }[] = [
+  {
+    q: 'Müsabiqədə kimlər iştirak edə bilər?',
+    a: 'Azərbaycan Respublikasında qeydiyyatdan keçmiş hüquqi şəxslər və fərdi sahibkarlar iştirak edə bilər. Hər müsabiqənin öz tələbləri (maliyyə zəmanəti, təcrübə və s.) müsabiqə səhifəsində açıq yazılır.',
+  },
+  {
+    q: 'Müraciətimin vəziyyətini necə yoxlaya bilərəm?',
+    a: 'Müraciəti göndərdikdən dərhal sonra sizə AGRO-2026-XXXX formatında müraciət nömrəsi verilir. Şəxsi kabinetinizdəki "Müraciətlərim" bölməsində hər mərhələni və ekspert qeydlərini görə bilərsiniz.',
+  },
+  {
+    q: 'Torpaq ayrıldıqdan sonra dövlət dəstəyi varmı?',
+    a: 'Bəli. Qarabağ və Şərqi Zəngəzurda fəaliyyət göstərən sahibkarlar üçün vergi və gömrük güzəştləri, texnika və damcılı suvarma subsidiyaları, güzəştli kreditlər nəzərdə tutulur.',
+  },
+  {
+    q: '"Mənə uyğun sahə" necə işləyir?',
+    a: 'Bir neçə suala cavab verirsiniz (rayon, büdcə, fəaliyyət növü, sahə ölçüsü). Sistem bunlara əsasən sizə ən yaxın torpaq sahələrini faizlə göstərir. Bu, köməkçi tövsiyədir və müsabiqədə qalibiyyətə zəmanət vermir.',
+  },
+];
+
+const selectClass =
+  'w-full min-h-[3.25rem] px-4 rounded-xl border-2 border-[#9AA89E] bg-white text-ink text-base focus:border-brand-700';
+
 export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
-  const [featuredLands, setFeaturedLands] = useState<AgriculturalLand[]>([]);
+  const [lands, setLands] = useState<AgriculturalLand[]>([]);
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [searchRegion, setSearchRegion] = useState('all');
   const [searchSector, setSearchSector] = useState('all');
@@ -19,22 +61,25 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
   useEffect(() => {
     fetch('/api/lands')
       .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setFeaturedLands(data.slice(0, 4));
-        }
-      })
+      .then(data => { if (Array.isArray(data)) setLands(data); })
       .catch(console.error);
 
     fetch('/api/competitions')
       .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setCompetitions(data);
-        }
-      })
+      .then(data => { if (Array.isArray(data)) setCompetitions(data); })
       .catch(console.error);
   }, []);
+
+  const countByType = useMemo(() => {
+    const m: Record<string, number> = {};
+    lands.forEach(l => { m[l.agricultureType] = (m[l.agricultureType] ?? 0) + 1; });
+    return m;
+  }, [lands]);
+
+  const activeCompetitions = competitions.filter(c => c.status === 'ACTIVE').length;
+  const totalInvestment = lands.reduce((sum, l) => sum + (l.estimatedInvestmentRequirement || 0), 0);
+  const regionCount = new Set(lands.map(l => l.region)).size;
+  const featured = lands.slice(0, 3);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,461 +90,306 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
     navigate(`/opportunities?${params.toString()}`);
   };
 
-  const faqs = [
-    {
-      q: 'Müsabiqədə kimlər iştirak edə bilər?',
-      a: 'Azərbaycan Respublikasında qeydiyyatdan keçmiş hüquqi şəxslər və fərdi sahibkarlar kənd təsərrüfatı müsabiqələrində iştirak etmək hüququna malikdirlər. Hər bir müsabiqənin spesifik tələbləri (maliyyə zəmanəti, aqrotexniki təcrübə və s.) müsabiqə səhifəsində açıq göstərilir.',
-    },
-    {
-      q: 'Müraciətimin statusunu necə yoxlaya bilərəm?',
-      a: 'Elektron ərizənizi göndərdikdən dərhal sonra sistem sizə AGRO-2026-XXXX formatında unikal müraciət nömrəsi təqdim edir. Şəxsi kabinetinizdəki "Müraciətlərim" bölməsindən addım-addım status tarixçəsini və ekspert qeydlərini real vaxt rejimində izləyə bilərsiniz.',
-    },
-    {
-      q: 'Torpaq sahəsi ayrıldıqdan sonra dövlət dəstəyi nəzərdə tutulurmu?',
-      a: 'Bəli. Qarabağ və Şərqi Zəngəzur iqtisadi rayonlarında fəaliyyət göstərən sahibkarlar üçün vergi və gömrük güzəştləri, kənd təsərrüfatı texnikası və damcılı suvarma subsidiyaları, eləcə də güzəştli kredit xətləri nəzərdə tutulur.',
-    },
-    {
-      q: 'AgroMatch tövsiyə sistemi nə dərəcədə etibarlıdır?',
-      a: 'AgroMatch şəffaf riyazi meyarlar (məkan 35%, büdcə 30%, sektor 20%, sahə 15%) əsasında sizin imkanlarınıza ən yaxın torpaq sahələrini seçir. Bu sistem qərar qəbuluna köməkçi xarakter daşıyır və rəsmi müsabiqə qalibiyyətinə avtomatik zəmanət vermir.',
-    },
-  ];
-
   return (
-    <div className="min-h-screen bg-[#F8FAF9]">
-      {/* 1. HERO SECTION */}
-      <section className="relative overflow-hidden bg-slate-900 text-white">
-        {/* Background Image with Measured Scrim */}
-        <div className="absolute inset-0 z-0">
-          <img
-            src="/src/assets/images/hero_karabakh_agriculture_1791976991286.jpg"
-            alt="Qarabağ kənd təsərrüfatı mənzərəsi"
-            className="w-full h-full object-cover object-center opacity-40 scale-105"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/70 to-slate-900/40" />
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-28 lg:pt-28 lg:pb-36">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-900/70 border border-emerald-500/30 rounded-lg text-emerald-300 text-xs font-semibold mb-6 backdrop-blur-xs">
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
-              <span>Qarabağ və Şərqi Zəngəzur Aqrar İnvestisiya Portalı</span>
-            </div>
-
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white text-balance leading-tight">
-              Qarabağın gələcəyinə <span className="text-amber-400">sərmayə</span> yatırın
+    <div className="bg-cream">
+      {/* 1. HERO */}
+      <section aria-labelledby="hero-title" className="relative">
+        <img
+          src={PHOTOS.hero}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover object-[center_60%]"
+        />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-36 sm:pt-24 sm:pb-44">
+          <div className="max-w-2xl bg-[rgba(11,36,22,0.84)] rounded-3xl p-7 sm:p-11 text-white">
+            <p className="font-display font-bold text-sm tracking-[0.14em] uppercase text-gold-400 mb-3">
+              Qarabağ və Şərqi Zəngəzur
+            </p>
+            <h1 id="hero-title" className="font-display font-extrabold text-[2rem] sm:text-5xl leading-[1.12] tracking-tight">
+              Qarabağın torpağına sərmayə yatırın
             </h1>
-
-            <p className="mt-5 text-base sm:text-lg text-slate-200 leading-relaxed max-w-2xl text-balance">
-              Qarabağda kənd təsərrüfatı investisiya imkanlarını kəşf edin, münbit torpaq sahələrini seçin və rəsmi müsabiqə müraciətlərinizi vahid elektron platformadan idarə edin.
+            <p className="mt-5 text-lg leading-relaxed text-[#EEF3EF]">
+              Münbit torpaq sahələrini tapın, şərtləri asanlıqla müqayisə edin və müsabiqəyə bir yerdən, onlayn müraciət edin.
             </p>
-
-            <div className="mt-8 flex flex-wrap items-center gap-4">
+            <div className="mt-8 flex flex-wrap gap-3">
               <button
+                type="button"
                 onClick={() => navigate('/opportunities')}
-                className="px-6 py-3.5 bg-emerald-700 hover:bg-emerald-600 text-white font-semibold text-sm rounded-xl shadow-lg hover:shadow-emerald-700/30 transition-all flex items-center gap-2 whitespace-nowrap"
+                className="inline-flex items-center gap-3 min-h-14 px-7 rounded-2xl bg-gold-500 hover:bg-gold-400 text-ink font-display font-extrabold text-base transition-colors"
               >
-                <span>İnvestisiya imkanlarını kəşf et</span>
-                <ArrowRight className="w-4 h-4" />
+                Torpaq sahələrinə baxın
+                <ArrowRight className="w-6 h-6" aria-hidden="true" />
               </button>
-
               <button
+                type="button"
                 onClick={() => navigate('/map')}
-                className="px-6 py-3.5 bg-white/10 hover:bg-white/20 text-white font-semibold text-sm rounded-xl backdrop-blur-md border border-white/20 transition-all flex items-center gap-2 whitespace-nowrap"
+                className="inline-flex items-center gap-3 min-h-14 px-6 rounded-2xl border-2 border-white text-white hover:bg-white/10 font-display font-bold text-base transition-colors"
               >
-                <MapPin className="w-4 h-4 text-amber-300" />
-                <span>İnteraktiv xəritəyə bax</span>
+                <MapIcon className="w-6 h-6" aria-hidden="true" />
+                Xəritədə axtarın
               </button>
             </div>
           </div>
-
-          {/* Quick Search Bar */}
-          <div className="mt-14 bg-white/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-2xl border border-white/30 text-slate-800">
-            <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Region
-                </label>
-                <select
-                  value={searchRegion}
-                  onChange={e => setSearchRegion(e.target.value)}
-                  className="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                >
-                  <option value="all">Bütün regionlar</option>
-                  <option value="Ağdam">Ağdam</option>
-                  <option value="Füzuli">Füzuli</option>
-                  <option value="Zəngilan">Zəngilan</option>
-                  <option value="Cəbrayıl">Cəbrayıl</option>
-                  <option value="Qubadlı">Qubadlı</option>
-                  <option value="Xocavənd">Xocavənd</option>
-                  <option value="Kəlbəcər">Kəlbəcər</option>
-                  <option value="Laçın">Laçın</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Aqrar Kateqoriya
-                </label>
-                <select
-                  value={searchSector}
-                  onChange={e => setSearchSector(e.target.value)}
-                  className="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                >
-                  <option value="all">Bütün istiqamətlər</option>
-                  <option value="Əkinçilik">Əkinçilik (Taxıl, dənli bitkilər)</option>
-                  <option value="Bağçılıq">Bağçılıq (Nar, qoz, zeytun)</option>
-                  <option value="İstixana təsərrüfatı">İstixana təsərrüfatı</option>
-                  <option value="Heyvandarlıq">Heyvandarlıq</option>
-                  <option value="Arıçılıq">Arıçılıq</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Minimal Sahə (ha)
-                </label>
-                <input
-                  type="number"
-                  placeholder="Məs: 50"
-                  value={searchMinArea}
-                  onChange={e => setSearchMinArea(e.target.value)}
-                  className="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                />
-              </div>
-
-              <div className="flex items-end">
-                <button
-                  type="submit"
-                  className="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-xs"
-                >
-                  <Search className="w-4 h-4" />
-                  <span>Axtar</span>
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       </section>
 
-      {/* 2. REAL-TIME STATS STRIP */}
-      <section className="bg-white border-b border-slate-200 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            <div className="border-r border-slate-100 last:border-0">
-              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono-numbers">12+</span>
-              <p className="text-xs text-slate-500 mt-1">Dərc olunmuş torpaq massivi</p>
+      {/* 2. SIMPLE SEARCH */}
+      <section aria-labelledby="search-title" className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24">
+        <form
+          onSubmit={handleSearchSubmit}
+          className="bg-white rounded-3xl shadow-[0_18px_50px_rgba(20,71,42,0.16)] p-6 sm:p-9"
+        >
+          <h2 id="search-title" className="font-display font-extrabold text-2xl text-brand-900 mb-5">
+            Sizə uyğun torpaq sahəsini tapın
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-end">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="home-region" className="font-bold">1. Rayon</label>
+              <select id="home-region" value={searchRegion} onChange={e => setSearchRegion(e.target.value)} className={selectClass}>
+                <option value="all">Bütün rayonlar</option>
+                {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
             </div>
-            <div className="border-r border-slate-100 last:border-0">
-              <span className="text-2xl sm:text-3xl font-extrabold text-emerald-800 font-mono-numbers">5</span>
-              <p className="text-xs text-slate-500 mt-1">Aktiv investisiya müsabiqəsi</p>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="home-sector" className="font-bold">2. Fəaliyyət növü</label>
+              <select id="home-sector" value={searchSector} onChange={e => setSearchSector(e.target.value)} className={selectClass}>
+                <option value="all">Bütün növlər</option>
+                {SECTORS.map(s => <option key={s.type} value={s.type}>{s.title}</option>)}
+              </select>
             </div>
-            <div className="border-r border-slate-100 last:border-0">
-              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono-numbers">8</span>
-              <p className="text-xs text-slate-500 mt-1">Əhatə olunan Qarabağ rayonu</p>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="home-area" className="font-bold">3. Sahənin ölçüsü</label>
+              <select id="home-area" value={searchMinArea} onChange={e => setSearchMinArea(e.target.value)} className={selectClass}>
+                <option value="">İstənilən ölçü</option>
+                <option value="50">50 hektardan çox</option>
+                <option value="100">100 hektardan çox</option>
+                <option value="200">200 hektardan çox</option>
+              </select>
             </div>
-            <div>
-              <span className="text-2xl sm:text-3xl font-extrabold text-amber-700 font-mono-numbers">6.2M ₼</span>
-              <p className="text-xs text-slate-500 mt-1">Gözlənilən aqro-sərmayə portfeli</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. FEATURED OPPORTUNITIES */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Seçilmiş İnvestisiya Sahələri</h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Qarabağda ən yüksək aqrar iqtisadi potensiala malik aktiv torpaq sahələri
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/opportunities')}
-            className="text-xs font-semibold text-emerald-800 hover:text-emerald-900 flex items-center gap-1 self-start sm:self-auto"
-          >
-            <span>Bütün sahələrə bax ({featuredLands.length})</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredLands.map(land => (
-            <div
-              key={land.id}
-              className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col group"
+            <button
+              type="submit"
+              className="min-h-[3.25rem] rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-extrabold text-lg flex items-center justify-center gap-3 transition-colors"
             >
-              <div className="relative h-44 overflow-hidden bg-slate-100">
-                <img
-                  src={land.imageUrl}
-                  alt={land.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  referrerPolicy="no-referrer"
-                />
-                <button
-                  onClick={() => toggleFavorite(land.id)}
-                  className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-slate-600 hover:text-rose-600 transition-colors shadow-xs"
-                  title="Seçilmişlərə əlavə et"
-                >
-                  <span className={`text-base leading-none ${isFavorite(land.id) ? 'text-rose-600' : 'text-slate-400'}`}>♥</span>
-                </button>
-              </div>
+              <Search className="w-6 h-6" aria-hidden="true" />
+              Axtar
+            </button>
+          </div>
+        </form>
+      </section>
 
-              <div className="p-4 flex-1 flex flex-col justify-between">
-                <div>
-                  {/* Zero-Pill Typography Metadata */}
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mb-1.5">
-                    <span className="text-emerald-800 font-semibold">{land.region}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{land.agricultureType}</span>
-                    <span aria-hidden="true">·</span>
-                    <span className="font-mono-numbers">{land.areaHectares} ha</span>
+      {/* 3. HOW IT WORKS */}
+      <section aria-labelledby="steps-title" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-10">
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-10">
+          <div className="max-w-2xl">
+            <p className="font-display font-bold text-sm tracking-[0.14em] uppercase text-gold-800 mb-2">Sadə addımlar</p>
+            <h2 id="steps-title" className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900">
+              Müraciət 5 addımdan ibarətdir
+            </h2>
+          </div>
+        </div>
+        <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {STEPS.map((s, i) => (
+            <li key={s.title} className="bg-white border border-line rounded-2xl p-6 flex flex-col gap-3">
+              <span aria-hidden="true" className="w-13 h-13 rounded-full bg-brand-900 text-gold-400 font-display font-extrabold text-xl flex items-center justify-center">
+                {i + 1}
+              </span>
+              <h3 className="font-display font-bold text-lg text-brand-900">
+                <span className="sr-only">Addım {i + 1}: </span>{s.title}
+              </h3>
+              <p className="text-[0.95rem] text-[#3E4F45]">{s.text}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* 4. SECTORS */}
+      <section aria-labelledby="sectors-title" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+        <p className="font-display font-bold text-sm tracking-[0.14em] uppercase text-gold-800 mb-2">Fəaliyyət növləri</p>
+        <h2 id="sectors-title" className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900 mb-9">
+          Nə ilə məşğul olmaq istəyirsiniz?
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          {SECTORS.map(s => (
+            <button
+              key={s.type}
+              type="button"
+              onClick={() => navigate(`/opportunities?sector=${encodeURIComponent(s.type)}`)}
+              className="group text-left bg-white rounded-2xl overflow-hidden border border-line hover:shadow-lg hover:-translate-y-0.5 transition-all flex flex-col"
+            >
+              <img src={s.img} alt="" className="w-full h-44 object-cover" />
+              <span className="p-5 flex flex-col gap-1.5 flex-1">
+                <span className="font-display font-extrabold text-xl text-brand-900">{s.title}</span>
+                <span className="text-[0.95rem] text-[#3E4F45]">{s.text}</span>
+                <span className="mt-auto pt-2 font-bold text-brand-700 flex items-center gap-2">
+                  {countByType[s.type] ?? 0} sahə
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* 5. FEATURED LANDS */}
+      <section aria-labelledby="lands-title" className="bg-sand mt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          <div className="flex flex-wrap items-end justify-between gap-4 mb-9">
+            <div>
+              <p className="font-display font-bold text-sm tracking-[0.14em] uppercase text-gold-800 mb-2">Aktiv müsabiqələr</p>
+              <h2 id="lands-title" className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900">
+                Seçilmiş torpaq sahələri
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/opportunities')}
+              className="inline-flex items-center min-h-14 px-6 rounded-xl border-2 border-brand-900 text-brand-900 font-display font-bold hover:bg-white transition-colors"
+            >
+              Bütün sahələr ({lands.length})
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {featured.map(land => {
+              const fav = isFavorite(land.id);
+              return (
+                <article key={land.id} className="bg-white rounded-3xl overflow-hidden flex flex-col">
+                  <div className="relative">
+                    <img src={landImage(land)} alt="" className="w-full h-56 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => toggleFavorite(land.id)}
+                      aria-pressed={fav}
+                      className="absolute top-3 right-3 flex items-center gap-2 min-h-11 px-3 rounded-xl bg-white/95 text-sm font-bold text-ink shadow"
+                    >
+                      <Heart className={`w-5 h-5 ${fav ? 'fill-[#C0392B] text-[#C0392B]' : 'text-ink'}`} aria-hidden="true" />
+                      {fav ? 'Yadda saxlanıb' : 'Yadda saxla'}
+                    </button>
                   </div>
-
-                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-emerald-800 transition-colors line-clamp-1">
-                    {land.title}
-                  </h3>
-
-                  <p className="text-xs text-slate-600 mt-1.5 line-clamp-2 leading-relaxed">
-                    {land.description}
-                  </p>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">Minimal İnvestisiya</span>
-                    <span className="text-xs font-bold text-slate-900 font-mono-numbers">
-                      {land.estimatedInvestmentRequirement ? `${land.estimatedInvestmentRequirement.toLocaleString()} ₼` : 'Təyin edilir'}
-                    </span>
+                  <div className="p-6 flex flex-col gap-4 flex-1">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="bg-brand-50 text-brand-900 font-bold text-sm px-3 py-1 rounded-full">{land.region}</span>
+                      <span className="bg-gold-100 text-gold-900 font-bold text-sm px-3 py-1 rounded-full">{land.agricultureType}</span>
+                    </div>
+                    <h3 className="font-display font-extrabold text-xl leading-snug text-brand-900">{land.title}</h3>
+                    <dl className="grid grid-cols-2 gap-3 py-4 border-y border-line">
+                      <div>
+                        <dt className="text-sm text-muted">Sahə</dt>
+                        <dd className="font-extrabold text-xl">{land.areaHectares} ha</dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted">Minimal sərmayə</dt>
+                        <dd className="font-extrabold text-xl">{formatManat(land.estimatedInvestmentRequirement)}</dd>
+                      </div>
+                    </dl>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/opportunities/${land.id}`)}
+                      className="mt-auto min-h-14 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-bold text-base transition-colors"
+                    >
+                      Ətraflı baxın
+                    </button>
                   </div>
-                  <button
-                    onClick={() => navigate(`/opportunities/${land.id}`)}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-800 hover:text-white text-slate-800 rounded-lg text-xs font-semibold transition-colors"
-                  >
-                    Ətraflı
-                  </button>
-                </div>
-              </div>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* 6. NUMBERS (computed from live data) */}
+      <section aria-label="Portal rəqəmlərlə" className="bg-brand-900 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7">
+          {[
+            { value: String(lands.length || '—'), label: 'dərc olunmuş torpaq sahəsi' },
+            { value: String(activeCompetitions || '—'), label: 'aktiv investisiya müsabiqəsi' },
+            { value: String(regionCount || '—'), label: 'Qarabağ rayonu əhatə olunur' },
+            { value: totalInvestment ? `${(totalInvestment / 1_000_000).toFixed(1).replace('.', ',')} mln ₼` : '—', label: 'gözlənilən sərmayə həcmi' },
+          ].map(s => (
+            <div key={s.label} className="flex flex-col gap-1 pl-5 border-l-4 border-gold-500">
+              <span className="font-display font-extrabold text-4xl leading-tight text-gold-400">{s.value}</span>
+              <span className="text-base text-[#E3ECE5]">{s.label}</span>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 4. AGRICULTURAL CATEGORIES (BENTO GRID) */}
-      <section className="bg-slate-50 border-y border-slate-200 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-12">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Aqrar İxtisaslaşma Sektorları</h2>
-            <p className="text-xs text-slate-500 mt-2">
-              Qarabağın torpaq-iqlim xüsusiyyətlərinə uyğunlaşdırılmış strateji kənd təsərrüfatı istiqamətləri
+      {/* 7. MATCH PROMO */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
+        <div className="bg-white border border-line rounded-3xl p-8 sm:p-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+          <div className="max-w-2xl">
+            <p className="font-display font-bold text-sm tracking-[0.14em] uppercase text-gold-800 mb-2">Mənə uyğun sahə</p>
+            <h2 className="font-display font-extrabold text-2xl sm:text-3xl text-brand-900">
+              Hansı torpağın sizə uyğun olduğunu bilmirsiniz?
+            </h2>
+            <p className="text-lg text-[#3E4F45] mt-3">
+              Bir neçə sadə suala cavab verin: büdcəniz, rayon və fəaliyyət növü. Sizə ən uyğun sahələri dərhal göstərəcəyik.
             </p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div
-              onClick={() => navigate('/opportunities?sector=Əkinçilik')}
-              className="md:col-span-2 relative h-72 rounded-2xl overflow-hidden cursor-pointer group shadow-xs border border-slate-200"
-            >
-              <img
-                src="/src/assets/images/category_crop_farming_1791976992217.jpg"
-                alt="Əkinçilik"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent p-6 flex flex-col justify-end text-white">
-                <span className="text-xs text-amber-300 font-bold uppercase tracking-wider">Ağdam · Cəbrayıl · Füzuli</span>
-                <h3 className="text-xl font-bold mt-1">Dənli Bitkilər və Toxumçuluq (Əkinçilik)</h3>
-                <p className="text-xs text-slate-200 mt-1 max-w-lg">
-                  Geniş düzənliklərdə müasir kombayn və pivot suvarma ilə buğda, arpa və qarğıdalı əkini.
-                </p>
-              </div>
-            </div>
-
-            <div
-              onClick={() => navigate('/opportunities?sector=Bağçılıq')}
-              className="relative h-72 rounded-2xl overflow-hidden cursor-pointer group shadow-xs border border-slate-200"
-            >
-              <img
-                src="/src/assets/images/category_orchard_horticulture_1791976992718.jpg"
-                alt="Bağçılıq"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent p-6 flex flex-col justify-end text-white">
-                <span className="text-xs text-amber-300 font-bold uppercase tracking-wider">Zəngilan · Xocavənd</span>
-                <h3 className="text-lg font-bold mt-1">İntensiv Bağçılıq</h3>
-                <p className="text-xs text-slate-200 mt-1">
-                  İxrac yönümlü nar, badam, qoz və tarixi yerli üzüm plantasiyaları.
-                </p>
-              </div>
-            </div>
-
-            <div
-              onClick={() => navigate('/opportunities?sector=İstixana təsərrüfatı')}
-              className="relative h-64 rounded-2xl overflow-hidden cursor-pointer group shadow-xs border border-slate-200"
-            >
-              <img
-                src="/src/assets/images/category_modern_greenhouse_1791976991572.jpg"
-                alt="İstixana"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent p-6 flex flex-col justify-end text-white">
-                <span className="text-xs text-amber-300 font-bold uppercase tracking-wider">Füzuli Aqropark</span>
-                <h3 className="text-lg font-bold mt-1">Hidroponik İstixanalar</h3>
-                <p className="text-xs text-slate-200 mt-1">
-                  Avtomatlaşdırılmış iqlim nəzarətli ekoloji təmiz tərəvəzçilik.
-                </p>
-              </div>
-            </div>
-
-            <div
-              onClick={() => navigate('/opportunities?sector=Heyvandarlıq')}
-              className="relative h-64 rounded-2xl overflow-hidden cursor-pointer group shadow-xs border border-slate-200"
-            >
-              <img
-                src="/src/assets/images/hero_karabakh_agriculture_1791976991286.jpg"
-                alt="Heyvandarlıq"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent p-6 flex flex-col justify-end text-white">
-                <span className="text-xs text-amber-300 font-bold uppercase tracking-wider">Kəlbəcər · Laçın · Cəbrayıl</span>
-                <h3 className="text-lg font-bold mt-1">Cins Heyvandarlıq</h3>
-                <p className="text-xs text-slate-200 mt-1">
-                  Alp çəmənlərində südlük və ətlik ferma kompleksləri.
-                </p>
-              </div>
-            </div>
-
-            <div
-              onClick={() => navigate('/opportunities?sector=Arıçılıq')}
-              className="relative h-64 rounded-2xl overflow-hidden cursor-pointer group shadow-xs border border-slate-200"
-            >
-              <img
-                src="/src/assets/images/category_orchard_horticulture_1791976992718.jpg"
-                alt="Arıçılıq"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent p-6 flex flex-col justify-end text-white">
-                <span className="text-xs text-amber-300 font-bold uppercase tracking-wider">Qubadlı · Kəlbəcər</span>
-                <h3 className="text-lg font-bold mt-1">Dağ Arıçılığı Klasteri</h3>
-                <p className="text-xs text-slate-200 mt-1">
-                  Qoruq vadilərində təbii dağ balı və arı məhsulları istehsalı.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. HOW IT WORKS (4 STEPS) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Müsabiqə Prosesi Necə İşləyir?</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            İnvestisiyadan reallaşmaya qədər 4 şəffaf rəqəmsal addım
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="p-6 bg-white rounded-xl border border-slate-200 flex flex-col justify-between">
-            <div>
-              <span className="text-2xl font-black text-emerald-800 font-mono-numbers">01</span>
-              <h3 className="text-sm font-bold text-slate-900 mt-3">İmkanı Seçin</h3>
-              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                Region, sahə ölçüsü və aqrar kateqoriya üzrə filtrasiya edərək uyğun torpaq sahəsi ilə tanış olun.
-              </p>
-            </div>
-            <span className="text-[11px] text-slate-400 mt-4 block">Kataloq və Xəritə</span>
-          </div>
-
-          <div className="p-6 bg-white rounded-xl border border-slate-200 flex flex-col justify-between">
-            <div>
-              <span className="text-2xl font-black text-emerald-800 font-mono-numbers">02</span>
-              <h3 className="text-sm font-bold text-slate-900 mt-3">Qeydiyyatdan Keçin</h3>
-              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                Şəxsi sahibkar kabineti açaraq hüquqi şəxs və ya fərdi sahibkar profilinizi təsdiq edin.
-              </p>
-            </div>
-            <span className="text-[11px] text-slate-400 mt-4 block">Təhlükəsiz Şəxsi Kabinet</span>
-          </div>
-
-          <div className="p-6 bg-white rounded-xl border border-slate-200 flex flex-col justify-between">
-            <div>
-              <span className="text-2xl font-black text-emerald-800 font-mono-numbers">03</span>
-              <h3 className="text-sm font-bold text-slate-900 mt-3">Elektron Müraciət Edin</h3>
-              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                Biznes planınızı və investisiya təklifinizi sistemə yükləyərək rəsmi müraciət nömrəsi əldə edin.
-              </p>
-            </div>
-            <span className="text-[11px] text-slate-400 mt-4 block">AGRO-2026 Kodu</span>
-          </div>
-
-          <div className="p-6 bg-white rounded-xl border border-slate-200 flex flex-col justify-between">
-            <div>
-              <span className="text-2xl font-black text-emerald-800 font-mono-numbers">04</span>
-              <h3 className="text-sm font-bold text-slate-900 mt-3">Müraciəti İzləyin</h3>
-              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                Ekspert rəylərini, əlavə sənəd sorğularını və yekun müsabiqə qərarını onlayn müşahidə edin.
-              </p>
-            </div>
-            <span className="text-[11px] text-slate-400 mt-4 block">Real Vaxt İzləmə</span>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. AGROMATCH PROMO BANNER */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        <div className="bg-gradient-to-r from-emerald-900 to-emerald-800 rounded-2xl p-8 sm:p-12 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-xl">
-          <div className="max-w-xl">
-            <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Ağıllı Uyğunluq Alqoritmi</span>
-            <h3 className="text-2xl sm:text-3xl font-bold mt-2">
-              Büdcənizə və profilinizə ən uyğun torpağı tapın
-            </h3>
-            <p className="text-xs sm:text-sm text-emerald-100 mt-3 leading-relaxed">
-              AgroMatch sual-cavab formasını 2 dəqiqə ərzində cavablandırın, investisiya həcminizə və təcrübənizə ən yüksək faizlə uyğun gələn torpaqları dərhal kəşf edin.
-            </p>
-          </div>
-
           <button
+            type="button"
             onClick={() => navigate('/agromatch')}
-            className="px-6 py-3.5 bg-amber-400 hover:bg-amber-300 text-emerald-950 font-bold text-sm rounded-xl shadow-md transition-colors whitespace-nowrap shrink-0"
+            className="shrink-0 min-h-14 px-7 rounded-2xl bg-gold-500 hover:bg-gold-400 text-ink font-display font-extrabold text-base transition-colors"
           >
-            AgroMatch Sorğusuna Başla
+            Suallara başlayın
           </button>
         </div>
       </section>
 
-      {/* 7. FAQ SECTION */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        <div className="text-center mb-10">
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Tez-tez Verilən Suallar</h2>
-          <p className="text-xs text-slate-500 mt-1">İnvestisiya müsabiqələri üzrə əsas suallara aydın cavablar</p>
-        </div>
-
+      {/* 8. FAQ */}
+      <section aria-labelledby="faq-title" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
+        <h2 id="faq-title" className="font-display font-extrabold text-3xl sm:text-4xl text-brand-900 mb-8">
+          Tez-tez verilən suallar
+        </h2>
         <div className="space-y-3">
-          {faqs.map((faq, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-xl border border-slate-200 overflow-hidden"
-            >
-              <button
-                onClick={() => setFaqOpen(faqOpen === index ? null : index)}
-                className="w-full text-left p-4.5 flex items-center justify-between gap-4 font-semibold text-xs sm:text-sm text-slate-900 hover:text-emerald-800 transition-colors"
-              >
-                <span>{faq.q}</span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${faqOpen === index ? 'rotate-180 text-emerald-800' : ''}`} />
-              </button>
-              {faqOpen === index && (
-                <div className="px-4.5 pb-4.5 pt-1 text-xs text-slate-600 leading-relaxed border-t border-slate-100">
-                  {faq.a}
-                </div>
-              )}
-            </div>
-          ))}
+          {FAQS.map((faq, index) => {
+            const open = faqOpen === index;
+            return (
+              <div key={faq.q} className="bg-white rounded-2xl border border-line overflow-hidden">
+                <h3>
+                  <button
+                    type="button"
+                    onClick={() => setFaqOpen(open ? null : index)}
+                    aria-expanded={open}
+                    aria-controls={`faq-${index}`}
+                    className="w-full text-left min-h-16 px-6 py-4 flex items-center justify-between gap-4 font-display font-bold text-lg text-brand-900 hover:bg-cream"
+                  >
+                    <span>{faq.q}</span>
+                    <ChevronDown className={`w-7 h-7 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+                  </button>
+                </h3>
+                {open && (
+                  <div id={`faq-${index}`} className="px-6 pb-6 text-[1.05rem] text-[#3E4F45] leading-relaxed">
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 9. HELP */}
+      <section aria-labelledby="help-title" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white border border-line rounded-3xl p-8 sm:p-10 flex flex-col gap-4">
+            <h2 id="help-title" className="font-display font-extrabold text-2xl sm:text-3xl text-brand-900">Sualınız var? Biz kömək edirik</h2>
+            <p className="text-lg text-[#3E4F45]">
+              AgroKöməkçi suallarınıza dərhal cavab verir: hansı sənədlər lazımdır, müraciət necə edilir, müraciətiniz hansı mərhələdədir.
+            </p>
+            <p className="flex items-center gap-3 font-bold text-brand-900 mt-2">
+              <MessageCircle className="w-6 h-6" aria-hidden="true" />
+              Ekranın sağ aşağı küncündəki düyməni basın.
+            </p>
+          </div>
+          <div className="bg-gold-100 rounded-3xl p-8 sm:p-10 flex flex-col gap-3">
+            <h2 className="font-display font-extrabold text-2xl sm:text-3xl text-brand-900">Zəng etməyi üstün tutursunuz?</h2>
+            <p className="text-lg text-[#3E3A2A]">Məsləhətçimiz sizə telefonla addım-addım kömək edəcək. Müraciəti birlikdə doldura bilərik.</p>
+            <p className="flex items-center gap-3 font-display font-extrabold text-3xl text-brand-900 mt-2">
+              <Phone className="w-8 h-8" aria-hidden="true" />
+              {HELP_LINE}
+            </p>
+            <p className="text-base text-[#3E3A2A]">Bazar ertəsi – Cümə, 09:00–18:00</p>
+          </div>
         </div>
       </section>
     </div>

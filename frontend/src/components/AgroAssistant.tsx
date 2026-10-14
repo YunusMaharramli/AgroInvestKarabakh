@@ -1,254 +1,443 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, RotateCcw } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { MessageCircle, X, Send, RotateCcw, Mic, MicOff, Phone, ArrowRight, Sparkles } from 'lucide-react';
+import { useAuth } from '../context/AuthContext.js';
+import { HELP_LINE } from './Header.js';
 
+/**
+ * AgroKöməkçi — the portal chat assistant.
+ * Talks to POST /api/ai/chat (the server adds live portal data and calls Gemini; the API key never reaches the browser).
+ * Other parts of the site can open it with a ready question:
+ *   window.dispatchEvent(new CustomEvent('agro:ask', { detail: 'Bu sahə üçün hansı sənədlər lazımdır?' }))
+ */
+
+interface ChatAction { label: string; route: string }
 interface ChatMessage {
+  id: string;
   role: 'user' | 'assistant';
   text: string;
+  actions?: ChatAction[];
+  suggestions?: string[];
+  failed?: boolean;
 }
 
-const CLIENT_FAQ_BACKUP: { keywords: string[]; answer: string }[] = [
-  {
-    keywords: ['necə müraciət', 'müraciət qaydası', 'müraciət etmək', 'ərizə vermək', 'addım', 'proses', 'müraciət'],
-    answer: 'AgroInvest Qarabağ portalında investisiya müsabiqəsinə müraciət 5 sadə elektron addımdan ibarətdir:\n\n1. **Qeydiyyat**: Portalda fərdi sahibkar və ya hüquqi şəxs kimi qeydiyyatdan keçin və ya kabinetinizə daxil olun.\n2. **Sahə Seçimi**: "İnvestisiya imkanları" kataloqundan fəaliyyətinizə uyğun torpaq sahəsini və aktiv müsabiqəni seçin.\n3. **Təklif**: "Müraciət et" düyməsini sıxaraq layihənizin investisiya məbləğini və icra müddətini qeyd edin.\n4. **Sənədlər**: Biznes Plan, Texniki-İqtisadi Əsaslandırma (TİƏ) və bank zəmanətini PDF formatında sistemə yükləyin.\n5. **Təsdiq**: Formanı təsdiq edib göndərin. Sizə dərhal unikal AGRO-2026-XXXX qeydiyyat kodu veriləcək.',
-  },
-  {
-    keywords: ['sənəd', 'hansı sənəd', 'lazım olan sənəd', 'tələb olunan sənədlər', 'sənədlər siyahısı', 'tiə', 'biznes plan'],
-    answer: 'İnvestisiya müsabiqələrində tələb olunan əsas sənədlər:\n\n• **Biznes Plan və Texniki-İqtisadi Əsaslandırma (TİƏ)**;\n• **Maliyyə Zəmanəti** (layihə məbləğinin ən azı 30%-i həcmində bank zəmanəti və ya hesab çıxarışı);\n• **VÖEN şəhadətnaməsi** və hüquqi şəxsin nizamnaməsi;\n• **Aqrar sahədə təcrübəni** təsdiq edən portfel sənədləri.',
-  },
-  {
-    keywords: ['agromatch', 'tövsiyə', 'uyğun torpaq', 'bal', 'necə hesablanır', 'alqoritm'],
-    answer: 'AgroMatch — sizin investisiya imkanlarınıza ən uyğun torpaq sahələrini müəyyən edən şəffaf çəkili alqoritmdir:\n\n• **Məkan uyğunluğu (35%)**\n• **Büdcə uyğunluğu (30%)**\n• **Aqrar sektor (20%)**\n• **Torpaq sahəsi (15%)**\n\nNəticədə 0-100% arası uyğunluq balı və amillərin ətraflı bölgüsü təqdim olunur.',
-  },
-  {
-    keywords: ['subsidiya', 'güzəşt', 'dövlət dəstəyi', 'kredit', 'vergi'],
-    answer: 'Qarabağ və Şərqi Zəngəzurda fəaliyyət göstərən sahibkarlar üçün xüsusi dövlət dəstəyi:\n\n• **10 il müddətinə vergi azadolmaları** (mənfəət, əmlak, torpaq);\n• **Kənd təsərrüfatı texnikası alışına 40%-dək subsidiya**;\n• **Müasir suvarma sistemlərinə dövlət dəstəyi**;\n• **SİF vasitəsilə 5%-li güzəştli aqro-kreditlər**.',
-  },
-  {
-    keywords: ['status', 'izləmə', 'mərhələ', 'nə deməkdir'],
-    answer: 'Müraciətlər 4 əsas mərhələdən keçir:\n\n• **Qəbul edilib (RECEIVED)**: Elektron müraciət qeydə alınıb.\n• **Baxılır (UNDER_REVIEW)**: Ekspert şurası biznes planı qiymətləndirir.\n• **Əlavə məlumat tələb olunur**: Komissiya əlavə aydınlaşdırma tələb edir.\n• **Qərar verilib (DECIDED)**: Müsabiqənin yekun nəticəsi təsdiqlənib.',
-  },
-  {
-    keywords: ['salam', 'necəsən', 'sabahınız xeyir', 'axşamınız xeyir'],
-    answer: 'Salam! Mən AgroKöməkçiyəm — Qarabağda aqrar investisiya imkanları, müsabiqə şərtləri və elektron müraciət üzrə virtual bələdçinizəm. Sizə necə kömək edə bilərəm?',
-  },
+interface AgroAssistantProps {
+  navigate: (route: string) => void;
+  currentRoute: string;
+}
+
+const STORAGE_KEY = 'agro_chat_v2';
+const TOPICS = [
+  { emoji: '📝', text: 'Necə müraciət edim?' },
+  { emoji: '📄', text: 'Hansı sənədlər lazımdır?' },
+  { emoji: '🌾', text: 'Mənə uyğun sahə tapın' },
+  { emoji: '🔎', text: 'Müraciətimin vəziyyəti necədir?' },
 ];
 
-export const AgroAssistant: React.FC = () => {
+const newId = () => Math.random().toString(36).slice(2);
+
+function loadMessages(): ChatMessage[] {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** **bold** inside a line */
+function inline(text: string, keyBase: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') && part.length > 4
+      ? <strong key={`${keyBase}-${i}`} className="font-extrabold">{part.slice(2, -2)}</strong>
+      : <React.Fragment key={`${keyBase}-${i}`}>{part}</React.Fragment>,
+  );
+}
+
+/** Small, safe formatter: paragraphs, "1." numbered lists, "-"/"•" bullet lists and **bold**. No HTML. */
+function FormattedText({ text }: { text: string }) {
+  const blocks: React.ReactNode[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+  const flush = () => {
+    if (!list) return;
+    const Tag = list.ordered ? 'ol' : 'ul';
+    blocks.push(
+      <Tag key={`l${blocks.length}`} className={`${list.ordered ? 'list-decimal' : 'list-disc'} pl-6 my-2 flex flex-col gap-1.5`}>
+        {list.items.map((it, i) => <li key={i}>{inline(it, `li${blocks.length}-${i}`)}</li>)}
+      </Tag>,
+    );
+    list = null;
+  };
+  text.split('\n').forEach((raw, i) => {
+    const line = raw.trim();
+    const num = line.match(/^\d+[.)]\s+(.*)$/);
+    const bullet = line.match(/^[-•*]\s+(.*)$/);
+    if (num || bullet) {
+      const ordered = Boolean(num);
+      if (!list || list.ordered !== ordered) { flush(); list = { ordered, items: [] }; }
+      list.items.push((num ?? bullet)![1]);
+    } else {
+      flush();
+      if (line) blocks.push(<p key={`p${i}`} className="my-1.5">{inline(line, `p${i}`)}</p>);
+    }
+  });
+  flush();
+  return <>{blocks}</>;
+}
+
+// Browser speech-to-text (Chrome/Edge). Hidden where not supported.
+const SpeechRecognitionImpl: any =
+  typeof window !== 'undefined' ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition : undefined;
+
+export const AgroAssistant: React.FC<AgroAssistantProps> = ({ navigate, currentRoute }) => {
+  const { user, token } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: 'assistant',
-      text: 'Salam! Mən AgroKöməkçiyəm — Qarabağda aqrar investisiya imkanları, müsabiqə şərtləri və elektron müraciət üzrə virtual bələdçinizəm. Sizə necə kömək edə bilərəm?',
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(loadMessages);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [listening, setListening] = useState(false);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
+  // Remember the conversation while the tab is open
+  useEffect(() => {
+    try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-40))); } catch { /* storage blocked */ }
+  }, [messages]);
+
+  // Keep the newest message in view
+  useEffect(() => {
+    if (isOpen) listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages, loading, isOpen]);
+
+  // Focus the text box when opened; Esc closes
+  useEffect(() => {
+    if (!isOpen) return;
+    setTimeout(() => inputRef.current?.focus(), 50);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen]);
+
+  const close = () => {
+    setIsOpen(false);
+    recognitionRef.current?.stop?.();
+    setTimeout(() => launcherRef.current?.focus(), 0);
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      scrollToBottom();
-    }
-  }, [messages, isOpen]);
-
-  const handleSend = async (textToSend?: string) => {
-    const query = (textToSend || input).trim();
+  const send = useCallback(async (text: string) => {
+    const query = text.trim();
     if (!query || loading) return;
+    const history = messagesRef.current
+      .filter(m => !m.failed)
+      .slice(-10)
+      .map(m => ({ role: m.role, text: m.text }));
 
-    const userMsg: ChatMessage = { role: 'user', text: query };
-    setMessages(prev => [...prev, userMsg]);
-    if (!textToSend) setInput('');
+    setMessages(prev => [...prev.filter(m => !m.failed), { id: newId(), role: 'user', text: query }]);
+    setInput('');
     setLoading(true);
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 35000);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
-
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: query,
-          history: messages.slice(-4),
-        }),
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ message: query, history, page: window.location.pathname }),
         signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const data = await res.json();
-        const reply = data.answer || 'Sorğunuzu cavablandırmaq mümkün olmadı.';
-        setMessages(prev => [...prev, { role: 'assistant', text: reply }]);
-      } else {
-        throw new Error('API response not ok');
-      }
-    } catch (err) {
-      // Instant Client-Side Knowledge Fallback
-      const lowerQuery = query.toLowerCase();
-      let matchedAnswer: string | null = null;
-      for (const item of CLIENT_FAQ_BACKUP) {
-        if (item.keywords.some(k => lowerQuery.includes(k))) {
-          matchedAnswer = item.answer;
-          break;
-        }
-      }
-
-      const fallbackReply = matchedAnswer || `Salam! Mən AgroKöməkçiyəm. Sizə Qarabağda investisiya müsabiqələri üzrə aşağıdakı mövzularda məlumat verə bilərəm:\n\n• **"Müraciət necə edilir?"**\n• **"Hansı sənədlər lazımdır?"**\n• **"AgroMatch necə hesablanır?"**\n• **"Dövlət subsidiyaları nədir?"**\n\nZəhmət olmasa sualınızı seçin və ya yazın!`;
-      setMessages(prev => [...prev, { role: 'assistant', text: fallbackReply }]);
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json();
+      setMessages(prev => [...prev, {
+        id: newId(),
+        role: 'assistant',
+        text: typeof data.answer === 'string' && data.answer ? data.answer : 'Bağışlayın, cavab hazırlaya bilmədim.',
+        actions: Array.isArray(data.actions) ? data.actions.filter((a: any) => a?.label && typeof a.route === 'string' && a.route.startsWith('/')) : [],
+        suggestions: Array.isArray(data.suggestions) ? data.suggestions.filter((s: any) => typeof s === 'string') : [],
+      }]);
+    } catch {
+      setMessages(prev => [...prev, {
+        id: newId(),
+        role: 'assistant',
+        failed: true,
+        text: `Bağlantı alınmadı. İnternetinizi yoxlayıb **“Yenidən göndər”** düyməsini basın. Təcili sualınız varsa, zəng edin: **${HELP_LINE}**`,
+      }]);
     } finally {
+      clearTimeout(timer);
       setLoading(false);
     }
+  }, [loading, token]);
+
+  // Other pages can open the chat with a question
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      setIsOpen(true);
+      const q = (e as CustomEvent<string>).detail;
+      if (typeof q === 'string' && q.trim()) send(q);
+    };
+    window.addEventListener('agro:ask', onAsk);
+    return () => window.removeEventListener('agro:ask', onAsk);
+  }, [send]);
+
+  const retryLast = () => {
+    const lastUser = [...messages].reverse().find(m => m.role === 'user');
+    if (!lastUser) return;
+    setMessages(prev => prev.filter(m => !m.failed && m.id !== lastUser.id));
+    send(lastUser.text);
   };
 
-  const handleReset = () => {
-    setMessages([
-      {
-        role: 'assistant',
-        text: 'Salam! Mən AgroKöməkçiyəm — Qarabağda aqrar investisiya imkanları, müsabiqə şərtləri və elektron müraciət üzrə virtual bələdçinizəm. Sizə necə kömək edə bilərəm?',
-      },
-    ]);
+  const reset = () => {
+    setMessages([]);
+    setInput('');
+    inputRef.current?.focus();
   };
 
-  const quickPrompts = [
-    'Müsabiqəyə necə müraciət edilir?',
-    'Hansı sənədlər tələb olunur?',
-    'AgroMatch necə hesablanır?',
-    'Dövlət subsidiyaları nədir?',
-  ];
-
-  // Helper to render bold and line breaks safely
-  const renderFormattedText = (text: string) => {
-    return text.split('\n').map((line, i) => {
-      // Parse **bold** parts
-      const parts = line.split(/(\*\*.*?\*\*)/g);
-      return (
-        <span key={i} className="block min-h-[1.1rem]">
-          {parts.map((part, pIdx) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-              return <strong key={pIdx} className="font-bold text-emerald-950">{part.slice(2, -2)}</strong>;
-            }
-            return part;
-          })}
-        </span>
-      );
-    });
+  const toggleMic = () => {
+    if (!SpeechRecognitionImpl) return;
+    if (listening) { recognitionRef.current?.stop(); return; }
+    const rec = new SpeechRecognitionImpl();
+    rec.lang = 'az-AZ';
+    rec.interimResults = true;
+    rec.continuous = false;
+    let finalText = '';
+    rec.onresult = (e: any) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      setInput((finalText + interim).trim());
+    };
+    rec.onend = () => { setListening(false); inputRef.current?.focus(); };
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+    setListening(true);
+    rec.start();
   };
+
+  const goTo = (route: string) => {
+    navigate(route);
+    // On phones the chat covers the page, so close it to show where we went
+    if (window.matchMedia('(max-width: 639px)').matches) close();
+  };
+
+  const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
+  const greeting = user ? `Salam, ${user.firstName}!` : 'Salam!';
+  // Hide the launcher label behind the compare bar on the list page
+  const raised = currentRoute === '/opportunities';
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
-      {!isOpen ? (
+    <>
+      {!isOpen && (
         <button
+          ref={launcherRef}
+          type="button"
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2.5 px-4 py-3 bg-emerald-800 hover:bg-emerald-900 text-white rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95 group"
+          aria-haspopup="dialog"
+          className={`fixed right-4 sm:right-6 z-40 flex items-center gap-3 min-h-14 pl-4 pr-5 rounded-full bg-brand-700 hover:bg-brand-800 text-white shadow-[0_10px_30px_rgba(20,71,42,0.35)] border-2 border-white ${raised ? 'bottom-24' : 'bottom-5 sm:bottom-6'}`}
         >
-          <Bot className="w-5 h-5 text-amber-300" />
-          <span className="text-xs font-semibold whitespace-nowrap">AgroKöməkçi AI</span>
+          <span className="w-9 h-9 rounded-full bg-gold-500 text-ink flex items-center justify-center" aria-hidden="true">
+            <MessageCircle className="w-5 h-5" />
+          </span>
+          <span className="font-display font-extrabold text-base leading-tight text-left">
+            Sualınız var?
+            <span className="block font-sans font-normal text-sm text-[#DCE8E0]">Köməkçiyə yazın</span>
+          </span>
         </button>
-      ) : (
-        <div className="w-[360px] sm:w-[420px] h-[540px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+      )}
+
+      {isOpen && (
+        <div
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="agro-chat-title"
+          className="fixed z-50 inset-0 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[27rem] sm:h-[min(42rem,calc(100vh-3rem))] bg-cream sm:rounded-3xl shadow-2xl border border-line flex flex-col overflow-hidden"
+        >
           {/* Header */}
-          <div className="bg-emerald-900 px-4 py-3 text-white flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-800 flex items-center justify-center">
-                <Bot className="w-4 h-4 text-amber-300" />
-              </div>
-              <div>
-                <h3 className="text-xs font-bold leading-tight">AgroKöməkçi</h3>
-                <p className="text-[10px] text-emerald-200">Qarabağ Aqro İnvestisiya Məsləhətçisi</p>
-              </div>
+          <div className="bg-brand-900 text-white px-4 py-3 flex items-center gap-3 shrink-0">
+            <span className="w-11 h-11 rounded-full bg-gold-500 text-ink flex items-center justify-center shrink-0" aria-hidden="true">
+              <Sparkles className="w-6 h-6" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <h2 id="agro-chat-title" className="font-display font-extrabold text-lg leading-tight">AgroKöməkçi</h2>
+              <p className="text-sm text-[#C9D8CE] leading-tight truncate">Portal üzrə köməkçiniz</p>
             </div>
-            <div className="flex items-center gap-1">
+            {messages.length > 0 && (
               <button
-                onClick={handleReset}
-                title="Söhbəti yenilə"
-                className="p-1.5 rounded-md text-emerald-200 hover:text-white hover:bg-emerald-800 transition-colors"
+                type="button"
+                onClick={reset}
+                aria-label="Yeni söhbət başlat"
+                title="Yeni söhbət"
+                className="w-11 h-11 rounded-xl text-[#DCE8E0] hover:bg-white/10 flex items-center justify-center"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-5 h-5" aria-hidden="true" />
               </button>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-md text-emerald-200 hover:text-white hover:bg-emerald-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+            )}
+            <button
+              type="button"
+              onClick={close}
+              className="min-h-11 px-3 rounded-xl bg-white/10 hover:bg-white/20 font-bold flex items-center gap-1.5"
+            >
+              <X className="w-5 h-5" aria-hidden="true" />
+              Bağla
+            </button>
           </div>
 
-          {/* Messages list */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50 text-xs">
-            {messages.map((m, idx) => (
-              <div
-                key={idx}
-                className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 leading-relaxed text-xs ${
-                    m.role === 'user'
-                      ? 'bg-emerald-800 text-white rounded-tr-xs shadow-xs'
-                      : 'bg-white text-slate-800 border border-slate-200/80 rounded-tl-xs shadow-2xs'
-                  }`}
-                >
-                  {renderFormattedText(m.text)}
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="bg-white border border-slate-200 text-slate-500 rounded-2xl rounded-tl-xs px-3.5 py-2 text-xs flex items-center gap-2 shadow-2xs">
-                  <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-bounce" />
-                  <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-bounce [animation-delay:0.2s]" />
-                  <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-bounce [animation-delay:0.4s]" />
-                  <span>Cavab hazırlanır...</span>
+          {/* Conversation */}
+          <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-4" role="log" aria-live="polite" aria-relevant="additions">
+            {/* Welcome (always first) */}
+            <div className="bg-white rounded-2xl rounded-tl-md border border-line px-4 py-3.5 text-[1.05rem] leading-relaxed max-w-[92%]">
+              <p className="font-bold">{greeting} Mən AgroKöməkçiyəm.</p>
+              <p className="mt-1">Torpaq sahəsi seçməyə, müraciət etməyə və müraciətinizin vəziyyətini öyrənməyə kömək edirəm.</p>
+            </div>
+
+            {messages.length === 0 && (
+              <div>
+                <p className="text-base font-bold text-muted mb-2">Bir mövzu seçin:</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {TOPICS.map(t => (
+                    <button
+                      key={t.text}
+                      type="button"
+                      onClick={() => send(t.text)}
+                      className="min-h-14 px-4 rounded-2xl bg-white border-2 border-line hover:border-brand-700 text-left font-bold text-base text-brand-900 flex items-center gap-3"
+                    >
+                      <span className="text-xl" aria-hidden="true">{t.emoji}</span>
+                      {t.text}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
+
+            {messages.map(m =>
+              m.role === 'user' ? (
+                <div key={m.id} className="self-end max-w-[85%] bg-brand-700 text-white rounded-2xl rounded-tr-md px-4 py-3 text-[1.05rem] leading-relaxed whitespace-pre-wrap">
+                  <span className="sr-only">Siz: </span>{m.text}
+                </div>
+              ) : (
+                <div key={m.id} className="max-w-[92%] flex flex-col gap-2.5">
+                  <div className={`bg-white rounded-2xl rounded-tl-md border px-4 py-3 text-[1.05rem] leading-relaxed ${m.failed ? 'border-[#C0392B]' : 'border-line'}`}>
+                    <span className="sr-only">Köməkçi: </span>
+                    <FormattedText text={m.text} />
+                  </div>
+                  {m.failed && (
+                    <button type="button" onClick={retryLast} className="self-start min-h-12 px-5 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold flex items-center gap-2">
+                      <RotateCcw className="w-5 h-5" aria-hidden="true" />
+                      Yenidən göndər
+                    </button>
+                  )}
+                  {m.actions && m.actions.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      {m.actions.map(a => (
+                        <button
+                          key={a.route}
+                          type="button"
+                          onClick={() => goTo(a.route)}
+                          className="self-start min-h-12 px-4 rounded-xl bg-gold-500 hover:bg-gold-400 text-ink font-display font-bold flex items-center gap-2 text-left"
+                        >
+                          {a.label}
+                          <ArrowRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ),
+            )}
+
+            {loading && (
+              <div className="self-start bg-white rounded-2xl rounded-tl-md border border-line px-4 py-3 flex items-center gap-3 text-base text-muted" role="status">
+                <span className="flex gap-1.5" aria-hidden="true">
+                  <span className="w-2.5 h-2.5 rounded-full bg-brand-600 animate-bounce" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-brand-600 animate-bounce [animation-delay:0.15s]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-brand-600 animate-bounce [animation-delay:0.3s]" />
+                </span>
+                Cavab yazılır…
+              </div>
+            )}
+
+            {/* Follow-up questions under the latest answer */}
+            {!loading && lastAssistant?.suggestions && lastAssistant.suggestions.length > 0 && lastAssistant === messages[messages.length - 1] && (
+              <div>
+                <p className="text-sm font-bold text-muted mb-2">Bunu da soruşa bilərsiniz:</p>
+                <div className="flex flex-wrap gap-2">
+                  {lastAssistant.suggestions.map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => send(s)}
+                      className="min-h-11 px-4 rounded-full bg-white border-2 border-line hover:border-brand-700 text-base font-bold text-brand-900"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Quick prompt suggestions */}
-          <div className="px-3 py-2 bg-white border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto text-[11px] no-scrollbar">
-            {quickPrompts.map((q, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => handleSend(q)}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-700 rounded-lg transition-colors font-medium border border-slate-200/60"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-
-          {/* Input form */}
+          {/* Input */}
           <form
-            onSubmit={e => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="p-3 bg-white border-t border-slate-200 flex items-center gap-2"
+            onSubmit={e => { e.preventDefault(); send(input); }}
+            className="shrink-0 border-t border-line bg-white px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           >
-            <input
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder="Sualınızı bura yazın (məs: müraciət qaydası)..."
-              className="flex-1 text-xs px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-700 text-slate-900"
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="p-2.5 bg-emerald-800 text-white rounded-xl hover:bg-emerald-900 disabled:opacity-50 transition-colors shadow-2xs"
-            >
-              <Send className="w-4 h-4" />
-            </button>
+            <label htmlFor="agro-chat-input" className="sr-only">Sualınız</label>
+            <div className="flex items-end gap-2">
+              <textarea
+                id="agro-chat-input"
+                ref={inputRef}
+                rows={1}
+                value={input}
+                maxLength={1000}
+                onChange={e => {
+                  setInput(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); }
+                }}
+                placeholder={listening ? 'Danışın, dinləyirəm…' : 'Sualınızı yazın…'}
+                className="flex-1 min-h-[3.25rem] max-h-36 resize-none px-4 py-3 rounded-2xl border-2 border-[#9AA89E] bg-white text-lg leading-snug focus:border-brand-700"
+              />
+              {SpeechRecognitionImpl && (
+                <button
+                  type="button"
+                  onClick={toggleMic}
+                  aria-pressed={listening}
+                  aria-label={listening ? 'Dinləməni dayandır' : 'Səslə soruşun'}
+                  title={listening ? 'Dinləməni dayandır' : 'Səslə soruşun'}
+                  className={`shrink-0 w-[3.25rem] h-[3.25rem] rounded-2xl border-2 flex items-center justify-center ${
+                    listening ? 'bg-[#C0392B] border-[#C0392B] text-white animate-pulse' : 'bg-white border-line text-brand-900 hover:border-brand-700'
+                  }`}
+                >
+                  {listening ? <MicOff className="w-6 h-6" aria-hidden="true" /> : <Mic className="w-6 h-6" aria-hidden="true" />}
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={loading || !input.trim()}
+                className="shrink-0 h-[3.25rem] px-4 rounded-2xl bg-brand-700 hover:bg-brand-800 disabled:opacity-50 text-white font-display font-bold flex items-center gap-2"
+              >
+                <Send className="w-5 h-5" aria-hidden="true" />
+                <span className="hidden min-[400px]:inline">Göndər</span>
+                <span className="sr-only min-[400px]:hidden">Göndər</span>
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-muted flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>Köməkçi səhv edə bilər — vacib məlumatı yoxlayın.</span>
+              <span className="whitespace-nowrap font-bold text-brand-900">
+                <Phone className="inline w-4 h-4 -mt-0.5" aria-hidden="true" /> {HELP_LINE}
+              </span>
+            </p>
           </form>
         </div>
       )}
-    </div>
+    </>
   );
 };

@@ -1,45 +1,84 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Application, Favorite, Notification } from '../types/index.js';
 import { useAuth } from '../context/AuthContext.js';
-import { LayoutDashboard, FileText, Heart, Bell, User, Clock, CheckCircle, AlertTriangle, Send, Eye, X, ArrowRight, ExternalLink } from 'lucide-react';
+import { useFavorites } from '../context/FavoritesContext.js';
+import { FileText, Heart, Bell, User, AlertTriangle, Send, X, ArrowRight, Check, Search, Phone } from 'lucide-react';
+import { landImage, formatManat, formatDateAz } from '../lib/landImages.js';
+import { statusInfo, STATUS_STEPS } from '../lib/applicationStatus.js';
+import { HELP_LINE } from '../components/Header.js';
 
 interface EntrepreneurDashboardPageProps {
   navigate: (route: string) => void;
 }
 
+type Tab = 'applications' | 'favorites' | 'notifications' | 'profile';
+
+const fieldClass =
+  'w-full min-h-[3.25rem] px-4 rounded-xl border-2 border-[#9AA89E] bg-white text-ink text-lg focus:border-brand-700';
+
+/** Three-step progress: Göndərildi → Yoxlanılır → Qərar verildi */
+const StatusSteps: React.FC<{ app: Application }> = ({ app }) => {
+  const info = statusInfo(app);
+  return (
+    <ol className="grid grid-cols-3 gap-2" aria-label="Müraciətin mərhələləri">
+      {STATUS_STEPS.map((s, i) => {
+        const done = i < info.step || (i === info.step && info.step === 2);
+        const current = i === info.step;
+        return (
+          <li key={s} className="flex flex-col gap-1.5" aria-current={current ? 'step' : undefined}>
+            <span className={`h-2.5 rounded-full ${i <= info.step ? 'bg-brand-700' : 'bg-sand'}`} />
+            <span className={`text-sm leading-tight ${current ? 'font-extrabold text-ink' : 'text-muted'}`}>
+              {done && !current ? '✓ ' : ''}{s}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+};
+
 export const EntrepreneurDashboardPage: React.FC<EntrepreneurDashboardPageProps> = ({ navigate }) => {
-  const { user, profile, token, updateProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'applications' | 'favorites' | 'notifications' | 'profile'>('overview');
+  const { user, profile, token, isLoading: authLoading, updateProfile } = useAuth();
+  const { toggleFavorite } = useFavorites();
+  const [activeTab, setActiveTab] = useState<Tab>('applications');
   const [applications, setApplications] = useState<Application[]>([]);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Selected application for detail modal
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [infoResponseText, setInfoResponseText] = useState('');
   const [submittingResponse, setSubmittingResponse] = useState(false);
+  const [responseSent, setResponseSent] = useState(false);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Profile edit states
-  const [editFirstName, setEditFirstName] = useState(user?.firstName || '');
-  const [editLastName, setEditLastName] = useState(user?.lastName || '');
-  const [editPhone, setEditPhone] = useState(user?.phone || '');
-  const [editCompanyName, setEditCompanyName] = useState(profile?.companyName || '');
-  const [editTin, setEditTin] = useState(profile?.taxIdentificationNumber || '');
-  const [editActivity, setEditActivity] = useState(profile?.businessActivity || '');
-  const [profileMsg, setProfileMsg] = useState('');
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editCompanyName, setEditCompanyName] = useState('');
+  const [editTin, setEditTin] = useState('');
+  const [editActivity, setEditActivity] = useState('');
+  const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Fill the profile form once the user has loaded (it is empty on a page reload otherwise)
+  useEffect(() => {
+    setEditFirstName(user?.firstName || '');
+    setEditLastName(user?.lastName || '');
+    setEditPhone(user?.phone || '');
+    setEditCompanyName(profile?.companyName || '');
+    setEditTin(profile?.taxIdentificationNumber || '');
+    setEditActivity(profile?.businessActivity || '');
+  }, [user, profile]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-
       const [appsRes, favsRes, notifsRes] = await Promise.all([
         fetch('/api/applications/my', { headers }),
         fetch('/api/favorites', { headers }),
         fetch('/api/notifications', { headers }),
       ]);
-
       if (appsRes.ok) setApplications(await appsRes.json());
       if (favsRes.ok) setFavorites(await favsRes.json());
       if (notifsRes.ok) setNotifications(await notifsRes.json());
@@ -51,32 +90,45 @@ export const EntrepreneurDashboardPage: React.FC<EntrepreneurDashboardPageProps>
   };
 
   useEffect(() => {
-    if (user) {
-      loadData();
-    }
-  }, [user]);
+    if (authLoading) return;
+    if (!user) { navigate('/login?next=%2Fdashboard'); return; }
+    if (user.role === 'ADMIN') { navigate('/admin'); return; }
+    loadData();
+  }, [user, authLoading]);
+
+  // Dialog: close with Escape, stop the page behind from scrolling
+  useEffect(() => {
+    if (!selectedApp) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedApp(null); };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    closeBtnRef.current?.focus();
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [selectedApp?.id]);
+
+  const openApp = (app: Application) => {
+    setResponseSent(false);
+    setInfoResponseText('');
+    setSelectedApp(app);
+  };
 
   const handleInfoResponseSubmit = async (requestId: string) => {
     if (!infoResponseText.trim() || !selectedApp) return;
     setSubmittingResponse(true);
-
     try {
       const res = await fetch(`/api/applications/${selectedApp.id}/respond-info`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          requestId,
-          responseText: infoResponseText,
-        }),
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ requestId, responseText: infoResponseText }),
       });
-
       if (res.ok) {
         const data = await res.json();
         setSelectedApp(data.application);
         setInfoResponseText('');
+        setResponseSent(true);
         loadData();
       }
     } catch (e) {
@@ -88,7 +140,7 @@ export const EntrepreneurDashboardPage: React.FC<EntrepreneurDashboardPageProps>
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setProfileMsg('');
+    setProfileMsg(null);
     const res = await updateProfile({
       firstName: editFirstName,
       lastName: editLastName,
@@ -97,585 +149,376 @@ export const EntrepreneurDashboardPage: React.FC<EntrepreneurDashboardPageProps>
       taxIdentificationNumber: editTin,
       businessActivity: editActivity,
     });
-    if (res.success) {
-      setProfileMsg('Profil məlumatları uğurla yeniləndi.');
-    } else {
-      setProfileMsg(res.error || 'Yenilənmədi.');
-    }
+    setProfileMsg(res.success ? { ok: true, text: 'Məlumatlarınız yadda saxlanıldı.' } : { ok: false, text: res.error || 'Yadda saxlamaq alınmadı.' });
   };
 
-  // Status badge styling helper
-  const renderStatus = (status: Application['status'], outcome: Application['decisionOutcome']) => {
-    if (status === 'DECIDED') {
-      if (outcome === 'APPROVED') {
-        return <span className="font-bold text-emerald-800">Qəbul edildi (Təsdiqləndi)</span>;
-      }
-      return <span className="font-bold text-rose-700">İmtina edildi</span>;
-    }
-    if (status === 'UNDER_REVIEW') {
-      return <span className="font-bold text-amber-700">Ekspertizada baxılır</span>;
-    }
-    if (status === 'ADDITIONAL_INFORMATION_REQUIRED') {
-      return <span className="font-bold text-indigo-700">Əlavə məlumat tələb olunur</span>;
-    }
-    return <span className="font-bold text-slate-700">Qəbul edilib</span>;
+  const removeFavorite = async (landId: string) => {
+    await toggleFavorite(landId);
+    setFavorites(prev => prev.filter(f => f.landId !== landId));
   };
 
-  const pendingInfoCount = applications.filter(a => a.status === 'ADDITIONAL_INFORMATION_REQUIRED').length;
-  const underReviewCount = applications.filter(a => a.status === 'UNDER_REVIEW').length;
-  const decidedCount = applications.filter(a => a.status === 'DECIDED').length;
+  const needAction = applications.filter(a => a.status === 'ADDITIONAL_INFORMATION_REQUIRED');
+  const unread = notifications.filter(n => !n.isRead).length;
+
+  const TABS: { id: Tab; label: string; Icon: React.FC<any>; count?: number; dot?: boolean }[] = [
+    { id: 'applications', label: 'Müraciətlərim', Icon: FileText, count: applications.length },
+    { id: 'favorites', label: 'Yadda saxladıqlarım', Icon: Heart, count: favorites.length },
+    { id: 'notifications', label: 'Bildirişlər', Icon: Bell, count: unread || undefined, dot: unread > 0 },
+    { id: 'profile', label: 'Məlumatlarım', Icon: User },
+  ];
+
+  if (authLoading || !user) {
+    return <div className="max-w-7xl mx-auto px-4 py-16 text-lg" role="status">Yüklənir…</div>;
+  }
 
   return (
-    <div className="min-h-screen bg-[#F8FAF9] py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Top welcome greeting */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+    <div className="bg-cream py-8 pb-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
-            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
-              Sahibkar Şəxsi Kabineti
-            </span>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 mt-0.5">
-              Xoş gördük, {user?.firstName} {user?.lastName}
+            <p className="text-base font-bold text-brand-700">Şəxsi kabinet</p>
+            <h1 className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900">
+              Xoş gördük, {user.firstName}!
             </h1>
-            <p className="text-xs text-slate-500">
-              {profile?.companyName ? `${profile.companyName} · VÖEN: ${profile.taxIdentificationNumber || '—'}` : 'Fərdi Sahibkar'}
-            </p>
+            {profile?.companyName && <p className="text-lg text-[#3E4F45] mt-1">{profile.companyName}</p>}
           </div>
-
           <button
+            type="button"
             onClick={() => navigate('/opportunities')}
-            className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 self-start sm:self-auto shadow-xs"
+            className="min-h-14 px-6 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-bold flex items-center gap-2"
           >
-            <span>Yeni Müsabiqə Seç</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <Search className="w-5 h-5" aria-hidden="true" />
+            Yeni sahə axtar
           </button>
         </div>
 
-        {/* Dashboard Layout: Sidebar Navigation + Main Viewport */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Sidebar */}
-          <div className="md:col-span-1 space-y-1">
-            <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-xs space-y-1 text-xs font-semibold">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-colors text-left ${
-                  activeTab === 'overview' ? 'bg-emerald-800 text-white' : 'text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                <span>İcmal</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('applications')}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-colors text-left ${
-                  activeTab === 'applications' ? 'bg-emerald-800 text-white' : 'text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <FileText className="w-4 h-4" />
-                  <span>Müraciətlərim</span>
-                </div>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono-numbers ${activeTab === 'applications' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                  {applications.length}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('favorites')}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-colors text-left ${
-                  activeTab === 'favorites' ? 'bg-emerald-800 text-white' : 'text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Heart className="w-4 h-4" />
-                  <span>Seçilmişlər</span>
-                </div>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono-numbers ${activeTab === 'favorites' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                  {favorites.length}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('notifications')}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-colors text-left ${
-                  activeTab === 'notifications' ? 'bg-emerald-800 text-white' : 'text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Bell className="w-4 h-4" />
-                  <span>Bildirişlər</span>
-                </div>
-                {notifications.some(n => !n.isRead) && (
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                )}
-              </button>
-
-              <button
-                onClick={() => setActiveTab('profile')}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-colors text-left ${
-                  activeTab === 'profile' ? 'bg-emerald-800 text-white' : 'text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                <User className="w-4 h-4" />
-                <span>Müəssisə Profili</span>
-              </button>
+        {/* What needs doing: shown first, in red */}
+        {needAction.length > 0 && (
+          <div role="alert" className="mb-6 p-5 rounded-2xl bg-[#FCEBE8] border-2 border-[#C0392B] flex flex-col sm:flex-row sm:items-center gap-4">
+            <AlertTriangle className="w-8 h-8 text-[#C0392B] shrink-0" aria-hidden="true" />
+            <div className="flex-1">
+              <p className="font-display font-extrabold text-xl text-[#7A1F14]">Sizdən cavab gözlənilir</p>
+              <p className="text-base text-[#7A1F14]">
+                Komissiya {needAction.length === 1 ? 'bir müraciətiniz' : `${needAction.length} müraciətiniz`} üzrə əlavə məlumat istəyir.
+              </p>
             </div>
-          </div>
-
-          {/* Main Content Viewport */}
-          <div className="md:col-span-3">
-            {/* 1. OVERVIEW TAB */}
-            {activeTab === 'overview' && (
-              <div className="space-y-6">
-                {/* Stats cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Cəmi Müraciət</span>
-                    <span className="text-2xl font-black text-slate-900 font-mono-numbers mt-1 block">
-                      {applications.length}
-                    </span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                    <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider block">Baxılmada</span>
-                    <span className="text-2xl font-black text-amber-700 font-mono-numbers mt-1 block">
-                      {underReviewCount}
-                    </span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                    <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider block">Əlavə Məlumat Tələbi</span>
-                    <span className="text-2xl font-black text-indigo-700 font-mono-numbers mt-1 block">
-                      {pendingInfoCount}
-                    </span>
-                  </div>
-
-                  <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                    <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">Qərar Verilmiş</span>
-                    <span className="text-2xl font-black text-emerald-800 font-mono-numbers mt-1 block">
-                      {decidedCount}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Attention notice if information is requested */}
-                {pendingInfoCount > 0 && (
-                  <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl text-xs flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2.5">
-                      <AlertTriangle className="w-5 h-5 text-indigo-700 shrink-0" />
-                      <div>
-                        <strong className="text-indigo-900 block">Komissiya tərəfindən əlavə sənəd tələb olunur!</strong>
-                        <span className="text-indigo-700">Müraciətinizin icraatını sürətləndirmək üçün zəhmət olmasa cavab təqdim edin.</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setActiveTab('applications')}
-                      className="px-3.5 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-semibold whitespace-nowrap"
-                    >
-                      Cavabla
-                    </button>
-                  </div>
-                )}
-
-                {/* Recent Applications Table */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                  <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-slate-900">Son Müraciətlər</h3>
-                    <button
-                      onClick={() => setActiveTab('applications')}
-                      className="text-xs font-semibold text-emerald-800 hover:underline"
-                    >
-                      Hamısına bax
-                    </button>
-                  </div>
-
-                  <div className="divide-y divide-slate-100">
-                    {applications.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-slate-400">
-                        Hələ heç bir elektron müraciət göndərilməyib.
-                      </div>
-                    ) : (
-                      applications.slice(0, 3).map(app => (
-                        <div key={app.id} className="p-4 sm:px-6 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
-                          <div>
-                            <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                              <span className="font-bold text-slate-900 font-mono-numbers">{app.referenceNumber}</span>
-                              <span aria-hidden="true">·</span>
-                              <span>{app.land?.region}</span>
-                              <span aria-hidden="true">·</span>
-                              <span className="font-mono-numbers">{new Date(app.submittedAt).toLocaleDateString('az-AZ')}</span>
-                            </div>
-                            <h4 className="text-xs font-semibold text-slate-800">{app.competition?.title}</h4>
-                            <div className="mt-1 text-xs">
-                              {renderStatus(app.status, app.decisionOutcome)}
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => setSelectedApp(app)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-800 hover:text-white text-slate-800 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 shrink-0"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Statusa bax</span>
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 2. APPLICATIONS TAB */}
-            {activeTab === 'applications' && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">Müraciətlər Siyahısı və Status İzləmə</h3>
-                    <p className="text-[11px] text-slate-500">Müraciət tarixçəsi, ekspert qeydləri və yekun qərarlar</p>
-                  </div>
-                </div>
-
-                <div className="divide-y divide-slate-100">
-                  {applications.length === 0 ? (
-                    <div className="p-12 text-center text-xs text-slate-400">
-                      Heç bir müraciət tapılmadı.
-                    </div>
-                  ) : (
-                    applications.map(app => (
-                      <div key={app.id} className="p-6 hover:bg-slate-50/50 transition-colors">
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                          <div>
-                            <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                              <span className="font-extrabold text-emerald-950 font-mono-numbers text-sm">
-                                {app.referenceNumber}
-                              </span>
-                              <span aria-hidden="true">·</span>
-                              <span>{app.land?.region}</span>
-                              <span aria-hidden="true">·</span>
-                              <span className="font-mono-numbers">{new Date(app.submittedAt).toLocaleDateString('az-AZ')}</span>
-                            </div>
-
-                            <h4 className="text-sm font-bold text-slate-900">{app.competition?.title}</h4>
-                            <p className="text-xs text-slate-600 mt-1 line-clamp-2">{app.businessPlanSummary}</p>
-
-                            <div className="mt-3 flex items-center gap-3 text-xs">
-                              <div>
-                                <span className="text-slate-400">Təklif edilən məbləğ: </span>
-                                <strong className="text-slate-900 font-mono-numbers">{app.proposedInvestmentAmount.toLocaleString()} AZN</strong>
-                              </div>
-                              <span aria-hidden="true">·</span>
-                              <div>
-                                <span className="text-slate-400">İcra müddəti: </span>
-                                <strong className="text-slate-900">{app.estimatedImplementationPeriod}</strong>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col sm:items-end gap-2 shrink-0">
-                            <div>{renderStatus(app.status, app.decisionOutcome)}</div>
-                            <button
-                              onClick={() => setSelectedApp(app)}
-                              className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>Ətraflı Bax</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* If pending information required */}
-                        {app.status === 'ADDITIONAL_INFORMATION_REQUIRED' && (
-                          <div className="mt-4 p-3.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs">
-                            <span className="font-bold text-indigo-900 block mb-1">Komissiyanın rəsmi sorğusu:</span>
-                            <p className="text-indigo-800">
-                              {app.infoRequests?.find(r => r.status === 'PENDING')?.message || 'Əlavə sənəd tələb olunur.'}
-                            </p>
-                            <button
-                              onClick={() => setSelectedApp(app)}
-                              className="mt-2 text-xs font-bold text-indigo-900 underline"
-                            >
-                              Rəsmi cavab təqdim et
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 3. FAVORITES TAB */}
-            {activeTab === 'favorites' && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6">
-                <h3 className="text-sm font-bold text-slate-900 mb-4">Seçilmiş Torpaq Sahələri</h3>
-                {favorites.length === 0 ? (
-                  <div className="text-center py-12 text-xs text-slate-400">
-                    Seçilmişlər siyahısında heç bir torpaq sahəsi yoxdur.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {favorites.map(fav => (
-                      <div key={fav.id} className="p-4 rounded-xl border border-slate-200 hover:border-emerald-300 transition-colors flex flex-col justify-between">
-                        <div>
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] font-bold text-emerald-800">{fav.land?.region}</span>
-                            <span className="text-[11px] text-slate-400 font-mono-numbers">{fav.land?.areaHectares} ha</span>
-                          </div>
-                          <h4 className="text-xs font-bold text-slate-900 mt-1">{fav.land?.title}</h4>
-                          <p className="text-[11px] text-slate-600 line-clamp-2 mt-1">{fav.land?.description}</p>
-                        </div>
-                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                          <span className="text-xs font-bold font-mono-numbers">
-                            {fav.land?.estimatedInvestmentRequirement?.toLocaleString()} AZN
-                          </span>
-                          <button
-                            onClick={() => navigate(`/opportunities/${fav.landId}`)}
-                            className="px-3 py-1 bg-emerald-800 text-white rounded text-xs font-semibold"
-                          >
-                            Ətraflı
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 4. NOTIFICATIONS TAB */}
-            {activeTab === 'notifications' && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-900">Bildirişlər</h3>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-slate-400">Bildiriş yoxdur.</div>
-                  ) : (
-                    notifications.map(n => (
-                      <div key={n.id} className="p-4 sm:px-6 hover:bg-slate-50 text-xs">
-                        <div className="flex items-center justify-between">
-                          <strong className="text-slate-900">{n.title}</strong>
-                          <span className="text-[10px] text-slate-400 font-mono-numbers">
-                            {new Date(n.createdAt).toLocaleDateString('az-AZ')}
-                          </span>
-                        </div>
-                        <p className="text-slate-600 mt-1 leading-relaxed">{n.message}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 5. PROFILE TAB */}
-            {activeTab === 'profile' && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6">
-                <h3 className="text-sm font-bold text-slate-900 mb-1">Müəssisə və Sahibkar Profili</h3>
-                <p className="text-xs text-slate-500 mb-6">Müsabiqə müraciətlərində istifadə olunan rəsmi rekvizitlər</p>
-
-                {profileMsg && (
-                  <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs">
-                    {profileMsg}
-                  </div>
-                )}
-
-                <form onSubmit={handleProfileSave} className="space-y-4 text-xs">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">Ad</label>
-                      <input
-                        type="text"
-                        value={editFirstName}
-                        onChange={e => setEditFirstName(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-900"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">Soyad</label>
-                      <input
-                        type="text"
-                        value={editLastName}
-                        onChange={e => setEditLastName(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-900"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Əlaqə Telefonu</label>
-                    <input
-                      type="text"
-                      value={editPhone}
-                      onChange={e => setEditPhone(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-900"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">Şirkət / Təsərrüfat Adı</label>
-                      <input
-                        type="text"
-                        value={editCompanyName}
-                        onChange={e => setEditCompanyName(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-900"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">VÖEN</label>
-                      <input
-                        type="text"
-                        value={editTin}
-                        onChange={e => setEditTin(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-900"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Fəaliyyət Sahəsi / İxtisaslaşma</label>
-                    <textarea
-                      rows={3}
-                      value={editActivity}
-                      onChange={e => setEditActivity(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-900"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="px-6 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white font-bold rounded-lg text-xs transition-colors"
-                  >
-                    Məlumatları Saxla
-                  </button>
-                </form>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* APPLICATION DETAILS & TIMELINE MODAL */}
-        {selectedApp && (
-          <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-slate-200 text-xs">
-              <div className="flex items-start justify-between pb-4 border-b border-slate-200">
-                <div>
-                  <span className="font-extrabold text-emerald-900 text-sm font-mono-numbers">
-                    {selectedApp.referenceNumber}
-                  </span>
-                  <h3 className="text-base font-bold text-slate-900 mt-0.5">{selectedApp.competition?.title}</h3>
-                </div>
-                <button
-                  onClick={() => setSelectedApp(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Status Banner */}
-              <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <span className="text-slate-400 block text-[10px] uppercase font-bold">Cari Status</span>
-                <div className="mt-1 text-sm font-bold">
-                  {renderStatus(selectedApp.status, selectedApp.decisionOutcome)}
-                </div>
-                {selectedApp.adminDecisionNote && (
-                  <p className="mt-2 text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200">
-                    <strong>Komissiya qeydi: </strong> {selectedApp.adminDecisionNote}
-                  </p>
-                )}
-              </div>
-
-              {/* Status History Timeline */}
-              <div className="mt-6">
-                <h4 className="font-bold text-slate-900 uppercase tracking-wider text-[11px] mb-3">
-                  Müraciətin Rəsmi İcraat Tarixçəsi
-                </h4>
-                <div className="space-y-4 border-l-2 border-slate-200 ml-2 pl-4">
-                  {selectedApp.statusHistory?.map(hist => (
-                    <div key={hist.id} className="relative">
-                      <span className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-700 ring-4 ring-white" />
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono-numbers">
-                        <span>{new Date(hist.createdAt).toLocaleString('az-AZ')}</span>
-                        <span>·</span>
-                        <span className="text-slate-600 font-semibold">{hist.changedBy}</span>
-                      </div>
-                      <p className="text-slate-800 font-medium mt-0.5">{hist.comment}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Additional Information Request & Response Form */}
-              {selectedApp.status === 'ADDITIONAL_INFORMATION_REQUIRED' && (
-                <div className="mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
-                  <span className="font-bold text-indigo-900 uppercase tracking-wider text-[11px] block mb-1">
-                    Komissiyanın Əlavə Məlumat Tələbi
-                  </span>
-                  <p className="text-indigo-800 mb-3">
-                    {selectedApp.infoRequests?.find(r => r.status === 'PENDING')?.message || 'Zəhmət olmasa tələb olunan məlumatı qeyd edin.'}
-                  </p>
-
-                  <div className="space-y-2">
-                    <label className="block font-semibold text-slate-700">Rəsmi Cavabınız:</label>
-                    <textarea
-                      rows={3}
-                      value={infoResponseText}
-                      onChange={e => setInfoResponseText(e.target.value)}
-                      placeholder="Tələb olunan texniki izahat və ya sənəd nömrəsini daxil edin..."
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-slate-900"
-                    />
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        disabled={submittingResponse || !infoResponseText.trim()}
-                        onClick={() => {
-                          const pendingReq = selectedApp.infoRequests?.find(r => r.status === 'PENDING');
-                          if (pendingReq) handleInfoResponseSubmit(pendingReq.id);
-                        }}
-                        className="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg font-bold text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                        <span>Cavabı Göndər</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Uploaded Documents List */}
-              <div className="mt-6 pt-4 border-t border-slate-100">
-                <h4 className="font-bold text-slate-900 uppercase tracking-wider text-[11px] mb-2">
-                  Təqdim Edilmiş Sənədlər ({selectedApp.documents?.length || 0})
-                </h4>
-                <div className="space-y-1.5">
-                  {selectedApp.documents?.map(doc => (
-                    <div key={doc.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-emerald-800" />
-                        <span className="font-semibold text-slate-800">{doc.fileName}</span>
-                      </div>
-                      <span className="text-slate-400 font-mono-numbers">{Math.round(doc.fileSize / 1024)} KB</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
-                <button
-                  onClick={() => setSelectedApp(null)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-semibold"
-                >
-                  Bağla
-                </button>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('applications'); openApp(needAction[0]); }}
+              className="min-h-14 px-6 rounded-xl bg-[#C0392B] hover:bg-[#A93226] text-white font-display font-bold flex items-center justify-center gap-2"
+            >
+              İndi cavab yazın
+              <ArrowRight className="w-5 h-5" aria-hidden="true" />
+            </button>
           </div>
         )}
+
+        {/* Big tabs */}
+        <div role="tablist" aria-label="Kabinet bölmələri" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-6">
+          {TABS.map(t => {
+            const active = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                id={`tab-${t.id}`}
+                aria-selected={active}
+                aria-controls={`panel-${t.id}`}
+                onClick={() => setActiveTab(t.id)}
+                className={`min-h-16 px-4 rounded-2xl border-2 font-display font-bold text-base flex items-center justify-center gap-2 text-center ${
+                  active ? 'bg-brand-900 border-brand-900 text-white' : 'bg-white border-line text-brand-900 hover:border-brand-900'
+                }`}
+              >
+                <t.Icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <span>{t.label}</span>
+                {t.count !== undefined && (
+                  <span className={`min-w-7 h-7 px-2 rounded-full text-sm flex items-center justify-center ${t.dot ? 'bg-[#C0392B] text-white' : active ? 'bg-white/20' : 'bg-sand'}`}>
+                    {t.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
+          {loading && <p className="text-lg" role="status">Yüklənir…</p>}
+
+          {/* APPLICATIONS */}
+          {!loading && activeTab === 'applications' && (
+            applications.length === 0 ? (
+              <div className="text-center py-14 px-6 bg-white rounded-3xl border border-line">
+                <p className="font-display font-extrabold text-2xl text-brand-900">Hələ müraciətiniz yoxdur</p>
+                <p className="text-lg text-muted mt-2">Bəyəndiyiniz sahəni seçin və “Müraciət edin” düyməsini basın.</p>
+                <button type="button" onClick={() => navigate('/opportunities')} className="mt-6 min-h-14 px-7 rounded-xl bg-brand-700 text-white font-display font-bold hover:bg-brand-800">
+                  Torpaq sahələrinə baxın
+                </button>
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-5">
+                {applications.map(app => {
+                  const info = statusInfo(app);
+                  return (
+                    <li key={app.id} className={`bg-white rounded-3xl border-2 p-5 sm:p-6 ${info.needsAction ? 'border-[#C0392B]' : 'border-line'}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-base text-muted">
+                            № <span className="font-bold text-ink">{app.referenceNumber}</span> · {formatDateAz(app.submittedAt)}
+                          </p>
+                          <h2 className="font-display font-extrabold text-xl leading-snug text-brand-900 mt-1">
+                            {app.competition?.title || app.land?.title}
+                          </h2>
+                          {app.land?.region && <p className="text-base text-[#3E4F45]">{app.land.region}</p>}
+                        </div>
+                        <span className={`font-display font-extrabold text-base px-4 py-2 rounded-full ${info.badge}`}>{info.label}</span>
+                      </div>
+                      <div className="mt-5"><StatusSteps app={app} /></div>
+                      <p className="mt-4 text-lg">{info.explain}</p>
+                      <div className="mt-5 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => openApp(app)}
+                          className={`min-h-14 px-6 rounded-xl font-display font-bold flex items-center gap-2 ${
+                            info.needsAction ? 'bg-[#C0392B] hover:bg-[#A93226] text-white' : 'bg-brand-700 hover:bg-brand-800 text-white'
+                          }`}
+                        >
+                          {info.needsAction ? 'Cavab yazın' : 'Ətraflı baxın'}
+                          <ArrowRight className="w-5 h-5" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )
+          )}
+
+          {/* FAVORITES */}
+          {!loading && activeTab === 'favorites' && (
+            favorites.length === 0 ? (
+              <div className="text-center py-14 px-6 bg-white rounded-3xl border border-line">
+                <p className="font-display font-extrabold text-2xl text-brand-900">Yadda saxlanmış sahə yoxdur</p>
+                <p className="text-lg text-muted mt-2">Sahələrin üzərindəki “Yadda saxla” düyməsini basın — burada görünəcək.</p>
+              </div>
+            ) : (
+              <ul className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {favorites.map(fav => fav.land && (
+                  <li key={fav.id} className="bg-white rounded-3xl overflow-hidden border border-line flex flex-col">
+                    <img src={landImage(fav.land)} alt="" className="w-full h-44 object-cover" />
+                    <div className="p-5 flex flex-col gap-3 flex-1">
+                      <p className="text-base text-[#3E4F45]">{fav.land.region} · {fav.land.agricultureType}</p>
+                      <h2 className="font-display font-extrabold text-xl leading-snug text-brand-900">{fav.land.title}</h2>
+                      <p className="text-lg"><strong>{fav.land.areaHectares} ha</strong> · {formatManat(fav.land.estimatedInvestmentRequirement)}</p>
+                      <div className="mt-auto flex flex-col sm:flex-row gap-2.5 pt-2">
+                        <button type="button" onClick={() => navigate(`/opportunities/${fav.landId}`)} className="flex-1 min-h-14 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-bold flex items-center justify-center gap-2">
+                          Ətraflı baxın
+                          <ArrowRight className="w-5 h-5" aria-hidden="true" />
+                        </button>
+                        <button type="button" onClick={() => removeFavorite(fav.landId)} className="min-h-14 px-4 rounded-xl border-2 border-line font-display font-bold text-ink hover:border-[#8E2A1F] hover:text-[#8E2A1F] flex items-center justify-center gap-2">
+                          <X className="w-5 h-5" aria-hidden="true" />
+                          Siyahıdan çıxar
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
+          )}
+
+          {/* NOTIFICATIONS */}
+          {!loading && activeTab === 'notifications' && (
+            <div className="bg-white rounded-3xl border border-line overflow-hidden">
+              {notifications.length === 0 ? (
+                <p className="p-10 text-center text-lg text-muted">Bildiriş yoxdur.</p>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {notifications.map(n => (
+                    <li key={n.id} className={`p-5 sm:px-6 ${n.isRead ? '' : 'bg-gold-100/50'}`}>
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <p className="font-bold text-lg">
+                          {!n.isRead && <span className="inline-block w-3 h-3 rounded-full bg-[#C0392B] mr-2" aria-label="Yeni" />}
+                          {n.title}
+                        </p>
+                        <span className="text-base text-muted">{formatDateAz(n.createdAt)}</span>
+                      </div>
+                      <p className="text-lg text-[#3E4F45] mt-1">{n.message}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* PROFILE */}
+          {activeTab === 'profile' && (
+            <div className="bg-white rounded-3xl border border-line p-5 sm:p-8 max-w-3xl">
+              <h2 className="font-display font-extrabold text-2xl text-brand-900">Məlumatlarım</h2>
+              <p className="text-lg text-muted mt-1 mb-6">Bu məlumatlar müraciət formalarına avtomatik yazılır.</p>
+              {profileMsg && (
+                <div role="status" className={`mb-6 p-4 rounded-xl border-2 text-base flex gap-2 ${profileMsg.ok ? 'bg-brand-50 border-brand-700 text-brand-900' : 'bg-[#FCEBE8] border-[#C0392B] text-[#7A1F14]'}`}>
+                  {profileMsg.ok && <Check className="w-6 h-6 shrink-0" aria-hidden="true" />}
+                  {profileMsg.text}
+                </div>
+              )}
+              <form onSubmit={handleProfileSave} className="flex flex-col gap-5">
+                <div className="grid sm:grid-cols-2 gap-5">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="p-first" className="font-bold">Ad</label>
+                    <input id="p-first" type="text" value={editFirstName} onChange={e => setEditFirstName(e.target.value)} className={fieldClass} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="p-last" className="font-bold">Soyad</label>
+                    <input id="p-last" type="text" value={editLastName} onChange={e => setEditLastName(e.target.value)} className={fieldClass} />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="p-phone" className="font-bold">Telefon</label>
+                  <input id="p-phone" type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} className={fieldClass} />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-5">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="p-company" className="font-bold">Şirkət və ya təsərrüfat <span className="font-normal text-muted">(istəyə görə)</span></label>
+                    <input id="p-company" type="text" value={editCompanyName} onChange={e => setEditCompanyName(e.target.value)} className={fieldClass} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="p-tin" className="font-bold">VÖEN <span className="font-normal text-muted">(istəyə görə)</span></label>
+                    <input id="p-tin" type="text" inputMode="numeric" value={editTin} onChange={e => setEditTin(e.target.value)} className={fieldClass} />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="p-activity" className="font-bold">Nə ilə məşğulsunuz? <span className="font-normal text-muted">(istəyə görə)</span></label>
+                  <textarea id="p-activity" rows={3} value={editActivity} onChange={e => setEditActivity(e.target.value)} className={`${fieldClass} py-3`} />
+                </div>
+                <button type="submit" className="min-h-14 px-8 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-extrabold text-lg sm:self-start">
+                  Yadda saxla
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-10 text-lg text-center">
+          Sualınız var? Zəng edin: <strong className="text-brand-900 whitespace-nowrap"><Phone className="inline w-5 h-5" aria-hidden="true" /> {HELP_LINE}</strong>
+        </p>
+
+        {/* APPLICATION DETAILS DIALOG */}
+        {selectedApp && (() => {
+          const info = statusInfo(selectedApp);
+          const pendingReq = selectedApp.infoRequests?.find(r => r.status === 'PENDING');
+          return (
+            <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center sm:p-4" onClick={() => setSelectedApp(null)}>
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="app-dialog-title"
+                className="bg-white w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-base text-muted">Müraciət № <strong className="text-ink">{selectedApp.referenceNumber}</strong></p>
+                    <h2 id="app-dialog-title" className="font-display font-extrabold text-2xl leading-snug text-brand-900 mt-1">
+                      {selectedApp.competition?.title || selectedApp.land?.title}
+                    </h2>
+                  </div>
+                  <button
+                    ref={closeBtnRef}
+                    type="button"
+                    onClick={() => setSelectedApp(null)}
+                    className="shrink-0 min-h-12 px-3 rounded-xl border-2 border-line font-bold flex items-center gap-1.5 hover:border-brand-900"
+                  >
+                    <X className="w-5 h-5" aria-hidden="true" />
+                    Bağla
+                  </button>
+                </div>
+
+                <div className="mt-5 p-5 rounded-2xl bg-cream border border-line">
+                  <span className={`inline-block font-display font-extrabold text-base px-4 py-2 rounded-full ${info.badge}`}>{info.label}</span>
+                  <div className="mt-4"><StatusSteps app={selectedApp} /></div>
+                  <p className="mt-4 text-lg">{info.explain}</p>
+                  {selectedApp.adminDecisionNote && (
+                    <p className="mt-3 text-lg bg-white p-4 rounded-xl border border-line">
+                      <strong>Komissiyanın qeydi:</strong> {selectedApp.adminDecisionNote}
+                    </p>
+                  )}
+                </div>
+
+                {responseSent && (
+                  <div role="status" className="mt-5 p-4 rounded-xl bg-brand-50 border-2 border-brand-700 text-brand-900 text-lg flex gap-2">
+                    <Check className="w-6 h-6 shrink-0" aria-hidden="true" />
+                    Cavabınız göndərildi. Təşəkkür edirik!
+                  </div>
+                )}
+
+                {selectedApp.status === 'ADDITIONAL_INFORMATION_REQUIRED' && pendingReq && (
+                  <div className="mt-5 p-5 rounded-2xl border-2 border-[#C0392B] bg-[#FCEBE8]/40">
+                    <p className="font-display font-extrabold text-xl text-[#7A1F14]">Komissiyanın sualı</p>
+                    <p className="text-lg mt-2">{pendingReq.message}</p>
+                    <label htmlFor="info-reply" className="block font-bold text-lg mt-5 mb-2">Cavabınız</label>
+                    <textarea
+                      id="info-reply"
+                      rows={4}
+                      value={infoResponseText}
+                      onChange={e => setInfoResponseText(e.target.value)}
+                      className={`${fieldClass} py-3`}
+                    />
+                    <button
+                      type="button"
+                      disabled={submittingResponse || !infoResponseText.trim()}
+                      onClick={() => handleInfoResponseSubmit(pendingReq.id)}
+                      className="mt-4 min-h-14 px-7 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-bold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Send className="w-5 h-5" aria-hidden="true" />
+                      {submittingResponse ? 'Göndərilir…' : 'Cavabı göndər'}
+                    </button>
+                  </div>
+                )}
+
+                <dl className="mt-6 grid sm:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl border border-line">
+                    <dt className="text-base text-muted">Təklif etdiyiniz məbləğ</dt>
+                    <dd className="font-extrabold text-xl">{formatManat(selectedApp.proposedInvestmentAmount)}</dd>
+                  </div>
+                  <div className="p-4 rounded-xl border border-line">
+                    <dt className="text-base text-muted">İcra müddəti</dt>
+                    <dd className="font-extrabold text-xl">{selectedApp.estimatedImplementationPeriod || '—'}</dd>
+                  </div>
+                </dl>
+
+                {selectedApp.statusHistory && selectedApp.statusHistory.length > 0 && (
+                  <section className="mt-6">
+                    <h3 className="font-display font-extrabold text-xl text-brand-900 mb-3">Nə vaxt nə baş verib</h3>
+                    <ol className="flex flex-col gap-4 border-l-4 border-brand-100 ml-2 pl-5">
+                      {selectedApp.statusHistory.map(hist => (
+                        <li key={hist.id} className="relative">
+                          <span className="absolute -left-[1.85rem] top-1.5 w-4 h-4 rounded-full bg-brand-700 ring-4 ring-white" aria-hidden="true" />
+                          <p className="text-base text-muted">{formatDateAz(hist.createdAt)}</p>
+                          <p className="text-lg">{hist.comment}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                )}
+
+                {selectedApp.documents && selectedApp.documents.length > 0 && (
+                  <section className="mt-6">
+                    <h3 className="font-display font-extrabold text-xl text-brand-900 mb-3">Göndərdiyiniz sənədlər</h3>
+                    <ul className="flex flex-col gap-2">
+                      {selectedApp.documents.map(doc => (
+                        <li key={doc.id} className="flex items-center gap-3 p-3 rounded-xl border border-line text-base">
+                          <FileText className="w-5 h-5 text-brand-700 shrink-0" aria-hidden="true" />
+                          <span className="font-bold break-all">{doc.fileName}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

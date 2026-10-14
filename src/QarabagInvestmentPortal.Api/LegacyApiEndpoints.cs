@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 
 namespace QarabagInvestmentPortal.Api;
 
-internal static class LegacyApiEndpoints
+internal static partial class LegacyApiEndpoints
 {
     private static readonly ConcurrentDictionary<string, Session> Sessions = new();
     private static readonly TimeSpan SessionLifetime = TimeSpan.FromDays(7);
@@ -499,11 +499,7 @@ internal static class LegacyApiEndpoints
         return Results.Json(CloneArray(results.OrderByDescending(x => N(x, "matchScore"))));
     }));
 
-    private static void MapAssistant(RouteGroupBuilder api) => api.MapPost("/ai/chat", (JsonObject body) =>
-    {
-        if (string.IsNullOrWhiteSpace(S(body, "message"))) return Error(400, "Mesaj mətni daxil edilməlidir.");
-        return Results.Json(new { answer = "Salam! Mən AgroKöməkçiyəm. Müraciət qaydaları, sənədlər, torpaq sahələri və AgroMatch barədə sizə kömək edə bilərəm." });
-    });
+    // MapAssistant (AgroKöməkçi + Gemini) lives in LegacyApiEndpoints.Assistant.cs
 
     private static string CreateSession(string userId, HttpResponse response)
     {

@@ -99,13 +99,16 @@ export default function App() {
     <AuthProvider>
       <FavoritesProvider>
         <ComparisonProvider>
-          <div className="min-h-screen flex flex-col bg-[#F8FAF9] text-[#172B24]">
+          <div className="min-h-screen flex flex-col bg-cream text-ink">
+            <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:bg-white focus:text-brand-900 focus:font-bold focus:px-5 focus:py-3 focus:rounded-xl">
+              Əsas məzmuna keç
+            </a>
             <Header currentRoute={currentPath} navigate={navigate} />
-            <main className="flex-1">
+            <main id="main" className="flex-1">
               {renderRoute()}
             </main>
             <Footer navigate={navigate} />
-            <AgroAssistant />
+            <AgroAssistant navigate={navigate} currentRoute={currentPath} />
           </div>
         </ComparisonProvider>
       </FavoritesProvider>

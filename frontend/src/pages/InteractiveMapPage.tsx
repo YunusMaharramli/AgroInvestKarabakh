@@ -1,111 +1,78 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AgriculturalLand } from '../types/index.js';
-import { MapPin, Filter, ArrowRight, Layers, Compass, Eye } from 'lucide-react';
+import { ArrowRight, List, MapPin, RotateCcw } from 'lucide-react';
+import { landImage, formatManat } from '../lib/landImages.js';
 
 interface InteractiveMapPageProps {
   navigate: (route: string) => void;
 }
 
+const REGIONS = ['Ağdam', 'Füzuli', 'Zəngilan', 'Cəbrayıl', 'Qubadlı', 'Xocavənd', 'Kəlbəcər', 'Laçın'];
+
+/** One clear colour per farming type, explained in the legend. */
+const TYPES: { value: string; label: string; color: string }[] = [
+  { value: 'Əkinçilik', label: 'Əkinçilik', color: '#B7791F' },
+  { value: 'Bağçılıq', label: 'Bağçılıq', color: '#1F6B3C' },
+  { value: 'İstixana təsərrüfatı', label: 'İstixana', color: '#2B6CB0' },
+  { value: 'Heyvandarlıq', label: 'Heyvandarlıq', color: '#8E2A1F' },
+  { value: 'Arıçılıq', label: 'Arıçılıq', color: '#6B46C1' },
+];
+const colorFor = (type: string) => TYPES.find(t => t.value === type)?.color ?? '#14472A';
+
+const fieldClass =
+  'w-full min-h-[3.25rem] px-4 rounded-xl border-2 border-[#9AA89E] bg-white text-ink text-base focus:border-brand-700';
+
+const KARABAKH_CENTER: [number, number] = [39.75, 46.75];
+
 export const InteractiveMapPage: React.FC<InteractiveMapPageProps> = ({ navigate }) => {
   const [lands, setLands] = useState<AgriculturalLand[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedLand, setSelectedLand] = useState<AgriculturalLand | null>(null);
   const [selectedRegion, setSelectedRegion] = useState('all');
   const [selectedSector, setSelectedSector] = useState('all');
+  const [mapReady, setMapReady] = useState(false);
+
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const leafletMapRef = useRef<any>(null);
+  const leafletRef = useRef<any>(null);
+  const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch('/api/lands')
       .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setLands(data);
-          if (data.length > 0) {
-            setSelectedLand(data[0]);
-          }
-        }
-      })
-      .catch(console.error);
+      .then(data => { if (Array.isArray(data)) setLands(data); })
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Initialize Leaflet Map
+  // Create the map once
   useEffect(() => {
-    let isMounted = true;
-
-    async function initMap() {
-      if (!mapContainerRef.current || leafletMapRef.current) return;
-
+    let cancelled = false;
+    (async () => {
+      if (!mapContainerRef.current || mapRef.current) return;
       try {
         const L = (await import('leaflet')).default;
-
-        // Centered around Karabakh coordinates (approx 39.75, 46.75)
-        const map = L.map(mapContainerRef.current, {
-          center: [39.75, 46.75],
-          zoom: 9,
-          zoomControl: true,
-        });
-
+        if (cancelled || !mapContainerRef.current) return;
+        const map = L.map(mapContainerRef.current, { center: KARABAKH_CENTER, zoom: 9, scrollWheelZoom: false });
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap əməkdaşları',
+          attribution: '&copy; OpenStreetMap',
           maxZoom: 18,
         }).addTo(map);
-
-        leafletMapRef.current = map;
-        renderMarkers(L, map, lands);
+        leafletRef.current = L;
+        mapRef.current = map;
+        setMapReady(true);
       } catch (err) {
         console.error('Leaflet initialization failed:', err);
       }
-    }
-
-    initMap();
-
+    })();
     return () => {
-      isMounted = false;
+      cancelled = true;
+      mapRef.current?.remove();
+      mapRef.current = null;
     };
   }, []);
-
-  // Update markers when filters or lands change
-  useEffect(() => {
-    if (!leafletMapRef.current) return;
-    import('leaflet').then(({ default: L }) => {
-      renderMarkers(L, leafletMapRef.current, filteredLands);
-    });
-  }, [lands, selectedRegion, selectedSector]);
-
-  const renderMarkers = (L: any, map: any, items: AgriculturalLand[]) => {
-    // Clear existing
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-
-    items.forEach(land => {
-      const customIcon = L.divIcon({
-        className: 'custom-map-pin',
-        html: `<div style="background-color: #166534; color: #fde047; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; border: 2px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); cursor: pointer;">
-          ${land.region.slice(0, 2)}
-        </div>`,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-      });
-
-      const marker = L.marker([land.latitude, land.longitude], { icon: customIcon }).addTo(map);
-
-      marker.on('click', () => {
-        setSelectedLand(land);
-        map.setView([land.latitude, land.longitude], 11, { animate: true });
-      });
-
-      marker.bindPopup(`
-        <div style="font-family: inherit; font-size: 12px; min-width: 180px;">
-          <strong style="color: #166534;">${land.title}</strong><br/>
-          <span style="color: #64748b;">${land.region} · ${land.agricultureType}</span><br/>
-          <strong>${land.areaHectares} ha</strong>
-        </div>
-      `);
-
-      markersRef.current.push(marker);
-    });
-  };
 
   const filteredLands = lands.filter(l => {
     if (selectedRegion !== 'all' && l.region !== selectedRegion) return false;
@@ -113,127 +80,231 @@ export const InteractiveMapPage: React.FC<InteractiveMapPageProps> = ({ navigate
     return true;
   });
 
-  const handleSelectLand = (land: AgriculturalLand) => {
+  // Draw the pins whenever the map, data, filters or selection change
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!mapReady || !L || !map) return;
+
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+
+    filteredLands.forEach(land => {
+      const selected = selectedLand?.id === land.id;
+      const size = selected ? 48 : 36;
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="width:${size}px;height:${size}px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${colorFor(land.agricultureType)};border:${selected ? 5 : 3}px solid ${selected ? '#E2A62B' : '#fff'};box-shadow:0 4px 10px rgba(0,0,0,.35);"></div>`,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size],
+      });
+      const marker = L.marker([land.latitude, land.longitude], {
+        icon,
+        title: land.title,
+        alt: land.title,
+        keyboard: true,
+        zIndexOffset: selected ? 1000 : 0,
+      }).addTo(map);
+      marker.on('click', () => selectLand(land, false));
+      markersRef.current.push(marker);
+    });
+
+    // Fit the visible pins when the filter changes (not when a pin is picked)
+  }, [mapReady, lands, selectedRegion, selectedSector, selectedLand]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map || filteredLands.length === 0) return;
+    const L = leafletRef.current;
+    const bounds = L.latLngBounds(filteredLands.map(l => [l.latitude, l.longitude]));
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 11 });
+    // If the selected plot is hidden by the filter, clear it
+    if (selectedLand && !filteredLands.some(l => l.id === selectedLand.id)) setSelectedLand(null);
+  }, [mapReady, lands, selectedRegion, selectedSector]);
+
+  const selectLand = (land: AgriculturalLand, fromList: boolean) => {
     setSelectedLand(land);
-    if (leafletMapRef.current) {
-      leafletMapRef.current.setView([land.latitude, land.longitude], 12, { animate: true });
+    mapRef.current?.setView([land.latitude, land.longitude], 11, { animate: true });
+    if (fromList) {
+      mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      // On phones the card sits under the map; bring it into view
+      setTimeout(() => cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
     }
   };
 
+  const resetFilters = () => {
+    setSelectedRegion('all');
+    setSelectedSector('all');
+    setSelectedLand(null);
+  };
+
+  const filtersActive = selectedRegion !== 'all' || selectedSector !== 'all';
+
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col md:flex-row overflow-hidden bg-slate-100">
-      {/* Sidebar with Filters and Lands list */}
-      <div className="w-full md:w-96 bg-white border-r border-slate-200 flex flex-col shrink-0 z-10 shadow-lg">
-        {/* Filter controls */}
-        <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900">İnteraktiv Aqro Xəritə</h2>
-            <span className="text-xs text-slate-500 font-mono-numbers">{filteredLands.length} sahə</span>
-          </div>
+    <div className="bg-cream pb-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <nav aria-label="Səhifə yolu" className="text-[0.95rem] text-muted mb-3">
+          <button type="button" onClick={() => navigate('/')} className="underline underline-offset-4 text-brand-900">Ana səhifə</button>
+          <span aria-hidden="true"> › </span>
+          <span aria-current="page">Xəritə</span>
+        </nav>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Region</label>
-              <select
-                value={selectedRegion}
-                onChange={e => setSelectedRegion(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-emerald-700"
-              >
-                <option value="all">Bütün Regionlar</option>
-                <option value="Ağdam">Ağdam</option>
-                <option value="Füzuli">Füzuli</option>
-                <option value="Zəngilan">Zəngilan</option>
-                <option value="Cəbrayıl">Cəbrayıl</option>
-                <option value="Qubadlı">Qubadlı</option>
-                <option value="Xocavənd">Xocavənd</option>
-                <option value="Kəlbəcər">Kəlbəcər</option>
-                <option value="Laçın">Laçın</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kateqoriya</label>
-              <select
-                value={selectedSector}
-                onChange={e => setSelectedSector(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-emerald-700"
-              >
-                <option value="all">Bütün Sektorlar</option>
-                <option value="Əkinçilik">Əkinçilik</option>
-                <option value="Bağçılıq">Bağçılıq</option>
-                <option value="İstixana təsərrüfatı">İstixana</option>
-                <option value="Heyvandarlıq">Heyvandarlıq</option>
-                <option value="Arıçılıq">Arıçılıq</option>
-              </select>
-            </div>
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+          <div className="max-w-3xl">
+            <h1 className="font-display font-extrabold text-3xl sm:text-4xl leading-tight text-brand-900">Sahələr xəritədə</h1>
+            <p className="text-lg text-[#3E4F45] mt-2">
+              Xəritədəki nişana basın — sahə haqqında qısa məlumat aşağıda görünəcək.
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate('/opportunities')}
+            className="inline-flex items-center gap-2 min-h-14 px-5 rounded-xl border-2 border-brand-900 text-brand-900 font-display font-bold hover:bg-white"
+          >
+            <List className="w-6 h-6" aria-hidden="true" />
+            Siyahı şəklində bax
+          </button>
         </div>
 
-        {/* List of lands */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-          {filteredLands.map(land => {
-            const isSelected = selectedLand?.id === land.id;
-            return (
-              <div
-                key={land.id}
-                onClick={() => handleSelectLand(land)}
-                className={`p-3.5 cursor-pointer transition-colors ${
-                  isSelected ? 'bg-emerald-50 border-l-4 border-l-emerald-800' : 'hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
-                  <span className="font-semibold text-emerald-800">{land.region}</span>
-                  <span className="font-mono-numbers">{land.areaHectares} ha</span>
-                </div>
-                <h4 className="text-xs font-bold text-slate-900 line-clamp-1">{land.title}</h4>
-                <p className="text-[11px] text-slate-600 line-clamp-1 mt-0.5">{land.intendedUse}</p>
-                <div className="mt-2 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">{land.agricultureType}</span>
-                  <span className="font-bold text-slate-900 font-mono-numbers">
-                    {land.estimatedInvestmentRequirement ? `${land.estimatedInvestmentRequirement.toLocaleString()} ₼` : '—'}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Selected Land Quick Summary Footer Card */}
-        {selectedLand && (
-          <div className="p-4 border-t border-slate-200 bg-white">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
-                  Seçilmiş Torpaq Sahəsi
-                </span>
-                <h3 className="text-xs font-bold text-slate-900 mt-0.5 line-clamp-1">{selectedLand.title}</h3>
-                <span className="text-[11px] text-slate-500 font-mono-numbers">{selectedLand.areaHectares} hektar · {selectedLand.region}</span>
-              </div>
+        {/* Filters */}
+        <div className="bg-white rounded-3xl border border-line p-5 sm:p-6 mb-5">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-5 items-end">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="m-region" className="font-bold">Rayon</label>
+              <select id="m-region" value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className={fieldClass}>
+                <option value="all">Bütün rayonlar</option>
+                {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="m-type" className="font-bold">Fəaliyyət növü</label>
+              <select id="m-type" value={selectedSector} onChange={e => setSelectedSector(e.target.value)} className={fieldClass}>
+                <option value="all">Bütün növlər</option>
+                {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            {filtersActive && (
               <button
-                onClick={() => navigate(`/opportunities/${selectedLand.id}`)}
-                className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors"
+                type="button"
+                onClick={resetFilters}
+                className="min-h-[3.25rem] px-5 rounded-xl border-2 border-line text-brand-900 font-display font-bold flex items-center justify-center gap-2 hover:border-brand-900"
               >
-                Ətraflı bax
+                <RotateCcw className="w-5 h-5" aria-hidden="true" />
+                Hamısını göstər
               </button>
+            )}
+          </div>
+          <p className="text-lg mt-4" role="status" aria-live="polite">
+            {loading ? 'Yüklənir…' : <>Xəritədə <strong className="font-extrabold text-brand-900">{filteredLands.length}</strong> sahə göstərilir</>}
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-[1fr_24rem] gap-5 items-start">
+          {/* Map + legend + selected card */}
+          <div className="flex flex-col gap-4">
+            <div className="relative rounded-3xl overflow-hidden border border-line bg-sand">
+              <div
+                ref={mapContainerRef}
+                className="w-full h-[60vh] min-h-[22rem] z-0"
+                role="region"
+                aria-label="Torpaq sahələrinin xəritəsi"
+              />
+              {loadError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/90 p-6 text-center text-lg">
+                  Sahələri yükləmək alınmadı. Səhifəni yeniləyin.
+                </div>
+              )}
+            </div>
+
+            {/* Legend: colours explained in words */}
+            <div className="bg-white rounded-2xl border border-line p-4">
+              <p className="font-bold mb-2">Nişanların rəngi nə deməkdir?</p>
+              <ul className="flex flex-wrap gap-x-5 gap-y-2">
+                {TYPES.map(t => (
+                  <li key={t.value} className="flex items-center gap-2 text-base">
+                    <span className="w-5 h-5 rounded-full border-2 border-white shadow" style={{ background: t.color }} aria-hidden="true" />
+                    {t.label}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[0.95rem] text-muted mt-2">Xəritəni böyütmək üçün sağ yuxarıdakı “+” və “−” düymələrindən istifadə edin.</p>
+            </div>
+
+            <div ref={cardRef} aria-live="polite">
+              {selectedLand ? (
+                <div className="bg-white rounded-3xl border-2 border-gold-500 overflow-hidden grid sm:grid-cols-[14rem_1fr]">
+                  <img src={landImage(selectedLand)} alt="" className="w-full h-44 sm:h-full object-cover" />
+                  <div className="p-5 sm:p-6 flex flex-col gap-3">
+                    <p className="text-sm font-bold text-gold-900 uppercase tracking-wide">Seçdiyiniz sahə</p>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="bg-brand-50 text-brand-900 font-bold text-sm px-3 py-1 rounded-full">{selectedLand.region}</span>
+                      <span className="bg-gold-100 text-gold-900 font-bold text-sm px-3 py-1 rounded-full">{selectedLand.agricultureType}</span>
+                    </div>
+                    <h2 className="font-display font-extrabold text-xl leading-snug text-brand-900">{selectedLand.title}</h2>
+                    <dl className="grid grid-cols-2 gap-3">
+                      <div>
+                        <dt className="text-sm text-muted">Sahə</dt>
+                        <dd className="font-extrabold text-xl">{selectedLand.areaHectares} ha</dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted">Minimal sərmayə</dt>
+                        <dd className="font-extrabold text-xl">{formatManat(selectedLand.estimatedInvestmentRequirement)}</dd>
+                      </div>
+                    </dl>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/opportunities/${selectedLand.id}`)}
+                      className="mt-1 min-h-14 px-6 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-bold flex items-center justify-center gap-2 sm:self-start"
+                    >
+                      Ətraflı baxın
+                      <ArrowRight className="w-5 h-5" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-3xl border-2 border-dashed border-line p-6 text-center text-lg text-muted flex items-center justify-center gap-2">
+                  <MapPin className="w-6 h-6" aria-hidden="true" />
+                  Sahə seçilməyib. Xəritədə nişana və ya siyahıda sahəyə basın.
+                </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Map View Area */}
-      <div className="flex-1 relative h-full">
-        <div ref={mapContainerRef} className="w-full h-full z-0" />
-
-        {/* Legend Overlay */}
-        <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-md p-3 rounded-xl border border-slate-200 shadow-md text-xs space-y-1.5 hidden sm:block">
-          <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider block">Xəritə Məlumatı</span>
-          <div className="flex items-center gap-2 text-slate-600 text-[11px]">
-            <span className="w-3 h-3 rounded-full bg-emerald-800" />
-            <span>Qarabağ torpaq massivləri</span>
-          </div>
-          <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-100">
-            Markerə klikləyərək sahəni seçin
-          </div>
+          {/* List: the same plots as buttons (works without the map) */}
+          <section aria-labelledby="map-list-title" className="bg-white rounded-3xl border border-line overflow-hidden">
+            <h2 id="map-list-title" className="font-display font-extrabold text-xl text-brand-900 px-5 pt-5 pb-3">Sahələrin siyahısı</h2>
+            <ul className="lg:max-h-[calc(60vh+10rem)] lg:overflow-y-auto divide-y divide-line">
+              {filteredLands.map(land => {
+                const isSelected = selectedLand?.id === land.id;
+                return (
+                  <li key={land.id}>
+                    <button
+                      type="button"
+                      onClick={() => selectLand(land, true)}
+                      aria-pressed={isSelected}
+                      className={`w-full text-left px-5 py-4 flex gap-3 items-start ${isSelected ? 'bg-gold-100' : 'hover:bg-cream'}`}
+                    >
+                      <span
+                        className="mt-1.5 w-4 h-4 rounded-full shrink-0 border-2 border-white shadow"
+                        style={{ background: colorFor(land.agricultureType) }}
+                        aria-hidden="true"
+                      />
+                      <span className="flex-1 min-w-0">
+                        <span className="block font-bold text-lg leading-snug text-ink">{land.title}</span>
+                        <span className="block text-base text-[#3E4F45]">
+                          {land.region} · {land.areaHectares} ha · {formatManat(land.estimatedInvestmentRequirement)}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+              {!loading && filteredLands.length === 0 && (
+                <li className="px-5 py-6 text-lg text-muted">Bu seçimlərə uyğun sahə yoxdur.</li>
+              )}
+            </ul>
+          </section>
         </div>
       </div>
     </div>

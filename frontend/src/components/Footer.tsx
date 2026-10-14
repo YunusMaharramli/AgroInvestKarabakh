@@ -1,73 +1,74 @@
 import React from 'react';
+import { HELP_LINE } from './Header.js';
 
 interface FooterProps {
   navigate: (route: string) => void;
 }
 
+const LINKS: { route: string; label: string }[] = [
+  { route: '/opportunities', label: 'Torpaq sahələri' },
+  { route: '/map', label: 'Xəritə' },
+  { route: '/agromatch', label: 'Mənə uyğun sahə' },
+  { route: '/login', label: 'Kabinetə daxil ol' },
+];
+
 export const Footer: React.FC<FooterProps> = ({ navigate }) => {
   return (
-    <footer className="bg-slate-900 text-slate-300 border-t border-slate-800 mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
-          <div className="md:col-span-1 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-md bg-emerald-700 text-amber-300 flex items-center justify-center font-bold text-xs">
-                AQ
-              </span>
-              <span className="text-white font-bold text-base tracking-tight">AgroInvest Qarabağ</span>
-            </div>
-            <p className="text-xs text-slate-400 italic">
-              "Qarabağın torpağına sərmayə, gələcəyinə dəyər."
-            </p>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Qarabağ regionu üzrə kənd təsərrüfatı torpaqları və investisiya müsabiqələri vahid rəqəmsal platforması.
+    <footer className="bg-brand-950 text-[#E3ECE5] mt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
+          <div className="space-y-4">
+            <img src="/brand/logo-horizontal-white.svg" alt="AgroInvest Qarabağ" className="h-14 w-auto" />
+            <p className="text-[0.95rem] leading-relaxed">
+              Qarabağ regionunda kənd təsərrüfatı torpaqları və investisiya müsabiqələri üçün vahid rəqəmsal platforma.
             </p>
           </div>
 
-          <div>
-            <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">Bölmələr</h4>
-            <ul className="space-y-2 text-xs text-slate-400">
-              <li><button onClick={() => navigate('/')} className="hover:text-white transition-colors">Ana səhifə</button></li>
-              <li><button onClick={() => navigate('/opportunities')} className="hover:text-white transition-colors">İnvestisiya imkanları</button></li>
-              <li><button onClick={() => navigate('/map')} className="hover:text-white transition-colors">İnteraktiv xəritə</button></li>
-              <li><button onClick={() => navigate('/agromatch')} className="hover:text-white transition-colors">AgroMatch tövsiyə sistemi</button></li>
-              <li><button onClick={() => navigate('/login')} className="hover:text-white transition-colors">Sahibkar Girişi</button></li>
+          <nav aria-label="Bölmələr">
+            <h2 className="font-display font-bold text-gold-400 mb-3 text-base">Bölmələr</h2>
+            <ul className="space-y-1">
+              {LINKS.map(l => (
+                <li key={l.route}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(l.route)}
+                    className="text-white text-[0.95rem] min-h-11 hover:underline underline-offset-4"
+                  >
+                    {l.label}
+                  </button>
+                </li>
+              ))}
             </ul>
-          </div>
+          </nav>
 
           <div>
-            <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">Əhatə Dairəsi</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <h2 className="font-display font-bold text-gold-400 mb-3 text-base">Rayonlar</h2>
+            <p className="text-[0.95rem] leading-relaxed">
               Ağdam · Füzuli · Zəngilan · Cəbrayıl · Qubadlı · Xocavənd · Kəlbəcər · Laçın
             </p>
-            <div className="mt-4 pt-3 border-t border-slate-800">
-              <span className="text-xs text-emerald-400 font-medium">Aqrar İxtisaslaşma:</span>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Dənli bitkilər, intensiv bağçılıq, hidroponik istixanalar, cins heyvandarlıq və arıçılıq.
-              </p>
-            </div>
+            <p className="text-sm text-[#C9D8CE] mt-4 leading-relaxed">
+              Dənli bitkilər, bağçılıq, istixanalar, heyvandarlıq və arıçılıq.
+            </p>
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">Prototip Qeydi</h4>
-            <p className="text-[11px] text-slate-400 leading-relaxed bg-slate-800/50 p-3 rounded-lg border border-slate-800">
-              Bu tətbiq universitet hakatonu üçün hazırlanmış prototipdir. Məlumatlar nümayiş xarakterlidir və rəsmi dövlət sənədi hesab edilmir.
-            </p>
-            <p className="text-[11px] text-slate-500 mt-3 font-mono-numbers">
-              EKTİS Adapter: Simulyasiya rejimi
-            </p>
+            <h2 className="font-display font-bold text-gold-400 mb-3 text-base">Əlaqə</h2>
+            <p className="text-[0.95rem]">Kömək xətti: <strong className="text-white">{HELP_LINE}</strong></p>
+            <p className="text-[0.95rem] mt-1">Hər gün 09:00–18:00</p>
+            <a href="mailto:info@agroinvest.gov.az" className="text-white text-[0.95rem] underline underline-offset-4 mt-2 inline-block">
+              info@agroinvest.gov.az
+            </a>
           </div>
         </div>
 
-        <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+        <p className="text-sm text-[#C9D8CE] bg-white/5 border border-white/10 rounded-xl p-4 mb-6 leading-relaxed">
+          Prototip qeydi: bu tətbiq universitet hakatonu üçün hazırlanıb. Məlumatlar və şəkillər nümayiş xarakterlidir
+          (şəkillər süni intellektlə yaradılıb) və rəsmi dövlət sənədi hesab edilmir.
+        </p>
+
+        <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm text-[#C9D8CE]">
           <span>© 2026 AgroInvest Qarabağ. Bütün hüquqlar qorunur.</span>
-          <div className="flex items-center gap-4 text-[11px]">
-            <span>Məxfilik siyasəti</span>
-            <span>·</span>
-            <span>İstifadə qaydaları</span>
-            <span>·</span>
-            <span>Əlaqə: info@agroinvest.gov.az</span>
-          </div>
+          <span>Məxfilik siyasəti · İstifadə qaydaları · Əlçatanlıq</span>
         </div>
       </div>
     </footer>

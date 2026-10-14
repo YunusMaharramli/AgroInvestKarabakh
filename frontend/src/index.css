@@ -1,11 +1,65 @@
 @import "tailwindcss";
 
+/* Brand tokens: usable as Tailwind classes, e.g. bg-brand-700, text-brand-900, font-display */
+@theme {
+  --font-sans: 'Noto Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Montserrat', 'Noto Sans', system-ui, sans-serif;
+
+  --color-brand-50: #EAF2EC;
+  --color-brand-100: #D5E6DA;
+  --color-brand-600: #2F7D46;
+  --color-brand-700: #1F6B3C;
+  --color-brand-800: #175632;
+  --color-brand-900: #14472A;
+  --color-brand-950: #0F3520;
+
+  --color-gold-100: #FBF0D6;
+  --color-gold-400: #F2C35B;
+  --color-gold-500: #E2A62B;
+  --color-gold-800: #8A5A00;
+  --color-gold-900: #6B4600;
+
+  --color-cream: #FBF8F0;
+  --color-sand: #F1EBDA;
+  --color-line: #E4DCC6;
+  --color-ink: #15241B;
+  --color-muted: #46564C;
+}
+
 @layer base {
+  /* html font-size is set by the text-size buttons (112.5% / 125% / 140%).
+     Every rem-based size on the site scales with it. */
+  html {
+    font-size: 112.5%;
+  }
+
   body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    background-color: #F8FAF9;
-    color: #172B24;
+    font-family: var(--font-sans);
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+  }
+
+  /* A clear, thick focus ring for keyboard users */
+  :focus-visible {
+    outline: 4px solid var(--color-gold-500);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+}
+
+/* Respect people who turn off motion in their system settings */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -14,18 +68,28 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Custom smooth scrollbar */
+/* Wider, easier-to-grab scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 12px;
+  height: 12px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #EFE8D6;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: #9AA89E;
+  border-radius: 6px;
+  border: 2px solid #EFE8D6;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #6F7F74;
+}
+
+/* Bigger map zoom buttons, easier to hit */
+.leaflet-touch .leaflet-bar a,
+.leaflet-bar a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  font-size: 26px;
 }

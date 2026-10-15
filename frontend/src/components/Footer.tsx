@@ -18,7 +18,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
           <div className="space-y-4">
-            <img src="/brand/logo-horizontal-white.svg" alt="AgroInvest Qarabağ" className="h-14 w-auto" />
+            <img src="/brand/agroinvest-qarabag-mark.png" alt="AgroInvest Qarabağ" className="h-16 w-16 translate-x-1 object-contain" />
             <p className="text-[0.95rem] leading-relaxed">
               Qarabağ regionunda torpaq sahiblərini və investorları birləşdirən vahid rəqəmsal platforma.
             </p>

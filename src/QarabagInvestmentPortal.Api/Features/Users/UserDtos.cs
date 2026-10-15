@@ -1,5 +1,7 @@
 namespace QarabagInvestmentPortal.Api.Features.Users;
 
+using QarabagInvestmentPortal.Api.Features.Rentals;
+
 public sealed record UserDto(
     string Id, string FirstName, string LastName, string Email, string? Phone, UserRole Role,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt)
@@ -25,10 +27,12 @@ public sealed record RegisterRequest(
     string? FirstName, string? LastName, string? Email, string? Phone,
     string? Password, string? ConfirmPassword, string? CompanyName,
     string? TaxIdentificationNumber, string? BusinessActivity,
-    string? RecaptchaToken = null);
+    string? RecaptchaToken = null,
+    ApplicantProfileInput? ApplicantProfile = null);
 
 public sealed record LoginRequest(
-    string? Email, string? Password, string? RecaptchaToken = null);
+    string? Email, string? Password, string? RecaptchaToken = null,
+    ApplicantType? ApplicantType = null);
 
 public sealed record UpdateProfileRequest(
     string? FirstName, string? LastName, string? Phone, string? CompanyName, string? TaxIdentificationNumber, string? BusinessActivity);

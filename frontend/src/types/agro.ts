@@ -22,6 +22,8 @@ export interface AppUser {
   isAdmin?: boolean;
   verified: boolean;
   preferences: UserPreferences;
+  /** Set after the investor explicitly saves their analysis criteria. */
+  investmentCriteriaSaved?: boolean;
   investorType?: 'individual' | 'company';
   companyName?: string;
   region?: string;

@@ -126,7 +126,7 @@ export const Header: React.FC<HeaderProps> = ({ currentRoute, navigate }) => {
             aria-label="AgroInvest Qarabağ — ana səhifə"
             className="min-w-0 shrink rounded-lg"
           >
-            <img src="/brand/logo-horizontal.svg" alt="AgroInvest Qarabağ" className="h-11 sm:h-14 w-auto max-w-full object-contain object-left block" />
+            <img src="/brand/agroinvest-qarabag-mark.png" alt="AgroInvest Qarabağ" className="h-12 w-12 sm:h-16 sm:w-16 translate-x-1 object-contain block" />
           </button>
 
           <nav aria-label="Əsas menyu" className="hidden lg:flex items-center gap-1">

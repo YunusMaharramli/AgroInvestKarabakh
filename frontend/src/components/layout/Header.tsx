@@ -10,13 +10,13 @@ import { useSiteModals } from './SiteModals';
 import { useCurrentUser } from '../../services/api';
 import { cabinetHome } from '../../features/auth/routing';
 
-/** Placeholder contact details — replace with the real ones. */
+/** Keep placeholder phone, WhatsApp, and office links disabled until real details are supplied. */
 export const CONTACT = {
-  email: 'info@agroinvest.az',
-  phone: '+994 12 000 00 00',
-  phoneHref: 'tel:+994120000000',
-  whatsapp: 'https://wa.me/994500000000',
-  maps: 'https://maps.google.com/?q=28+May+street+12+Baku',
+  email: import.meta.env.VITE_CONTACT_EMAIL?.trim() || '',
+  phone: '',
+  phoneHref: '',
+  whatsapp: '',
+  maps: '',
 };
 
 type DropItem = { label: string; icon: React.ReactNode; href?: string; external?: boolean; onClick?: () => void };
@@ -59,7 +59,7 @@ const NavDropdown: React.FC<{ label: string; items: DropItem[]; overlay: boolean
 };
 
 /** Pages whose first section is a full-bleed photo hero: the header sits on top of it until scrolled. */
-const HERO_PAGES = [/^\/(az|en|ru)\/?$/, /^\/(az|en|ru)\/investments\/?$/, /^\/(az|en|ru)\/owners\/?$/];
+const HERO_PAGES = [/^\/(az|en|ru)\/?$/, /^\/(az|en|ru)\/rentals\/?$/];
 
 export const Header: React.FC = () => {
   const { t } = useTranslation();
@@ -90,36 +90,36 @@ export const Header: React.FC = () => {
   const links = [
     { to: lp('/'), label: t('nav.home'), end: true },
     { to: lp('/about'), label: t('nav.about') },
-    { to: lp('/investments'), label: t('nav.investments') },
-    { to: lp('/owners'), label: t('nav.owners') },
+    { to: lp('/rentals'), label: t('nav.rentals') },
+    { to: lp('/applicant'), label: t('nav.applicant') },
     { to: lp('/guides'), label: t('nav.guides') },
   ];
   const contactItems: DropItem[] = [
-    { label: t('contact.email'), icon: <Mail className="w-4 h-4" />, href: `mailto:${CONTACT.email}` },
-    { label: t('contact.call'), icon: <Phone className="w-4 h-4" />, href: CONTACT.phoneHref },
-    { label: t('contact.whatsapp'), icon: <MessageCircle className="w-4 h-4" />, href: CONTACT.whatsapp, external: true },
-    { label: t('contact.office'), icon: <MapPin className="w-4 h-4" />, onClick: () => document.getElementById('footer-address')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) },
-    { label: t('contact.message'), icon: <Send className="w-4 h-4" />, onClick: openContact },
+    ...(CONTACT.email ? [{ label: t('contact.email'), icon: <Mail className="w-4 h-4" />, href: `mailto:${CONTACT.email}` }] : []),
+    ...(CONTACT.phone ? [{ label: t('contact.call'), icon: <Phone className="w-4 h-4" />, href: CONTACT.phoneHref }] : []),
+    ...(CONTACT.whatsapp ? [{ label: t('contact.whatsapp'), icon: <MessageCircle className="w-4 h-4" />, href: CONTACT.whatsapp, external: true }] : []),
+    ...(CONTACT.maps ? [{ label: t('contact.office'), icon: <MapPin className="w-4 h-4" />, onClick: () => document.getElementById('footer-address')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }] : []),
+    ...(import.meta.env.DEV ? [{ label: t('contact.message'), icon: <Send className="w-4 h-4" />, onClick: openContact }] : []),
   ];
   const helpItems: DropItem[] = [
     { label: t('help.faq'), icon: <HelpCircle className="w-4 h-4" />, onClick: () => openHelp('faq') },
     { label: t('help.howInvest'), icon: <TrendingUp className="w-4 h-4" />, onClick: () => openHelp('invest') },
     { label: t('help.howList'), icon: <Sprout className="w-4 h-4" />, onClick: () => openHelp('list') },
     { label: t('help.account'), icon: <UserCog className="w-4 h-4" />, onClick: () => openHelp('account') },
-    { label: t('help.report'), icon: <Flag className="w-4 h-4" />, onClick: () => openHelp('report') },
+    ...(import.meta.env.DEV ? [{ label: t('help.report'), icon: <Flag className="w-4 h-4" />, onClick: () => openHelp('report') }] : []),
   ];
   const cabinetLink = user ? lp(cabinetHome(user)) : lp('/login');
   const linkCls = (active: boolean) =>
-    `relative px-3 py-2 text-[0.92rem] font-semibold whitespace-nowrap transition ${overlay ? (active ? 'text-white' : 'text-white/85 hover:text-white') : active ? 'text-brand' : 'text-ink hover:text-brand'}`;
+    `relative px-3 py-2 text-[1.1rem] font-semibold whitespace-nowrap transition ${overlay ? (active ? 'text-white' : 'text-white/85 hover:text-white') : active ? 'text-brand' : 'text-ink hover:text-brand'}`;
 
   return (
     <header className={`${hasHero ? 'fixed' : 'sticky'} top-0 inset-x-0 z-50 transition-colors duration-300 ${overlay ? 'bg-gradient-to-b from-forest/70 to-transparent' : 'bg-cream/95 backdrop-blur border-b border-line shadow-sm'}`}>
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 btn btn-primary">{t('nav.skip')}</a>
       <div className="container-x">
-        {/* Desktop: logo centred above the navigation bar */}
-        <div className={`hidden xl:flex flex-col items-center transition-all ${scrolled || !hasHero ? 'pt-2' : 'pt-4'}`}>
-          <Link to={lp('/')} aria-label={t('nav.home')} className={`transition-all ${scrolled ? 'scale-90' : ''}`}><Logo light={overlay} /></Link>
-          <nav aria-label={t('nav.primary')} className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-2">
+        {/* Desktop: logo left-aligned above the navigation bar */}
+        <div className={`hidden xl:flex flex-col items-start transition-all ${scrolled || !hasHero ? 'pt-2' : 'pt-4'}`}>
+          <Link to={lp('/')} aria-label={t('nav.home')} className={`transition-all ${scrolled ? 'scale-90' : ''}`} style={{ marginLeft: 'clamp(-6rem, calc(40rem - 50vw), 0px)' }}><Logo light={overlay} /></Link>
+          <nav aria-label={t('nav.primary')} className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-2 -translate-y-8">
             <div aria-hidden="true" />
             <ul className="flex items-center gap-0.5">
               {links.map(l => (
@@ -129,7 +129,7 @@ export const Header: React.FC = () => {
                   </NavLink>
                 </li>
               ))}
-              <li><NavDropdown id="menu-contact" label={t('nav.contact')} items={contactItems} overlay={overlay} /></li>
+              {contactItems.length > 0 && <li><NavDropdown id="menu-contact" label={t('nav.contact')} items={contactItems} overlay={overlay} /></li>}
               <li><NavDropdown id="menu-help" label={t('nav.help')} items={helpItems} overlay={overlay} /></li>
             </ul>
             <div className="flex items-center justify-end gap-3">
@@ -163,7 +163,7 @@ export const Header: React.FC = () => {
               {links.map(l => (
                 <NavLink key={l.to} to={l.to} end={l.end} className={({ isActive }) => `px-3 py-3 rounded-xl text-lg font-semibold ${isActive ? 'bg-sage text-brand' : 'text-ink hover:bg-sand'}`}>{l.label}</NavLink>
               ))}
-              {[{ label: t('nav.contact'), items: contactItems }, { label: t('nav.help'), items: helpItems }].map(g => (
+              {[{ label: t('nav.contact'), items: contactItems }, { label: t('nav.help'), items: helpItems }].filter(g => g.items.length > 0).map(g => (
                 <details key={g.label} className="group">
                   <summary className="flex justify-between items-center px-3 py-3 rounded-xl text-lg font-semibold cursor-pointer list-none hover:bg-sand">{g.label}<ChevronDown className="w-5 h-5 transition group-open:rotate-180" /></summary>
                   <div className="pl-3 pb-2 flex flex-col">

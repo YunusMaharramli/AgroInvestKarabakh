@@ -6,6 +6,7 @@ using QarabagInvestmentPortal.Api.Features.Lands;
 using QarabagInvestmentPortal.Api.Features.Notifications;
 using QarabagInvestmentPortal.Api.Features.Opportunities;
 using QarabagInvestmentPortal.Api.Features.Proposals;
+using QarabagInvestmentPortal.Api.Features.Rentals;
 using QarabagInvestmentPortal.Api.Features.Users;
 using QarabagInvestmentPortal.Api.Infrastructure.Import;
 
@@ -28,6 +29,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Proposal> Proposals => Set<Proposal>();
     public DbSet<ProposalDocument> ProposalDocuments => Set<ProposalDocument>();
     public DbSet<ProposalHistoryEntry> ProposalHistory => Set<ProposalHistoryEntry>();
+    public DbSet<RentalListing> RentalListings => Set<RentalListing>();
+    public DbSet<RentalDocumentRequirement> RentalDocumentRequirements => Set<RentalDocumentRequirement>();
+    public DbSet<RentalListingDocument> RentalListingDocuments => Set<RentalListingDocument>();
+    public DbSet<RentalApplicantProfile> RentalApplicantProfiles => Set<RentalApplicantProfile>();
+    public DbSet<RentalApplication> RentalApplications => Set<RentalApplication>();
+    public DbSet<RentalApplicationDocument> RentalApplicationDocuments => Set<RentalApplicationDocument>();
+    public DbSet<RentalApplicationHistory> RentalApplicationHistory => Set<RentalApplicationHistory>();
+    public DbSet<RentalLease> RentalLeases => Set<RentalLease>();
+    public DbSet<RentalAuditEntry> RentalAudit => Set<RentalAuditEntry>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<Favorite> Favorites => Set<Favorite>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -275,6 +285,178 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Status).HasMaxLength(64);
             e.Property(x => x.ChangedBy).HasMaxLength(200);
             e.Property(x => x.Comment).HasMaxLength(4000);
+        });
+
+        modelBuilder.Entity<RentalListing>(e =>
+        {
+            e.ToTable("rental_listings");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.PropertyType).HasConversion<string>().HasMaxLength(32);
+            e.Property(x => x.OwnerCategory).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Procedure).HasConversion<string>().HasMaxLength(32);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Description).HasMaxLength(4000).IsRequired();
+            e.Property(x => x.LegalDesignation).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Region).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Address).HasMaxLength(500).IsRequired();
+            e.Property(x => x.Area).HasPrecision(18, 2);
+            e.Property(x => x.AreaUnit).HasMaxLength(8).IsRequired();
+            e.Property(x => x.PermittedUse).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.RentAmount).HasPrecision(18, 2);
+            e.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            e.Property(x => x.PaymentPeriod).HasMaxLength(12).IsRequired();
+            e.Property(x => x.DepositAmount).HasPrecision(18, 2);
+            e.Property(x => x.AdditionalCharges).HasMaxLength(1000);
+            e.Property(x => x.Infrastructure).HasMaxLength(2000);
+            e.Property(x => x.PhotoUrls).HasColumnType("text[]");
+            e.Property(x => x.AuthorityBasis).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.AuthorityReference).HasMaxLength(300).IsRequired();
+            e.Property(x => x.ProcedureReference).HasMaxLength(500);
+            e.Property(x => x.ProcedureNotes).HasMaxLength(3000);
+            e.Property(x => x.EligibilityRules).HasMaxLength(3000);
+            e.Property(x => x.WithdrawalReason).HasMaxLength(2000);
+            e.Property(x => x.CreatedById).HasMaxLength(64).IsRequired();
+            e.Property(x => x.UpdatedById).HasMaxLength(64).IsRequired();
+            e.HasIndex(x => new { x.Status, x.OwnerCategory });
+            e.HasMany(x => x.DocumentRequirements).WithOne().HasForeignKey(x => x.ListingId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Documents).WithOne().HasForeignKey(x => x.ListingId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RentalDocumentRequirement>(e =>
+        {
+            e.ToTable("rental_document_requirements");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.ListingId).HasMaxLength(64);
+            e.Property(x => x.ApplicantScope).HasMaxLength(32).IsRequired();
+            e.Property(x => x.Kind).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Label).HasMaxLength(200).IsRequired();
+            e.HasIndex(x => new { x.ListingId, x.ApplicantScope, x.Kind }).IsUnique();
+        });
+
+        modelBuilder.Entity<RentalListingDocument>(e =>
+        {
+            e.ToTable("rental_listing_documents");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.ListingId).HasMaxLength(64);
+            e.Property(x => x.Kind).HasMaxLength(64).IsRequired();
+            e.Property(x => x.FileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
+            e.Property(x => x.StorageKey).HasMaxLength(500).IsRequired();
+            e.Property(x => x.UploadedById).HasMaxLength(64).IsRequired();
+        });
+
+        modelBuilder.Entity<RentalApplicantProfile>(e =>
+        {
+            e.ToTable("rental_applicant_profiles");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.UserId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.ApplicantType).HasConversion<string>().HasMaxLength(32);
+            e.Property(x => x.ForeignKind).HasConversion<string>().HasMaxLength(16);
+            e.HasIndex(x => x.UserId).IsUnique();
+            foreach (var property in new[] { nameof(RentalApplicantProfile.FullLegalName), nameof(RentalApplicantProfile.LegalName) })
+                e.Property<string>(property).HasMaxLength(300);
+            e.Property(x => x.Citizenship).HasMaxLength(100);
+            e.Property(x => x.CountryOfResidence).HasMaxLength(100);
+            e.Property(x => x.ResidenceAddress).HasMaxLength(500);
+            e.Property(x => x.IdDocumentType).HasMaxLength(100);
+            e.Property(x => x.IdDocumentNumber).HasMaxLength(100);
+            e.Property(x => x.Fin).HasMaxLength(32);
+            e.Property(x => x.LegalForm).HasMaxLength(100);
+            e.Property(x => x.CountryOfIncorporation).HasMaxLength(100);
+            e.Property(x => x.RegistrationIdentifier).HasMaxLength(100);
+            e.Property(x => x.TaxIdentifier).HasMaxLength(100);
+            e.Property(x => x.RegisteredAddress).HasMaxLength(500);
+            e.Property(x => x.ContactPhone).HasMaxLength(32).IsRequired();
+            e.Property(x => x.ContactEmail).HasMaxLength(256).IsRequired();
+            e.Property(x => x.ContactAddress).HasMaxLength(500);
+            e.Property(x => x.RepresentativeName).HasMaxLength(300);
+            e.Property(x => x.RepresentativePosition).HasMaxLength(100);
+            e.Property(x => x.AuthorityToAct).HasMaxLength(500);
+            e.Property(x => x.ConsentVersion).HasMaxLength(64).IsRequired();
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RentalApplication>(e =>
+        {
+            e.ToTable("rental_applications");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.ReferenceNumber).HasMaxLength(32).IsRequired();
+            e.Property(x => x.ListingId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.ApplicantUserId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.ApplicantProfileId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(40);
+            e.Property(x => x.IntendedUse).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.Message).HasMaxLength(2000);
+            e.Property(x => x.AdditionalInformationResponse).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.ApplicantSnapshot).HasColumnType("jsonb");
+            e.Property(x => x.DecisionReason).HasMaxLength(2000);
+            e.Property(x => x.DecidedById).HasMaxLength(64);
+            e.HasIndex(x => x.ReferenceNumber).IsUnique();
+            e.HasIndex(x => new { x.ListingId, x.ApplicantUserId }).IsUnique();
+            e.HasIndex(x => new { x.ListingId, x.Status });
+            e.HasOne(x => x.Listing).WithMany().HasForeignKey(x => x.ListingId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<RentalApplicantProfile>().WithMany().HasForeignKey(x => x.ApplicantProfileId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.ApplicantUserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Documents).WithOne().HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RentalApplicationDocument>(e =>
+        {
+            e.ToTable("rental_application_documents");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.ApplicationId).HasMaxLength(64);
+            e.Property(x => x.Kind).HasMaxLength(64).IsRequired();
+            e.Property(x => x.FileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
+            e.Property(x => x.StorageKey).HasMaxLength(500).IsRequired();
+            e.HasIndex(x => new { x.ApplicationId, x.Kind });
+        });
+
+        modelBuilder.Entity<RentalApplicationHistory>(e =>
+        {
+            e.ToTable("rental_application_history");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.ApplicationId).HasMaxLength(64);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(40);
+            e.Property(x => x.ActorId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Comment).HasMaxLength(2000);
+            e.HasIndex(x => new { x.ApplicationId, x.CreatedAt });
+            e.HasOne<RentalApplication>().WithMany().HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RentalLease>(e =>
+        {
+            e.ToTable("rental_leases");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.ListingId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.ApplicationId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.AgreementReference).HasMaxLength(200).IsRequired();
+            e.Property(x => x.FinalizedById).HasMaxLength(64).IsRequired();
+            e.HasIndex(x => x.ApplicationId).IsUnique();
+            e.HasIndex(x => x.ListingId).IsUnique().HasFilter("\"EndedAt\" IS NULL").HasDatabaseName("ux_rental_leases_one_active_per_listing");
+            e.HasOne<RentalListing>().WithMany().HasForeignKey(x => x.ListingId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<RentalApplication>().WithMany().HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<RentalAuditEntry>(e =>
+        {
+            e.ToTable("rental_audit");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.ActorId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Action).HasMaxLength(64).IsRequired();
+            e.Property(x => x.ObjectType).HasMaxLength(32).IsRequired();
+            e.Property(x => x.ObjectId).HasMaxLength(64).IsRequired();
+            e.HasIndex(x => new { x.ObjectType, x.ObjectId, x.At });
         });
 
         modelBuilder.Entity<ChatMessage>(e =>

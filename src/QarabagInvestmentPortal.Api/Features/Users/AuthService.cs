@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using QarabagInvestmentPortal.Api.Features.Rentals;
 using QarabagInvestmentPortal.Api.Infrastructure.Auth;
 using QarabagInvestmentPortal.Api.Infrastructure.Http;
 using QarabagInvestmentPortal.Api.Infrastructure.Persistence;
@@ -29,8 +30,15 @@ public sealed class AuthService(
             return Outcome<RegistrationResponse>.Fail(400, "Daxil edilən şifrələr bir-biri ilə uyğun gəlmir.");
         if (password.Length < 6)
             return Outcome<RegistrationResponse>.Fail(400, "Şifrə ən azı 6 simvoldan ibarət olmalıdır.");
-        if (!AzerbaijaniPhone.TryNormalize(req.Phone, out var phone))
-            return Outcome<RegistrationResponse>.Fail(400, AzerbaijaniPhone.InvalidMessage);
+        if (!InternationalPhone.TryNormalize(req.Phone, out var phone))
+            return Outcome<RegistrationResponse>.Fail(400, InternationalPhone.InvalidMessage);
+        if (req.ApplicantProfile is null)
+            return Outcome<RegistrationResponse>.Fail(400, "Müraciətçi növünü və profil məlumatlarını daxil edin.");
+
+        var applicantInput = req.ApplicantProfile with { ContactPhone = phone, ContactEmail = email };
+        var applicantErrors = RentalRules.Validate(applicantInput);
+        if (applicantErrors.Count > 0)
+            return Outcome<RegistrationResponse>.Fail(400, string.Join(" ", applicantErrors.Values));
         if (await db.Users.AnyAsync(u => u.Email == email, ct))
             return Outcome<RegistrationResponse>.Fail(409, "Bu elektron poçt ünvanı artıq sistemdə qeydiyyatdan keçib.");
 
@@ -59,7 +67,38 @@ public sealed class AuthService(
             UpdatedAt = now,
             Profile = profile,
         };
+        var applicantProfile = new RentalApplicantProfile
+        {
+            Id = Ids.New("rprofile"),
+            UserId = userId,
+            ApplicantType = applicantInput.ApplicantType,
+            ForeignKind = applicantInput.ForeignKind,
+            FullLegalName = applicantInput.FullLegalName?.Trim() ?? string.Empty,
+            Citizenship = applicantInput.Citizenship?.Trim() ?? string.Empty,
+            CountryOfResidence = applicantInput.CountryOfResidence?.Trim() ?? string.Empty,
+            ResidenceAddress = applicantInput.ResidenceAddress?.Trim() ?? string.Empty,
+            IdDocumentType = applicantInput.IdDocumentType?.Trim() ?? string.Empty,
+            IdDocumentNumber = applicantInput.IdDocumentNumber?.Trim() ?? string.Empty,
+            Fin = applicantInput.Fin?.Trim() ?? string.Empty,
+            LegalName = applicantInput.LegalName?.Trim() ?? string.Empty,
+            LegalForm = applicantInput.LegalForm?.Trim() ?? string.Empty,
+            CountryOfIncorporation = applicantInput.CountryOfIncorporation?.Trim() ?? string.Empty,
+            RegistrationIdentifier = applicantInput.RegistrationIdentifier?.Trim() ?? string.Empty,
+            TaxIdentifier = applicantInput.TaxIdentifier?.Trim() ?? string.Empty,
+            RegisteredAddress = applicantInput.RegisteredAddress?.Trim() ?? string.Empty,
+            ContactPhone = phone,
+            ContactEmail = email,
+            ContactAddress = applicantInput.ContactAddress?.Trim() ?? string.Empty,
+            RepresentativeName = applicantInput.RepresentativeName?.Trim() ?? string.Empty,
+            RepresentativePosition = applicantInput.RepresentativePosition?.Trim() ?? string.Empty,
+            AuthorityToAct = applicantInput.AuthorityToAct?.Trim() ?? string.Empty,
+            ConsentGrantedAt = now,
+            ConsentVersion = "rental-profile-v1",
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
         db.Users.Add(user);
+        db.RentalApplicantProfiles.Add(applicantProfile);
         await db.SaveChangesAsync(ct);
 
         try
@@ -108,6 +147,20 @@ public sealed class AuthService(
         if (user.EmailConfirmedAt is null)
             return Outcome<AuthResponse>.Fail(
                 403, "Giriş üçün əvvəlcə e-poçt ünvanınızı təsdiqləyin.");
+
+        if (user.Role != UserRole.Admin && req.ApplicantType is { } selectedType)
+        {
+            if (!Enum.IsDefined(selectedType))
+                return Outcome<AuthResponse>.Fail(400, "Müraciətçi növü düzgün deyil.");
+
+            var savedType = await db.RentalApplicantProfiles.AsNoTracking()
+                .Where(profile => profile.UserId == user.Id)
+                .Select(profile => (ApplicantType?)profile.ApplicantType)
+                .SingleOrDefaultAsync(ct);
+
+            if (savedType is not null && savedType != selectedType)
+                return Outcome<AuthResponse>.Fail(400, "Seçilmiş müraciətçi növü ilə hesab uyğun gəlmir.");
+        }
 
         var token = sessions.Create(user, response);
 
@@ -172,8 +225,8 @@ public sealed class AuthService(
         if (req.Phone is not null)
         {
             if (req.Phone.Trim().Length == 0) user.Phone = null;
-            else if (AzerbaijaniPhone.TryNormalize(req.Phone, out var phone)) user.Phone = phone;
-            else return Outcome<ProfileUpdatedResponse>.Fail(400, AzerbaijaniPhone.InvalidMessage);
+            else if (InternationalPhone.TryNormalize(req.Phone, out var phone)) user.Phone = phone;
+            else return Outcome<ProfileUpdatedResponse>.Fail(400, InternationalPhone.InvalidMessage);
         }
         if (!string.IsNullOrWhiteSpace(req.FirstName)) user.FirstName = req.FirstName.Trim();
         if (!string.IsNullOrWhiteSpace(req.LastName)) user.LastName = req.LastName.Trim();

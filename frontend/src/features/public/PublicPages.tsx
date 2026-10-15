@@ -90,10 +90,12 @@ export const AboutPage: React.FC = () => {
               </Reveal>
             ))}
           </div>
-          <Reveal className="mt-14 rounded-2xl bg-sand p-6">
-            <h3 className="font-display text-2xl text-brand">{t('about.teamTitle')}</h3>
-            <p className="mt-2 text-ink/80">{t('about.team')} <span className="text-xs text-muted">({t('meta.placeholderNote')})</span></p>
-          </Reveal>
+          {import.meta.env.DEV && (
+            <Reveal className="mt-14 rounded-2xl bg-sand p-6">
+              <h3 className="font-display text-2xl text-brand">{t('about.teamTitle')}</h3>
+              <p className="mt-2 text-ink/80">{t('about.team')} <span className="text-xs text-muted">({t('meta.placeholderNote')})</span></p>
+            </Reveal>
+          )}
         </div>
       </section>
 

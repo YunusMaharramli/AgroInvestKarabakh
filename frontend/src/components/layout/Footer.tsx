@@ -52,6 +52,10 @@ export const NewsletterForm: React.FC = () => {
 export const Footer: React.FC = () => {
   const { t } = useTranslation();
   const lp = useLocalePath();
+  const socialAccounts = SOCIAL.filter(s => {
+    try { return new URL(s.href).pathname !== '/'; }
+    catch { return false; }
+  });
   return (
     <footer>
       {/* Part 1: brand band */}
@@ -71,22 +75,24 @@ export const Footer: React.FC = () => {
 
       {/* Part 2: two-column main footer */}
       <section className="bg-[#0F2A19] text-cream py-14">
-        <div className="container-x grid md:grid-cols-2 gap-12">
+        <div className={`container-x grid ${import.meta.env.DEV ? 'md:grid-cols-2 gap-12' : 'max-w-3xl'}`}>
           <div>
             <h2 className="font-display text-3xl mb-6">{t('brand.name')}</h2>
-            <h3 className="eyebrow eyebrow-light mb-2">{t('footer.visit')}</h3>
-            <p id="footer-address" className="flex gap-2 text-cream/85 mb-6 scroll-mt-32">
-              <MapPin className="w-5 h-5 text-gold shrink-0" aria-hidden="true" />
-              <a href={CONTACT.maps} target="_blank" rel="noopener noreferrer" className="hover:text-gold">{t('footer.address')}</a>
-            </p>
-            <h3 className="eyebrow eyebrow-light mb-2">{t('footer.contactTitle')}</h3>
-            <p className="flex gap-2 text-cream/85"><Mail className="w-5 h-5 text-gold" aria-hidden="true" /><a href={`mailto:${CONTACT.email}`} className="hover:text-gold underline underline-offset-4">{CONTACT.email}</a></p>
-            <p className="flex gap-2 text-cream/85 mt-2"><Phone className="w-5 h-5 text-gold" aria-hidden="true" /><a href={CONTACT.phoneHref} className="hover:text-gold">{CONTACT.phone}</a></p>
+            {CONTACT.maps && <>
+              <h3 className="eyebrow eyebrow-light mb-2">{t('footer.visit')}</h3>
+              <p id="footer-address" className="flex gap-2 text-cream/85 mb-6 scroll-mt-32">
+                <MapPin className="w-5 h-5 text-gold shrink-0" aria-hidden="true" />
+                <a href={CONTACT.maps} target="_blank" rel="noopener noreferrer" className="hover:text-gold">{t('footer.address')}</a>
+              </p>
+            </>}
+            {(CONTACT.email || CONTACT.phone) && <h3 className="eyebrow eyebrow-light mb-2">{t('footer.contactTitle')}</h3>}
+            {CONTACT.email && <p className="flex gap-2 text-cream/85"><Mail className="w-5 h-5 text-gold" aria-hidden="true" /><a href={`mailto:${CONTACT.email}`} className="hover:text-gold underline underline-offset-4">{CONTACT.email}</a></p>}
+            {CONTACT.phone && <p className="flex gap-2 text-cream/85 mt-2"><Phone className="w-5 h-5 text-gold" aria-hidden="true" /><a href={CONTACT.phoneHref} className="hover:text-gold">{CONTACT.phone}</a></p>}
           </div>
-          <div>
+          {import.meta.env.DEV && <div>
             <h2 className="font-display text-3xl mb-6">{t('footer.stay')}</h2>
-            <ul className="flex gap-3 mb-8">
-              {SOCIAL.map(s => (
+            {socialAccounts.length > 0 && <ul className="flex gap-3 mb-8">
+              {socialAccounts.map(s => (
                 <li key={s.name}>
                   <a href={s.href} target="_blank" rel="noopener noreferrer" aria-label={t('footer.social', { name: s.name })}
                     className="w-11 h-11 rounded-full border border-white/30 grid place-items-center hover:bg-gold hover:text-forest hover:border-gold transition">
@@ -94,9 +100,9 @@ export const Footer: React.FC = () => {
                   </a>
                 </li>
               ))}
-            </ul>
+            </ul>}
             <NewsletterForm />
-          </div>
+          </div>}
         </div>
       </section>
 

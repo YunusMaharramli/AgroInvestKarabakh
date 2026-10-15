@@ -16,8 +16,10 @@
   "nav": {
     "home": "Home",
     "about": "About Us",
-    "investments": "Investment Opportunities",
-    "owners": "For Owners",
+    "investments": "Rental listings",
+    "owners": "Applicant cabinet",
+    "rentals": "Rental listings",
+    "applicant": "Applicant cabinet",
     "guides": "Picking Guides",
     "contact": "Contact Us",
     "help": "Help",
@@ -447,7 +449,8 @@
     "quoteLogin": "Grow your capital with the land.",
     "quoteSignup": "Every harvest starts with one decision.",
     "loginTitle": "Welcome back",
-    "loginSubtitle": "Log in to your AGROInvest account.",
+    "loginSubtitle": "Choose your applicant type to log in to AGROInvest.",
+    "loginTypeTitle": "Choose applicant type",
     "identifier": "Email or phone number",
     "password": "Password",
     "show": "Show password",
@@ -472,7 +475,16 @@
     "checkEmailText": "If an account exists for {{email}}, a reset link is on its way.",
     "backLogin": "Back to log in",
     "signupTitle": "Create your account",
-    "signupSubtitle": "Join the marketplace for agricultural land.",
+    "signupSubtitle": "Register as an applicant and complete the form for your applicant type.",
+    "applicantSignupTitle": "Choose your applicant type",
+    "applicantSignupIntro": "The form displays the information required for your selection.",
+    "individualSignupText": "Create an applicant profile in your own name.",
+    "entitySignupText": "Provide details for the organization and its authorized representative.",
+    "foreignSignupText": "Register as a foreign individual or foreign legal entity.",
+    "foreignSubtypeRequired": "Choose whether the foreign applicant is an individual or legal entity.",
+    "representativeFullName": "Authorized representative’s full name",
+    "phoneInvalid": "Enter an international phone number with 7–15 digits.",
+    "consentRequired": "Consent is required to process applicant profile information.",
     "step": "Step {{n}} of {{total}}",
     "steps": [
       "Account",
@@ -801,6 +813,8 @@
     },
     "detail": {
       "why": "Why this score?",
+      "criteriaRequired": "Save your investment criteria in your profile to view this analysis.",
+      "setCriteria": "Set investment criteria",
       "factor": {
         "budget": "Budget fit",
         "fieldType": "Field type match",
@@ -1217,5 +1231,24 @@
       "soil_analysis": "Soil analysis (result)",
       "water_analysis": "Water analysis (result)"
     }
+  },
+  "rental": {
+    "marketTitle": "Rental listings", "marketIntro": "Explore agricultural land and business property rental opportunities. Listings are published by platform administrators.",
+    "search": "Search by area, designation or permitted use", "propertyType": "Property type", "allTypes": "All types", "land": "Land", "businessProperty": "Business property",
+    "ownerCategory": { "private": "Private", "municipal": "Municipal", "state": "State" }, "areaUnit": { "ha": "ha", "m2": "m²" }, "period": { "month": "month", "year": "year", "day": "day" },
+    "view": "View listing", "noListings": "There are no published rental listings at the moment.", "loadError": "Could not load data. Please try again.", "backToListings": "Back to listings",
+    "designation": "Land designation", "area": "Area", "permittedUse": "Permitted use", "procedure": "Proposed procedure", "procedureReference": "Procedure reference", "procedureNotes": "Procedure details", "infrastructure": "Infrastructure", "eligibility": "Applicant eligibility information", "additionalCharges": "Additional charges", "rent": "Rent", "deposit": "Deposit", "leaseDuration": "Lease duration, months", "months": "months", "documents": "Required documents", "noDocumentRequirements": "No separate document requirements are shown for this listing.", "required": "required", "optional": "optional",
+    "scope": { "all": "All applicants", "individual": "Individual", "legalEntity": "Legal entity", "foreignIndividual": "Foreign individual", "foreignLegalEntity": "Foreign legal entity" },
+    "approvalDisclaimer": "Application approval does not form a lease agreement or create lease rights. The contract must be completed separately.", "apply": "Apply to rent", "loginToApply": "Sign in to apply",
+    "applicantCabinet": "Applicant cabinet", "applicantCabinetIntro": "Maintain your applicant profile and track your rental applications.", "logout": "Sign out", "profile": "Applicant profile", "profileIntro": "Provide information relevant to your applicant type. FIN, a local tax number and an Azerbaijani phone number are not required for every applicant.",
+    "myApplications": "My applications", "applicationsIntro": "Review the status and administrator notes for your applications.", "browse": "Browse rental listings", "applicantType": "Applicant type", "typeIndividual": "Individual", "typeEntity": "Legal entity", "typeForeign": "Foreign applicant", "foreignSubtype": "Foreign applicant subtype", "typeForeignIndividual": "Foreign individual", "typeForeignEntity": "Foreign legal entity",
+    "fullLegalName": "Full legal name", "citizenship": "Citizenship", "countryOfResidence": "Country of residence", "residenceAddress": "Residential address", "idType": "Identity document type", "idNumber": "Identity document number", "finOptional": "FIN (optional)", "optionalNoFin": "Provide only where justified for this application.", "legalName": "Registered legal name", "legalForm": "Legal form", "countryOfIncorporation": "Country of incorporation/registration", "registrationIdentifier": "Registration number or identifier", "taxIdentifierOptional": "Tax identifier (optional)", "optionalNoTaxId": "Provide a local tax number only where applicable.", "registeredAddress": "Registered address", "representative": "Authorized representative name", "representativePosition": "Representative's position", "authorityToAct": "Short description of authority to act", "contactPhone": "Contact phone", "internationalPhone": "Use an international format; an Azerbaijani number is not required.", "contactEmail": "Contact email", "contactAddress": "Contact address (optional)",
+    "consent": "I agree to processing the information I provide in this form to create my applicant profile and review my rental applications.", "profileSaved": "Applicant profile saved.", "checkFields": "Check the information and complete the required fields.", "saveProfile": "Save profile", "saving": "Saving…", "back": "Back", "noApplications": "You do not have any rental applications yet.", "details": "Details", "profileRequired": "Complete your applicant profile first", "completeProfile": "Complete profile", "newApplication": "Rental application", "editProfile": "Edit profile information", "intendedUse": "Intended use of the property", "proposedDuration": "Proposed duration (months)", "messageOptional": "Additional message (optional)", "privateDocuments": "Uploaded documents are private and available only to authorized users. PDF, JPG and PNG files are accepted.", "missingDocuments": "Please add the following documents", "reviewApplication": "Review application", "reviewTitle": "Check the information before submitting", "listing": "Listing", "applicant": "Applicant", "submitApplication": "Submit application", "submitting": "Submitting…", "backToEdit": "Back to edit", "applicationSubmitted": "Application submitted.", "submitError": "Could not submit the application. Check the information and documents.",
+    "applicationDetails": "Application details", "noDocumentsUploaded": "No documents uploaded.", "submittedProfile": "Submitted profile information", "profileSnapshotPending": "Profile snapshot has not been created yet.", "statusHistory": "Status history", "sendAdditionalInfo": "Send additional documents", "additionalResponse": "Response to the information request", "additionalSubmitted": "Additional information sent for review.",
+    "status": { "draft": "Draft", "submitted": "Submitted", "underReview": "Under review", "additionalInformationRequired": "Additional information required", "approved": "Approved", "rejected": "Rejected", "withdrawn": "Withdrawn" }, "listingStatus": { "draft": "Draft", "published": "Published", "withdrawn": "Withdrawn", "archived": "Archived" },
+    "adminListings": "Rental listings", "adminListingsIntro": "Manage listings, eligibility information and document requirements.", "createListing": "New listing", "editListing": "Edit rental listing", "adminApplications": "Application review", "adminApplicationsIntro": "Review applicant information, documents and status history.", "all": "All", "withdrawReason": "Enter a reason for withdrawing the listing", "actionError": "Action could not be completed.", "edit": "Edit", "publish": "Publish", "withdraw": "Withdraw", "draftSaved": "Draft saved.", "documentUploaded": "Private document uploaded.", "published": "Listing published.",
+    "adminListingDisclaimer": "Publishing requires a review of authority and applicable procedure. Platform approval does not create a legally effective lease.", "areaUnitLabel": "Area unit", "currency": "Currency", "paymentPeriod": "Payment period", "minimumLease": "Minimum duration, months", "maximumLease": "Maximum duration, months", "externalProcedure": "External procedure", "title": "Listing title", "region": "District/region", "legalDesignation": "Land designation", "address": "Address", "authorityBasis": "Basis for authority to lease", "authorityReference": "Document or decision reference", "photoUrls": "Photo URLs", "photoUrlsHint": "Enter HTTPS addresses separated by commas.", "documentRuleEditor": "Document requirements (one scope|kind|label|required/optional per line)", "documentRuleFormat": "Scopes: ALL, INDIVIDUAL, LEGAL_ENTITY, FOREIGN_INDIVIDUAL, FOREIGN_LEGAL_ENTITY. These are platform rules, not automatic legal mandates. Add only documents justified for this listing and its applicable procedure.", "authorityReviewed": "I reviewed the listing's supporting documents and authority.", "saveDraft": "Save draft", "authorityDocuments": "Authority and ownership documents", "uploadAuthority": "Upload a PDF/JPG/PNG document", "actionSaved": "Status updated.", "decisionReason": "Reason for the decision or additional information request", "startReview": "Start review", "requestInformation": "Request information", "approve": "Approve application", "reject": "Reject", "applicantSnapshot": "Profile snapshot at submission", "finalizeLease": "Finalize lease", "finalizeLeaseHint": "Use this action only after the agreement has been completed separately.", "agreementReference": "Agreement reference", "startsAt": "Lease start", "endsAt": "Lease end", "leaseFinalized": "Lease recorded separately; the listing is temporarily unavailable.", "adminDisclaimer": "The administrator must separately verify authority and whether the agreement is legally effective.",
+    "procedure": { "direct": "Direct agreement", "auction": "Auction", "tender": "Tender/competition", "investmentCompetition": "Investment competition", "externalProcedure": "External procedure", "legalReviewRequired": "Legal review required" },
+    "field": { "applicantType": "Applicant type", "foreignKind": "Foreign subtype", "fullLegalName": "Full legal name", "citizenship": "Citizenship", "countryOfResidence": "Country of residence", "residenceAddress": "Residential address", "idDocumentType": "Identity document type", "idDocumentNumber": "Document number", "fin": "FIN", "legalName": "Legal name", "legalForm": "Legal form", "countryOfIncorporation": "Country of registration", "registrationIdentifier": "Registration identifier", "taxIdentifier": "Tax identifier", "registeredAddress": "Registered address", "contactPhone": "Phone", "contactEmail": "Email", "contactAddress": "Contact address", "representativeName": "Representative", "representativePosition": "Representative position", "authorityToAct": "Authority to act", "consentGrantedAt": "Consent date" }
   }
 }

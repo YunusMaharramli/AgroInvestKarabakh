@@ -2,8 +2,8 @@ import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  AlertTriangle, Archive, ArchiveRestore, CheckCircle2, ChevronRight, CircleSlash, ExternalLink, Eye, FileText, Globe, History, Landmark,
-  LayoutGrid, LogOut, Plus, Send, ShieldAlert, ShieldCheck, Trash2, Upload, UserCog, XCircle,
+  AlertTriangle, Archive, ArchiveRestore, CheckCircle2, ChevronRight, CircleSlash, ExternalLink, Eye, FileText, Globe, History, Inbox, Landmark,
+  Inbox, LayoutGrid, LogOut, Plus, Send, ShieldAlert, ShieldCheck, Trash2, Upload, UserCog, XCircle,
 } from 'lucide-react';
 import { Logo } from '../../components/layout/Logo';
 import { LanguageSwitcher } from '../../components/layout/LanguageSwitcher';
@@ -66,6 +66,9 @@ export const AdminShell: React.FC = () => {
     { to: lp('/admin'), label: t('admin.nav.lands'), icon: <LayoutGrid className="w-5 h-5" />, end: true },
     { to: lp('/admin/lands/new'), label: t('admin.nav.add'), icon: <Plus className="w-5 h-5" /> },
     { to: lp('/admin/workflow'), label: 'Müraciətlər', icon: <FileText className="w-5 h-5" /> },
+    { to: lp('/admin/rentals'), label: t('rental.adminListings'), icon: <LayoutGrid className="w-5 h-5" /> },
+    { to: lp('/admin/rentals/new'), label: t('rental.createListing'), icon: <Plus className="w-5 h-5" /> },
+    { to: lp('/admin/applications'), label: t('rental.adminApplications'), icon: <Inbox className="w-5 h-5" /> },
   ];
   return (
     <div className="min-h-[100svh] bg-cream">
@@ -91,7 +94,7 @@ export const AdminShell: React.FC = () => {
               </NavLink>
             ))}
           </nav>
-          <p className="p-4 text-xs text-muted border-t border-line">{t('admin.disclaimer')}</p>
+          <p className="p-4 text-xs text-muted border-t border-line">{t('rental.adminDisclaimer')}</p>
         </aside>
         <main id="main" className="flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-8 pb-28 lg:pb-12">
           <Suspense fallback={<div className="skeleton h-40" />}><Outlet /></Suspense>

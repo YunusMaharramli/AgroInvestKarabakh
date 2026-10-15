@@ -12,7 +12,7 @@ import { Photo, ProgressBar, RiskBadge, ScoreGauge, VerifiedBadge, StatusBadge, 
 import { Modal, useToast } from '../../components/ui/Overlay';
 import { SingleLandMap } from '../../components/map/LandsMap';
 import { useCompare } from '../compare/CompareContext';
-import type { InvestmentModel, Land } from '../../types/agro';
+import type { InvestmentModel, Land, UserPreferences } from '../../types/agro';
 import { backend } from '../../services/backend';
 
 const Lightbox: React.FC<{ photos: string[]; index: number; onClose: () => void; alt: string }> = ({ photos, index, onClose, alt }) => {
@@ -105,6 +105,12 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
   );
 };
 
+function hasConfiguredInvestorCriteria(preferences: UserPreferences): boolean {
+  return preferences.budgetMin !== 50_000 || preferences.budgetMax !== 500_000 ||
+    preferences.fieldTypes.length > 0 || preferences.regions.length > 0 ||
+    preferences.riskTolerance !== 'medium';
+}
+
 /** Land detail (Part 2, 4.3). mode: public website, investor cabinet, or owner cabinet (owner-only stats). */
 export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = ({ mode }) => {
   const { id = '' } = useParams();
@@ -130,6 +136,7 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
       .then(d => setContactPhone(d.opportunities.find(o => o.myProposal?.id === myRequest.id)?.contactPhone ?? null))
       .catch(() => undefined);
   }, [land?.id, land?.source, myRequest?.id]);
+  const hasSavedCriteria = Boolean(me && (me.investmentCriteriaSaved || hasConfiguredInvestorCriteria(me.preferences)));
 
   useEffect(() => { if (land && mode !== 'owner') landService.addView(land.id); }, [id]);
   const score = useMemo(() => (land ? scoreLand(land, me?.preferences ?? {}) : null), [land, me?.preferences]);
@@ -146,7 +153,9 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
     [t('land.soil'), t(`soil.${land.soilType}`)], [t('land.irrigation'), t(`irrigationTypes.${land.irrigation}`)],
     [t('land.lastCrop'), t(`crops.${land.lastCrop}`, { defaultValue: land.lastCrop })], [t('land.road'), land.roadAccess ? t('form.yes') : t('form.no')],
     [t('land.electricity'), land.electricity ? t('form.yes') : t('form.no')], [t('land.duration'), land.durationMonths ? t('land.months', { n: land.durationMonths }) : '—'],
-    [t('land.model'), t(`models.${land.investmentModel}`)], [t('land.return'), land.expectedReturnPct ? `${land.expectedReturnPct}%` : '—'], [t('land.area'), t('land.ha', { n: land.areaHa })],
+    [t('land.model'), t(`models.${land.investmentModel}`)],
+    ...(hasSavedCriteria ? [[t('land.return'), land.expectedReturnPct ? `${land.expectedReturnPct}%` : '—'] as [string, string]] : []),
+    [t('land.area'), t('land.ha', { n: land.areaHa })],
   ];
   const ministry = land.source === 'ministry' ? ministryFacts(land, facts, t)
     : land.source === 'ownerPortal' ? <p className="mb-4 text-sm text-muted">Bu elanın torpaq məlumatları sahibkar tərəfindən təqdim edilib və dərcdən əvvəl nazirlik tərəfindən yoxlanılıb. Göstərilməyən göstəricilər barədə məlumat yoxdur.</p> : null;
@@ -231,26 +240,32 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
             </div>
           )}
 
-          {/* Three metrics, larger + "Why this score?" */}
-          {!score.unavailable && <div className="card p-6 mt-6">
-            <div className="grid sm:grid-cols-3 gap-6 items-center">
-              <div className="flex justify-center"><ScoreGauge value={score.suitability} size={96} /></div>
-              <div className="flex justify-center"><RiskBadge level={score.risk} factors={score.riskFactors} size="lg" /></div>
-              <ProgressBar label={t('land.fertility')} value={land.fertilityPct} />
+          {hasSavedCriteria ? (
+            <div className="card p-6 mt-6">
+              <div className="grid sm:grid-cols-3 gap-6 items-center">
+                <div className="flex justify-center"><ScoreGauge value={score.suitability} size={96} /></div>
+                <div className="flex justify-center"><RiskBadge level={score.risk} factors={score.riskFactors} size="lg" /></div>
+                <ProgressBar label={t('land.fertility')} value={land.fertilityPct} />
+              </div>
+              <button type="button" onClick={() => setWhy(w => !w)} aria-expanded={why} className="mt-5 text-sm font-bold text-leaf-dark flex items-center gap-1">
+                {t('investor.detail.why')}<ChevronDown className={`w-4 h-4 transition ${why ? 'rotate-180' : ''}`} aria-hidden="true" />
+              </button>
+              {why && (
+                <ul className="mt-4 grid gap-3">
+                  {(Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[]).map(k => (
+                    <li key={k}>
+                      <ProgressBar label={`${t(`investor.detail.factor.${k}`)} · ${t('investor.detail.weight', { w: WEIGHTS[k] * 100 })}`} value={score.breakdown[k] * 100} tone="brand" />
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            <button type="button" onClick={() => setWhy(w => !w)} aria-expanded={why} className="mt-5 text-sm font-bold text-leaf-dark flex items-center gap-1">
-              {t('investor.detail.why')}<ChevronDown className={`w-4 h-4 transition ${why ? 'rotate-180' : ''}`} aria-hidden="true" />
-            </button>
-            {why && (
-              <ul className="mt-4 grid gap-3">
-                {(Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[]).map(k => (
-                  <li key={k}>
-                    <ProgressBar label={`${t(`investor.detail.factor.${k}`)} · ${t('investor.detail.weight', { w: WEIGHTS[k] * 100 })}`} value={score.breakdown[k] * 100} tone="brand" />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>}
+          ) : mode === 'investor' ? (
+            <div className="card p-5 mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <p className="text-sm text-muted">{t('investor.detail.criteriaRequired')}</p>
+              <Link to={lp('/investor/settings#preferences')} className="btn btn-outline btn-sm shrink-0">{t('investor.detail.setCriteria')}</Link>
+            </div>
+          ) : null}
 
           <div className="lg:hidden mt-6">{box}</div>
 

@@ -12,6 +12,12 @@ import { PublicLandPage, LandDetail } from '../features/shared/LandDetail';
 import { LoginPage, SignupPage, ForgotPage, ChooseCabinetPage, ConfirmEmailPage, ResetPasswordPage } from '../features/auth/AuthPages';
 import { CabinetShell } from '../features/cabinet/CabinetShell';
 import { AgroAssistant } from '../components/assistant/AgroAssistant';
+import {
+  AdminRentalApplicationDetailPage, AdminRentalApplicationsPage, AdminRentalListingEditorPage, AdminRentalListingsPage,
+  ApplicantApplicationsPage, ApplicantHomePage, ApplicantProfilePage, NewRentalApplicationPage, RentalApplicantLayout,
+  RentalApplicationDetailPage,
+  RentalDetailPage, RentalListingsPage,
+} from '../features/rentals/RentalPages';
 
 // Cabinet pages are loaded on demand so the public website stays light (charts etc. load only when needed)
 const SettingsPage = lazy(() => import('../features/cabinet/SettingsPage').then(m => ({ default: m.SettingsPage })));
@@ -52,6 +58,9 @@ const ScrollToTop: React.FC = () => {
   }, [pathname, hash]);
   return null;
 };
+
+const LegacyMarketRedirect: React.FC = () => { const lp = useLocalePath(); return <Navigate to={lp('/rentals')} replace />; };
+const LegacyCabinetRedirect: React.FC = () => { const lp = useLocalePath(); return <Navigate to={lp('/applicant')} replace />; };
 
 const PublicLayout: React.FC = () => (
   <>
@@ -113,10 +122,22 @@ export const AppRouter: React.FC = () => {
               <Route element={<PublicLayout />}>
                 <Route index element={<HomePage />} />
                 <Route path="about" element={<AboutPage />} />
-                <Route path="investments" element={<InvestmentsPage />} />
-                <Route path="owners" element={<OwnersPage />} />
+                <Route path="investments" element={<LegacyMarketRedirect />} />
+                <Route path="owners" element={<LegacyCabinetRedirect />} />
                 <Route path="guides" element={<GuidesPage />} />
-                <Route path="lands/:id" element={<PublicLandPage />} />
+                <Route path="lands/:id" element={<LegacyMarketRedirect />} />
+                <Route path="rentals" element={<RentalListingsPage />} />
+                <Route path="rentals/:id" element={<RentalDetailPage />} />
+                <Route element={<RentalApplicantLayout />}>
+                  <Route path="applicant" element={<ApplicantHomePage />} />
+                  <Route path="applicant/profile" element={<ApplicantProfilePage />} />
+                  <Route path="applicant/applications" element={<ApplicantApplicationsPage />} />
+                  <Route path="applicant/applications/:id" element={<RentalApplicationDetailPage />} />
+                  <Route path="rental-apply/:listingId" element={<NewRentalApplicationPage />} />
+                  <Route path="owner/*" element={<LegacyCabinetRedirect />} />
+                  <Route path="investor/*" element={<LegacyCabinetRedirect />} />
+                  <Route path="choose-cabinet" element={<LegacyCabinetRedirect />} />
+                </Route>
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
               <Route path="login" element={<LoginPage />} />
@@ -151,6 +172,11 @@ export const AppRouter: React.FC = () => {
                 <Route path="workflow" element={<AdminWorkflowPage />} />
                 <Route path="lands/new" element={<AdminLandEditor />} />
                 <Route path="lands/:id" element={<AdminLandEditor />} />
+                <Route path="rentals" element={<AdminRentalListingsPage />} />
+                <Route path="rentals/new" element={<AdminRentalListingEditorPage />} />
+                <Route path="rentals/:id" element={<AdminRentalListingEditorPage />} />
+                <Route path="applications" element={<AdminRentalApplicationsPage />} />
+                <Route path="applications/:id" element={<AdminRentalApplicationDetailPage />} />
               </Route>
             </Route>
           </Routes>

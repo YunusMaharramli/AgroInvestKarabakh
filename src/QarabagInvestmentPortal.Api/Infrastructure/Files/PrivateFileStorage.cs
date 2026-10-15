@@ -15,6 +15,9 @@ public sealed record FileRule(string Purpose, IReadOnlyList<string> AllowedTypes
     /// <summary>Investor proposal documents: PDF or photos/scans.</summary>
     public static readonly FileRule ProposalDocuments = new("proposal", ["application/pdf", "image/jpeg", "image/png"], 10 * 1024 * 1024, 10);
 
+    /// <summary>Applicant and authority evidence: always private, PDF or photos/scans.</summary>
+    public static readonly FileRule RentalDocuments = new("rental", ["application/pdf", "image/jpeg", "image/png"], 10 * 1024 * 1024, 10);
+
     public string AllowedForHumans => string.Join(", ", AllowedTypes.Select(t => t switch
     {
         "application/pdf" => "PDF",

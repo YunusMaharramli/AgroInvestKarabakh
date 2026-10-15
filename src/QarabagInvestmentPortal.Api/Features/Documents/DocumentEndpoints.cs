@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Net.Http.Headers;
 using QarabagInvestmentPortal.Api.Features.Opportunities;
 using QarabagInvestmentPortal.Api.Features.Proposals;
+using QarabagInvestmentPortal.Api.Features.Rentals;
 using QarabagInvestmentPortal.Api.Infrastructure.Auth;
 using QarabagInvestmentPortal.Api.Infrastructure.Files;
 using QarabagInvestmentPortal.Api.Infrastructure.Http;
@@ -38,6 +39,13 @@ public static class DocumentEndpoints
                 .FirstAsync(p => p.Id == doc.ProposalId, ct);
             if (!ProposalService.CanView(proposal, new Viewer(user.UserId(), user.IsAdmin())))
                 return ApiResults.Forbidden("Bu sənədə baxmaq icazəniz yoxdur.");
+            return Serve(storage, doc.StorageKey, doc.ContentType, doc.FileName, download == true, response);
+        });
+
+        docs.MapGet("/rentals/{id}", async (string id, bool? download, ClaimsPrincipal user, RentalService rentals, PrivateFileStorage storage, HttpResponse response, CancellationToken ct) =>
+        {
+            var doc = await rentals.GetDocumentAsync(id, user.RequiredUserId(), user.IsAdmin(), user.IsAdmin() ? null : user.RequiredUserId(), ct);
+            if (doc is null) return ApiResults.NotFound("Sənəd tapılmadı.");
             return Serve(storage, doc.StorageKey, doc.ContentType, doc.FileName, download == true, response);
         });
 

@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Heart, MapPin, Star } from 'lucide-react';
 import type { Land } from '../../types/agro';
-import type { LandScore } from '../../services/scoring';
-import { Photo, ProgressBar, RiskBadge, ScoreGauge } from '../../components/ui/Bits';
+import { Photo } from '../../components/ui/Bits';
 import { useFormat } from '../../app/i18n';
 import { useLandName } from './landText';
 import { groupColor } from '../../data/categories';
@@ -20,8 +19,8 @@ export const TypeBadge: React.FC<{ type: string }> = ({ type }) => {
   );
 };
 
-/** Investor search result card (Part 2, 4.2): photo, facts and the three key metrics. */
-export const LandResultCard: React.FC<{ land: Land; score: LandScore; href: string }> = ({ land, score, href }) => {
+/** Investor search result card: show listing facts while keeping analysis for the detail flow. */
+export const LandResultCard: React.FC<{ land: Land; href: string }> = ({ land, href }) => {
   const { t } = useTranslation();
   const f = useFormat();
   const name = useLandName();
@@ -45,19 +44,15 @@ export const LandResultCard: React.FC<{ land: Land; score: LandScore; href: stri
         )}
       </div>
       <div className="p-5 flex flex-col gap-4 flex-1">
-        <div className="flex gap-3 justify-between">
+        <div>
           <div className="min-w-0">
             <h3 className="font-display text-xl text-brand leading-snug"><Link to={href} className="hover:underline">{title}</Link></h3>
             <p className="text-sm text-muted flex items-center gap-1 mt-1"><MapPin className="w-4 h-4" aria-hidden="true" />{t(`regions.${land.region}`)} · {t('land.ha', { n: land.areaHa })}</p>
           </div>
-          {!score.unavailable && <ScoreGauge value={score.suitability} />}
         </div>
-        <dl className="grid grid-cols-2 gap-3 text-sm">
+        <dl className="grid gap-3 text-sm">
           <div><dt className="text-muted text-xs font-semibold">{t('land.required')}</dt><dd className="font-bold">{land.source ? f.compactAzn(land.investmentMin) : `${f.compactAzn(land.investmentMin)} – ${f.compactAzn(land.investmentMax)}`}</dd></div>
-          <div><dt className="text-muted text-xs font-semibold">{t('land.return')}</dt><dd className="font-bold text-leaf-dark">{land.expectedReturnPct ? `${land.expectedReturnPct}%` : '—'}</dd></div>
         </dl>
-        {!land.source && <ProgressBar label={t('land.fertility')} value={land.fertilityPct} />}
-        {!score.unavailable && <div><RiskBadge level={score.risk} factors={score.riskFactors} /></div>}
         <div className="mt-auto pt-2 flex items-center justify-between gap-3 border-t border-line">
           <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer pt-3">
             <input type="checkbox" checked={has(land.id)} onChange={() => toggle(land.id)} className="w-4 h-4 accent-[#1F4D2E]" />{t('land.addCompare')}

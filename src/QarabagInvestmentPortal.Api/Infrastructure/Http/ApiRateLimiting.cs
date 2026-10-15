@@ -15,6 +15,9 @@ public static class ApiRateLimiting
             options.GlobalLimiter =
                 PartitionedRateLimiter.Create<HttpContext, string>(context =>
                 {
+                    if (context.RequestServices?.GetService<IHostEnvironment>()?.IsEnvironment("Testing") == true)
+                        return RateLimitPartition.GetNoLimiter<string>("testing");
+
                     if (!context.Request.Path.StartsWithSegments("/api"))
                         return RateLimitPartition.GetNoLimiter<string>("non-api");
 

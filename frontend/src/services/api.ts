@@ -40,6 +40,31 @@ const SEED_EMAILS = new Set(SEED_USERS.map(u => u.email.toLowerCase()));
 
 interface Session { userId: string; remember: boolean; token?: string | null }
 
+export type SignupApplicantProfile = {
+  applicantType: 'INDIVIDUAL' | 'LEGAL_ENTITY' | 'FOREIGN_APPLICANT';
+  foreignKind: 'INDIVIDUAL' | 'LEGAL_ENTITY' | null;
+  fullLegalName: string;
+  citizenship: string;
+  countryOfResidence: string;
+  residenceAddress: string;
+  idDocumentType: string;
+  idDocumentNumber: string;
+  fin: string;
+  legalName: string;
+  legalForm: string;
+  countryOfIncorporation: string;
+  registrationIdentifier: string;
+  taxIdentifier: string;
+  registeredAddress: string;
+  contactPhone: string;
+  contactEmail: string;
+  contactAddress: string;
+  representativeName: string;
+  representativePosition: string;
+  authorityToAct: string;
+  consentToProcess: boolean;
+};
+
 function readSession(): Session | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY) ?? sessionStorage.getItem(SESSION_KEY);
@@ -58,9 +83,9 @@ export const authService = {
    * Every other account logs in against the real backend, which refuses accounts
    * whose email is not confirmed yet (403).
    */
-  async login(identifier: string, password: string, remember: boolean, recaptchaToken: string): Promise<AppUser> {
+  async login(identifier: string, password: string, remember: boolean, recaptchaToken: string, applicantType: SignupApplicantProfile['applicantType']): Promise<AppUser> {
     const id = identifier.trim().toLowerCase().replace(/\s/g, '');
-    if (SEED_EMAILS.has(id)) {
+    if (import.meta.env.DEV && SEED_EMAILS.has(id)) {
       await delay(null, 400);
       const user = db().users.find(u => u.email.toLowerCase() === id);
       const pw = (user && localStorage.getItem(`agroinvest_pw_${user.id}`)) || TEST_PASSWORD;
@@ -70,7 +95,7 @@ export const authService = {
     }
     let res: AuthResponse;
     try {
-      res = await backend<AuthResponse>('POST', '/auth/login', { email: id, password, recaptchaToken });
+      res = await backend<AuthResponse>('POST', '/auth/login', { email: id, password, recaptchaToken, applicantType });
     } catch (x) {
       const e = fromBackend(x, 'auth.errors.invalid');
       if (e.status === 403) throw new ApiError('auth.errors.notConfirmed', e.detail, 403);
@@ -97,7 +122,7 @@ export const authService = {
   },
 
   /** Creates the account on the backend; the backend emails a confirmation link (Mailpit in development). */
-  async signup(input: { fullName: string; email: string; phone: string; password: string; recaptchaToken: string }): Promise<RegistrationResponse> {
+  async signup(input: { fullName: string; email: string; phone: string; password: string; recaptchaToken: string; applicantProfile: SignupApplicantProfile }): Promise<RegistrationResponse> {
     const parts = input.fullName.trim().split(/\s+/);
     const firstName = parts.shift() ?? '';
     const lastName = parts.join(' ');
@@ -106,6 +131,7 @@ export const authService = {
         firstName, lastName, email: input.email.trim().toLowerCase(), phone: input.phone,
         password: input.password, confirmPassword: input.password,
         recaptchaToken: input.recaptchaToken,
+        applicantProfile: input.applicantProfile,
       });
     } catch (x) {
       const e = fromBackend(x);
@@ -159,6 +185,7 @@ export const authService = {
     mutate(d => {
       const u = d.users.find(x => x.id === me.id)!;
       u.preferences = { ...u.preferences, ...patch };
+      u.investmentCriteriaSaved = true;
     });
   },
 

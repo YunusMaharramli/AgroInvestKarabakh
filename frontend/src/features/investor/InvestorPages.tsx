@@ -46,7 +46,7 @@ export const InvestorOverview: React.FC = () => {
         <Link to={lp('/investor/search')} className="text-sm font-bold text-leaf-dark hover:underline whitespace-nowrap">{t('investor.nav.search')} →</Link>
       </div>
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {loading ? [0, 1, 2].map(i => <SkeletonCard key={i} rows={4} />) : recommended.map(({ land, score }) => <LandResultCard key={land.id} land={land} score={score} href={lp(`/investor/lands/${land.id}`)} />)}
+        {loading ? [0, 1, 2].map(i => <SkeletonCard key={i} rows={4} />) : recommended.map(({ land }) => <LandResultCard key={land.id} land={land} href={lp(`/investor/lands/${land.id}`)} />)}
       </div>
     </>
   );
@@ -168,7 +168,7 @@ export const InvestorSearch: React.FC = () => {
             : (
               <>
                 <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-5">
-                  {results.slice(0, shown).map(({ land, score }) => <LandResultCard key={land.id} land={land} score={score} href={lp(`/investor/lands/${land.id}`)} />)}
+                  {results.slice(0, shown).map(({ land }) => <LandResultCard key={land.id} land={land} href={lp(`/investor/lands/${land.id}`)} />)}
                 </div>
                 {shown < results.length && <div className="text-center mt-8"><button type="button" className="btn btn-outline px-8" onClick={() => setShown(s => s + 9)}>{t('investor.search.loadMore')}</button></div>}
               </>

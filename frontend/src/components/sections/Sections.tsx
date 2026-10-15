@@ -36,7 +36,8 @@ export const HeroSlider: React.FC<{ slides: Slide[] }> = ({ slides }) => {
   const { t } = useTranslation();
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [userPaused, setUserPaused] = useState(false);
+  // Keep the hero still on first load; visitors can start rotation with the play control.
+  const [userPaused, setUserPaused] = useState(true);
   const { frame, layer } = useParallax(0.35);
   useEffect(() => {
     if (paused || userPaused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;

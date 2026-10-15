@@ -8,6 +8,7 @@ using QarabagInvestmentPortal.Api.Features.Lands;
 using QarabagInvestmentPortal.Api.Features.Notifications;
 using QarabagInvestmentPortal.Api.Features.Opportunities;
 using QarabagInvestmentPortal.Api.Features.Proposals;
+using QarabagInvestmentPortal.Api.Features.Rentals;
 using QarabagInvestmentPortal.Api.Features.Recommendations;
 using QarabagInvestmentPortal.Api.Features.Users;
 using QarabagInvestmentPortal.Api.Infrastructure.Auth;
@@ -58,10 +59,10 @@ builder.Services.AddScoped<LandSubmissionService>();
 builder.Services.AddScoped<LandReviewService>();
 builder.Services.AddScoped<AdminLandService>();
 builder.Services.AddScoped<ProposalService>();
+builder.Services.AddScoped<RentalService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<LegacyJsonImporter>();
-builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<LoginAttemptService>();
 
 var app = builder.Build();
@@ -83,9 +84,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
 var api = app.MapGroup("/api");
 api.MapAuthEndpoints()
-    .MapLandEndpoints()
-    .MapAdminLandEndpoints()
-    .MapOpportunityAndProposalEndpoints()
+    .MapRentalEndpoints()
     .MapChatEndpoints()
     .MapDocumentEndpoints()
     .MapFavoriteEndpoints()

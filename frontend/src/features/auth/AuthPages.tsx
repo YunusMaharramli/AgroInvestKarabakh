@@ -2,12 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import type ReCAPTCHA from 'react-google-recaptcha';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
-import { AlertCircle, Eye, EyeOff, Loader2, Mail, Map as MapIcon, TrendingUp, CheckCircle2, Upload } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Loader2, Mail, Map as MapIcon, TrendingUp, CheckCircle2, Upload, UserRound, Building2, Globe2 } from 'lucide-react';
 import { Logo } from '../../components/layout/Logo';
 import { LanguageSwitcher } from '../../components/layout/LanguageSwitcher';
 import { RecaptchaField } from '../../components/RecaptchaField';
 import { useLocalePath } from '../../app/i18n';
-import { authService, useCurrentUser, ApiError, errorText } from '../../services/api';
+import { authService, useCurrentUser, ApiError, errorText, type SignupApplicantProfile } from '../../services/api';
 import { MAILPIT_URL, isLocalDev } from '../../services/backend';
 import { TEST_PASSWORD } from '../../mocks/seed';
 import { cabinetHome } from './routing';
@@ -18,6 +18,13 @@ import { CATEGORIES } from '../../data/categories';
 import type { CabinetRole } from '../../types/agro';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const emptySignupApplicant = (): SignupApplicantProfile => ({
+  applicantType: 'INDIVIDUAL', foreignKind: null, fullLegalName: '', citizenship: '', countryOfResidence: '', residenceAddress: '',
+  idDocumentType: '', idDocumentNumber: '', fin: '', legalName: '', legalForm: '', countryOfIncorporation: '',
+  registrationIdentifier: '', taxIdentifier: '', registeredAddress: '', contactPhone: '', contactEmail: '', contactAddress: '',
+  representativeName: '', representativePosition: '', authorityToAct: '', consentToProcess: false,
+});
 
 /* ---------- split-screen layout (1.1) ---------- */
 export const AuthLayout: React.FC<{ image: string; quote: string; children: React.ReactNode; wide?: boolean }> = ({ image, quote, children, wide }) => {
@@ -102,13 +109,21 @@ const MailpitHint: React.FC = () => {
 };
 
 /** "Send the confirmation link again" — the server limits how often and always answers generically. */
-const ResendLink: React.FC<{ email: string; askEmail?: boolean }> = ({ email: initial, askEmail }) => {
+type SharedCaptcha = {
+  token: string | null;
+  setToken: (token: string | null) => void;
+  reset: () => void;
+};
+
+const ResendLink: React.FC<{ email: string; askEmail?: boolean; captcha?: SharedCaptcha }> = ({ email: initial, askEmail, captcha }) => {
   const { t } = useTranslation();
   const [email, setEmail] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [localRecaptchaToken, setLocalRecaptchaToken] = useState<string | null>(null);
   const recaptchaRef = useRef<ReCAPTCHA>(null);
+  const recaptchaToken = captcha ? captcha.token : localRecaptchaToken;
+  const setRecaptchaToken = captcha?.setToken ?? setLocalRecaptchaToken;
   useEffect(() => { setEmail(initial); }, [initial]);
   const send = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -117,14 +132,19 @@ const ResendLink: React.FC<{ email: string; askEmail?: boolean }> = ({ email: in
     setBusy(true); setMsg(null);
     try { const m = await authService.resendConfirmation(email, recaptchaToken); setMsg({ tone: 'ok', text: m || t('auth.resent') }); }
     catch (x) { setMsg({ tone: 'error', text: errorText(t, x) }); }
-    finally { setBusy(false); setRecaptchaToken(null); recaptchaRef.current?.reset(); }
+    finally {
+      setBusy(false);
+      setRecaptchaToken(null);
+      if (captcha) captcha.reset();
+      else recaptchaRef.current?.reset();
+    }
   };
   return (
     <form onSubmit={send} noValidate className="grid gap-3 mt-6 text-left">
       {askEmail && (
         <Field label={t('auth.email')} htmlFor="resend-email"><input id="resend-email" type="email" className="field" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></Field>
       )}
-      <RecaptchaField ref={recaptchaRef} onChange={setRecaptchaToken} />
+      {!captcha && <RecaptchaField ref={recaptchaRef} onChange={setRecaptchaToken} />}
       <button type="submit" className={askEmail ? 'btn btn-primary w-full' : 'text-sm font-bold text-leaf-dark hover:underline justify-self-start'} disabled={busy}>
         {busy && <Loader2 className="w-4 h-4 animate-spin inline mr-1" aria-hidden="true" />}{t('auth.resend')}
       </button>
@@ -139,6 +159,7 @@ export const LoginPage: React.FC = () => {
   const lp = useLocalePath();
   const navigate = useNavigate();
   const user = useCurrentUser();
+  const [applicantType, setApplicantType] = useState<SignupApplicantProfile['applicantType']>('INDIVIDUAL');
   const [id, setId] = useState('');
   const [pw, setPw] = useState('');
   const [remember, setRemember] = useState(true);
@@ -160,7 +181,7 @@ export const LoginPage: React.FC = () => {
     if (er.id || er.pw || er.form) return;
     setBusy(true); setUnconfirmed(false);
     try {
-      const u = await authService.login(id, pw, remember, recaptchaToken!);
+      const u = await authService.login(id, pw, remember, recaptchaToken!, applicantType);
       navigate(lp(cabinetHome(u)), { replace: true });
     } catch (x) {
       setErr({ form: errorText(t, x) });
@@ -175,8 +196,24 @@ export const LoginPage: React.FC = () => {
     <AuthLayout image="/images/site/photo-21.jpg" quote={t('auth.quoteLogin')}>
       <h1 className="font-display text-4xl text-brand">{t('auth.loginTitle')}</h1>
       <p className="text-muted mt-2 mb-8">{t('auth.loginSubtitle')}</p>
-      {err.form && <div className="mb-5"><Alert>{err.form}</Alert>{unconfirmed && <ResendLink email={id.trim()} />}</div>}
+      {err.form && <div className="mb-5"><Alert>{err.form}</Alert>{unconfirmed && <ResendLink email={id.trim()} captcha={{ token: recaptchaToken, setToken: setRecaptchaToken, reset: () => recaptchaRef.current?.reset() }} />}</div>}
       <form onSubmit={submit} noValidate className="grid gap-5">
+        <fieldset>
+          <legend className="field-label">{t('auth.loginTypeTitle')}</legend>
+          <div role="radiogroup" aria-label={t('auth.loginTypeTitle')} className="grid grid-cols-3 gap-2 mt-2">
+            {([
+              ['INDIVIDUAL', UserRound, t('rental.typeIndividual')],
+              ['LEGAL_ENTITY', Building2, t('rental.typeEntity')],
+              ['FOREIGN_APPLICANT', Globe2, t('rental.typeForeign')],
+            ] as const).map(([value, Icon, title]) => (
+              <button key={value} type="button" role="radio" aria-checked={applicantType === value} onClick={() => setApplicantType(value)}
+                className={`min-h-20 rounded-xl border-2 px-3 py-3 text-left text-sm font-semibold transition ${applicantType === value ? 'border-brand bg-sage text-brand' : 'border-line bg-white text-ink hover:border-leaf'}`}>
+                <Icon className="mb-1 h-4 w-4" aria-hidden="true" />
+                <span className="block">{title}</span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
         <Field label={t('auth.identifier')} htmlFor="login-id" error={err.id}>
           <input id="login-id" className="field" value={id} onChange={e => setId(e.target.value)} autoComplete="username" aria-invalid={!!err.id} />
         </Field>
@@ -193,7 +230,7 @@ export const LoginPage: React.FC = () => {
       <OrDivider />
       <GoogleButton />
       <p className="text-center text-sm mt-8">{t('auth.noAccount')} <Link to={lp('/signup')} className="font-bold text-leaf-dark hover:underline">{t('auth.signup')}</Link></p>
-      {import.meta.env.VITE_HIDE_TEST_ACCOUNTS !== 'true' ? (
+      {import.meta.env.DEV && import.meta.env.VITE_HIDE_TEST_ACCOUNTS !== 'true' ? (
         <aside className="mt-8 rounded-2xl border border-dashed border-gold bg-[#FBF6E8] p-4 text-sm" aria-label={t('auth.devTitle')}>
           <p className="font-bold text-gold-dark">{t('auth.devTitle')}</p>
           <ul className="mt-2 grid gap-1">
@@ -295,6 +332,7 @@ export const SignupPage: React.FC = () => {
 
   // Step 1
   const [v, setV] = useState({ fullName: '', email: '', code: '+994', phone: '', password: '', confirm: '', terms: false });
+  const [applicant, setApplicant] = useState<SignupApplicantProfile>(emptySignupApplicant);
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
@@ -317,17 +355,43 @@ export const SignupPage: React.FC = () => {
     if (v.fullName.trim().length < 3) er.fullName = t('form.minLength', { n: 3 });
     else if (v.fullName.trim().split(/\s+/).length < 2) er.fullName = t('auth.errors.fullName');
     if (!EMAIL_RE.test(v.email)) er.email = t('form.email');
-    if (v.phone.replace(/\D/g, '').length < 7) er.phone = t('auth.errors.phone');
+    const phoneDigits = `${v.code}${v.phone}`.replace(/\D/g, '');
+    if (phoneDigits.length < 7 || phoneDigits.length > 15) er.phone = t('auth.phoneInvalid');
     if (v.password.length < 8) er.password = t('form.minLength', { n: 8 });
     if (v.confirm !== v.password) er.confirm = t('auth.errors.passwordMatch');
     if (!v.terms) er.terms = t('auth.errors.terms');
+    if (!applicant.consentToProcess) er.profileConsent = t('auth.consentRequired');
+    const entity = applicant.applicantType === 'LEGAL_ENTITY' || (applicant.applicantType === 'FOREIGN_APPLICANT' && applicant.foreignKind === 'LEGAL_ENTITY');
+    const foreignIndividual = applicant.applicantType === 'FOREIGN_APPLICANT' && applicant.foreignKind === 'INDIVIDUAL';
+    if (applicant.applicantType === 'FOREIGN_APPLICANT' && !applicant.foreignKind) er.foreignKind = t('auth.foreignSubtypeRequired');
+    if (entity) {
+      if (applicant.legalName.trim().length < 2) er.legalName = t('form.required');
+      if (!applicant.legalForm.trim()) er.legalForm = t('form.required');
+      if (!applicant.countryOfIncorporation.trim()) er.countryOfIncorporation = t('form.required');
+      if (!applicant.registrationIdentifier.trim()) er.registrationIdentifier = t('form.required');
+      if (!applicant.representativePosition.trim()) er.representativePosition = t('form.required');
+      if (!applicant.authorityToAct.trim()) er.authorityToAct = t('form.required');
+    }
+    if (foreignIndividual) {
+      if (!applicant.citizenship.trim()) er.citizenship = t('form.required');
+      if (!applicant.countryOfResidence.trim()) er.countryOfResidence = t('form.required');
+    }
     if (!recaptchaToken) er.form = t('auth.errors.recaptcha');
     setErr(er);
     if (Object.keys(er).length) return;
     setBusy(true);
     try {
-      const r = await authService.signup({ fullName: v.fullName, email: v.email, phone: `${v.code} ${v.phone.trim()}`, password: v.password, recaptchaToken: recaptchaToken! });
       const email = v.email.trim().toLowerCase();
+      const phone = `${v.code} ${v.phone.trim()}`.trim();
+      const applicantProfile: SignupApplicantProfile = {
+        ...applicant,
+        fullLegalName: entity ? '' : v.fullName.trim(),
+        legalName: entity ? applicant.legalName.trim() : '',
+        representativeName: entity ? v.fullName.trim() : '',
+        contactPhone: phone,
+        contactEmail: email,
+      };
+      const r = await authService.signup({ fullName: v.fullName, email, phone, password: v.password, recaptchaToken: recaptchaToken!, applicantProfile });
       savePendingEmail(email); setSentTo(email); setDeliveryFailed(r.emailDeliveryFailed);
       go('check-email');
     } catch (x) {
@@ -363,6 +427,13 @@ export const SignupPage: React.FC = () => {
   const s = strength(v.password);
   const levels = t('auth.strengthLevels', { returnObjects: true }) as unknown as string[];
   const bind = (k: 'fullName' | 'email' | 'phone') => ({ id: `su-${k}`, value: v[k], 'aria-invalid': !!err[k], onChange: (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: e.target.value }) });
+  const updateApplicant = (patch: Partial<SignupApplicantProfile>) => setApplicant(current => ({ ...current, ...patch }));
+  const chooseApplicantType = (applicantType: SignupApplicantProfile['applicantType']) => {
+    setApplicant({ ...emptySignupApplicant(), applicantType, countryOfIncorporation: applicantType === 'LEGAL_ENTITY' ? 'Azərbaycan' : '' });
+    setErr({});
+  };
+  const isEntity = applicant.applicantType === 'LEGAL_ENTITY' || (applicant.applicantType === 'FOREIGN_APPLICANT' && applicant.foreignKind === 'LEGAL_ENTITY');
+  const isIndividual = applicant.applicantType === 'INDIVIDUAL' || (applicant.applicantType === 'FOREIGN_APPLICANT' && applicant.foreignKind === 'INDIVIDUAL');
 
   return (
     <AuthLayout image="/images/site/photo-07.jpg" quote={t('auth.quoteSignup')} wide={step === 'role' || step.startsWith('profile')}>
@@ -373,7 +444,80 @@ export const SignupPage: React.FC = () => {
           <p className="text-muted mt-2 mb-8">{t('auth.signupSubtitle')}</p>
           {err.form && <div className="mb-5"><Alert>{err.form}</Alert></div>}
           <form onSubmit={submitAccount} noValidate className="grid gap-5">
-            <Field label={t('auth.fullName')} htmlFor="su-fullName" error={err.fullName}><input className="field" autoComplete="name" {...bind('fullName')} /></Field>
+            <fieldset>
+              <legend className="field-label">{t('auth.applicantSignupTitle')}</legend>
+              <p className="field-hint mb-3">{t('auth.applicantSignupIntro')}</p>
+              <div role="radiogroup" aria-label={t('auth.applicantSignupTitle')} className="grid gap-3 sm:grid-cols-3">
+                {([
+                  ['INDIVIDUAL', UserRound, t('rental.typeIndividual'), t('auth.individualSignupText')],
+                  ['LEGAL_ENTITY', Building2, t('rental.typeEntity'), t('auth.entitySignupText')],
+                  ['FOREIGN_APPLICANT', Globe2, t('rental.typeForeign'), t('auth.foreignSignupText')],
+                ] as const).map(([value, Icon, title, description]) => (
+                  <button key={value} type="button" role="radio" aria-checked={applicant.applicantType === value} onClick={() => chooseApplicantType(value)}
+                    className={`rounded-2xl border-2 p-4 text-left transition ${applicant.applicantType === value ? 'border-brand bg-sage' : 'border-line bg-white hover:border-leaf'}`}>
+                    <Icon className="h-5 w-5 text-brand" aria-hidden="true" />
+                    <span className="mt-2 block font-bold text-ink">{title}</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-muted">{description}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            {applicant.applicantType === 'FOREIGN_APPLICANT' && (
+              <fieldset>
+                <legend className="field-label">{t('rental.foreignSubtype')}</legend>
+                <div role="radiogroup" aria-label={t('rental.foreignSubtype')} className="grid grid-cols-2 gap-3 mt-2">
+                  {([
+                    ['INDIVIDUAL', t('rental.typeForeignIndividual')],
+                    ['LEGAL_ENTITY', t('rental.typeForeignEntity')],
+                  ] as const).map(([value, title]) => (
+                    <button key={value} type="button" role="radio" aria-checked={applicant.foreignKind === value} onClick={() => updateApplicant({ foreignKind: value })}
+                      className={`rounded-xl border-2 px-4 py-3 text-left font-semibold transition ${applicant.foreignKind === value ? 'border-brand bg-sage' : 'border-line bg-white hover:border-leaf'}`}>
+                      {title}
+                    </button>
+                  ))}
+                </div>
+                {err.foreignKind && <p className="field-error mt-2" role="alert">{err.foreignKind}</p>}
+              </fieldset>
+            )}
+            <Field label={isEntity ? t('auth.representativeFullName') : t('rental.fullLegalName')} htmlFor="su-fullName" error={err.fullName}>
+              <input className="field" autoComplete="name" {...bind('fullName')} />
+            </Field>
+            {isIndividual && (
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('rental.citizenship')} htmlFor="su-citizenship" error={err.citizenship}>
+                  <input id="su-citizenship" className="field" value={applicant.citizenship} onChange={e => updateApplicant({ citizenship: e.target.value })} required={applicant.applicantType === 'FOREIGN_APPLICANT'} />
+                </Field>
+                <Field label={t('rental.countryOfResidence')} htmlFor="su-residence-country" error={err.countryOfResidence}>
+                  <input id="su-residence-country" className="field" value={applicant.countryOfResidence} onChange={e => updateApplicant({ countryOfResidence: e.target.value })} required={applicant.applicantType === 'FOREIGN_APPLICANT'} />
+                </Field>
+                <Field label={t('rental.residenceAddress')} htmlFor="su-residence-address">
+                  <input id="su-residence-address" className="field" value={applicant.residenceAddress} onChange={e => updateApplicant({ residenceAddress: e.target.value })} />
+                </Field>
+                <Field label={t('rental.idType')} htmlFor="su-id-type">
+                  <input id="su-id-type" className="field" value={applicant.idDocumentType} onChange={e => updateApplicant({ idDocumentType: e.target.value })} />
+                </Field>
+                <Field label={t('rental.idNumber')} htmlFor="su-id-number">
+                  <input id="su-id-number" className="field" value={applicant.idDocumentNumber} onChange={e => updateApplicant({ idDocumentNumber: e.target.value })} />
+                </Field>
+                {applicant.applicantType === 'INDIVIDUAL' && (
+                  <Field label={t('rental.finOptional')} htmlFor="su-fin" hint={t('rental.optionalNoFin')}>
+                    <input id="su-fin" className="field" value={applicant.fin} onChange={e => updateApplicant({ fin: e.target.value })} />
+                  </Field>
+                )}
+              </div>
+            )}
+            {isEntity && (
+              <div className="grid gap-5 sm:grid-cols-2 rounded-2xl border border-line bg-sand/50 p-4 sm:p-5">
+                <Field label={t('rental.legalName')} htmlFor="su-legal-name" error={err.legalName}><input id="su-legal-name" className="field" value={applicant.legalName} onChange={e => updateApplicant({ legalName: e.target.value })} required /></Field>
+                <Field label={t('rental.legalForm')} htmlFor="su-legal-form" error={err.legalForm}><input id="su-legal-form" className="field" value={applicant.legalForm} onChange={e => updateApplicant({ legalForm: e.target.value })} required /></Field>
+                <Field label={t('rental.countryOfIncorporation')} htmlFor="su-incorporation-country" error={err.countryOfIncorporation}><input id="su-incorporation-country" className="field" value={applicant.countryOfIncorporation} onChange={e => updateApplicant({ countryOfIncorporation: e.target.value })} required /></Field>
+                <Field label={t('rental.registrationIdentifier')} htmlFor="su-registration-id" error={err.registrationIdentifier}><input id="su-registration-id" className="field" value={applicant.registrationIdentifier} onChange={e => updateApplicant({ registrationIdentifier: e.target.value })} required /></Field>
+                <Field label={t('rental.taxIdentifierOptional')} htmlFor="su-tax-id" hint={t('rental.optionalNoTaxId')}><input id="su-tax-id" className="field" value={applicant.taxIdentifier} onChange={e => updateApplicant({ taxIdentifier: e.target.value })} /></Field>
+                <Field label={t('rental.registeredAddress')} htmlFor="su-registered-address"><input id="su-registered-address" className="field" value={applicant.registeredAddress} onChange={e => updateApplicant({ registeredAddress: e.target.value })} /></Field>
+                <Field label={t('rental.representativePosition')} htmlFor="su-representative-position" error={err.representativePosition}><input id="su-representative-position" className="field" value={applicant.representativePosition} onChange={e => updateApplicant({ representativePosition: e.target.value })} required /></Field>
+                <Field label={t('rental.authorityToAct')} htmlFor="su-authority" error={err.authorityToAct}><input id="su-authority" className="field" value={applicant.authorityToAct} onChange={e => updateApplicant({ authorityToAct: e.target.value })} required /></Field>
+              </div>
+            )}
             <Field label={t('auth.email')} htmlFor="su-email" error={err.email}><input className="field" type="email" autoComplete="email" {...bind('email')} /></Field>
             <Field label={t('auth.phone')} htmlFor="su-phone" error={err.phone}>
               <div className="flex gap-2">
@@ -382,6 +526,7 @@ export const SignupPage: React.FC = () => {
                 </select>
                 <input className="field" type="tel" autoComplete="tel-national" placeholder="50 123 45 67" {...bind('phone')} />
               </div>
+              <p className="field-hint">{t('rental.internationalPhone')}</p>
             </Field>
             <Field label={t('auth.password')} htmlFor="su-pw" error={err.password}>
               <PasswordInput id="su-pw" value={v.password} onChange={x => setV({ ...v, password: x })} invalid={!!err.password} autoComplete="new-password" describedBy="pw-strength" />
@@ -398,11 +543,16 @@ export const SignupPage: React.FC = () => {
               </label>
               {err.terms && <p className="field-error" role="alert">{err.terms}</p>}
             </div>
+            <div>
+              <label className="flex items-start gap-3 rounded-xl bg-sage/60 p-4 text-sm cursor-pointer">
+                <input type="checkbox" checked={applicant.consentToProcess} onChange={e => updateApplicant({ consentToProcess: e.target.checked })} className="mt-0.5 h-4 w-4 accent-brand" aria-invalid={!!err.profileConsent} />
+                <span>{t('rental.consent')}</span>
+              </label>
+              {err.profileConsent && <p className="field-error" role="alert">{err.profileConsent}</p>}
+            </div>
             <RecaptchaField ref={recaptchaRef} onChange={setRecaptchaToken} />
             <button type="submit" className="btn btn-primary w-full" disabled={busy}>{busy && <Loader2 className="w-4 h-4 animate-spin" />}{t('auth.create')}</button>
           </form>
-          <OrDivider />
-          <GoogleButton />
           <p className="text-center text-sm mt-8">{t('auth.haveAccount')} <Link to={lp('/login')} className="font-bold text-leaf-dark hover:underline">{t('auth.login')}</Link></p>
         </>
       )}

@@ -106,6 +106,9 @@ public static class Policies
     /// <summary>Any logged-in user (USER or ADMIN).</summary>
     public const string SignedIn = "SignedIn";
 
+    /// <summary>Applicant actions are available to regular USER accounts only.</summary>
+    public const string User = "User";
+
     /// <summary>Administrators only.</summary>
     public const string Admin = "Admin";
 }
@@ -119,6 +122,7 @@ public static class AuthSetup
             .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null);
         services.AddAuthorizationBuilder()
             .AddPolicy(Policies.SignedIn, p => p.RequireAuthenticatedUser())
+            .AddPolicy(Policies.User, p => p.RequireAuthenticatedUser().RequireRole(Roles.User))
             .AddPolicy(Policies.Admin, p => p.RequireAuthenticatedUser().RequireRole(Roles.Admin));
         return services;
     }

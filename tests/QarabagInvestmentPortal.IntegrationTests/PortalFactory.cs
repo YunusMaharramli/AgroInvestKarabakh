@@ -118,6 +118,31 @@ public sealed class PortalFactory : WebApplicationFactory<Program>, IAsyncLifeti
             phone,
             password = "Parol-2026",
             confirmPassword = "Parol-2026",
+            applicantProfile = new
+            {
+                applicantType = "INDIVIDUAL",
+                foreignKind = (string?)null,
+                fullLegalName = "Test Applicant",
+                citizenship = "Azerbaijan",
+                countryOfResidence = "Azerbaijan",
+                residenceAddress = "",
+                idDocumentType = "",
+                idDocumentNumber = "",
+                fin = "",
+                legalName = "",
+                legalForm = "",
+                countryOfIncorporation = "",
+                registrationIdentifier = "",
+                taxIdentifier = "",
+                registeredAddress = "",
+                contactPhone = phone,
+                contactEmail = email,
+                contactAddress = "",
+                representativeName = "",
+                representativePosition = "",
+                authorityToAct = "",
+                consentToProcess = true,
+            },
         });
         Assert.Equal(System.Net.HttpStatusCode.Created, res.StatusCode);
 

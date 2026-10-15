@@ -7,7 +7,8 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Auth;
 public sealed class RecaptchaVerifier(
     HttpClient httpClient,
     IConfiguration configuration,
-    ILogger<RecaptchaVerifier> logger)
+    ILogger<RecaptchaVerifier> logger,
+    IHostEnvironment environment)
 {
     /// <summary>
     /// Recaptcha:Enabled = false switches the check off (automated tests only).
@@ -22,6 +23,12 @@ public sealed class RecaptchaVerifier(
             return false;
 
         var secret = configuration["Recaptcha:SecretKey"];
+        if (string.IsNullOrWhiteSpace(secret) && environment.IsDevelopment())
+        {
+            // Google-published v2 test key; it always passes and must never be used in production.
+            secret = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe";
+        }
+
         if (string.IsNullOrWhiteSpace(secret))
         {
             logger.LogError("reCAPTCHA secret key konfiqurasiya edilməyib.");

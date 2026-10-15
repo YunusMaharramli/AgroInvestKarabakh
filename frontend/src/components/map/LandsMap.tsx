@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { APIProvider, Map, Marker, InfoWindow, MapMouseEvent } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, Marker, InfoWindow, MapMouseEvent, useApiIsLoaded } from '@vis.gl/react-google-maps';
 import { MapPin, MousePointerClick } from 'lucide-react';
 import { CATEGORY_GROUPS, CategoryGroup, categoryByKey, groupColor } from '../../data/categories';
 import { useLocalePath } from '../../app/i18n';
@@ -57,6 +57,17 @@ const NoKeyFallback: React.FC<{ lands: Land[]; onSelectHref: (l: Land) => string
 };
 
 /** 5.4 Investment map: colour-coded markers, legend, filter chips, info window, scroll zoom only after a click. */
+/** Markers need the Google Maps script (google.maps.Size), so they render only after it has loaded. */
+const LandMarkers: React.FC<{ lands: Land[]; title: (l: Land) => string; onSelect: (l: Land) => void }> = ({ lands, title, onSelect }) => {
+  const loaded = useApiIsLoaded();
+  if (!loaded) return null;
+  const size = new google.maps.Size(30, 40);
+  return <>{lands.map(l => (
+    <Marker key={l.id} position={{ lat: l.lat, lng: l.lng }} title={title(l)} onClick={() => onSelect(l)}
+      icon={{ url: markerIcon(groupColor(l.fieldType), l.isSpecial), scaledSize: size }} />
+  ))}</>;
+};
+
 export const LandsMap: React.FC<{ lands: Land[]; height?: string; detailHref?: (l: Land) => string; showFilters?: boolean }> = ({ lands, height = 'h-[520px]', detailHref, showFilters = true }) => {
   const { t } = useTranslation();
   const lp = useLocalePath();
@@ -90,10 +101,7 @@ export const LandsMap: React.FC<{ lands: Land[]; height?: string; detailHref?: (
           <APIProvider apiKey={MAPS_KEY}>
             <Map defaultCenter={AZ_CENTER} defaultZoom={7} styles={MAP_STYLE} scrollwheel={wheel} gestureHandling={wheel ? 'greedy' : 'cooperative'}
               zoomControl streetViewControl={false} mapTypeControl={false} fullscreenControl={false} clickableIcons={false}>
-              {visible.map(l => (
-                <Marker key={l.id} position={{ lat: l.lat, lng: l.lng }} title={name(l)} onClick={() => setActive(l)}
-                  icon={{ url: markerIcon(groupColor(l.fieldType), l.isSpecial), scaledSize: new google.maps.Size(30, 40) }} />
-              ))}
+              <LandMarkers lands={visible} title={name} onSelect={setActive} />
               {active && (
                 <InfoWindow position={{ lat: active.lat, lng: active.lng }} onCloseClick={() => setActive(null)} pixelOffset={[0, -38]}>
                   <div className="font-sans min-w-48 max-w-60">

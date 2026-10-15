@@ -457,14 +457,23 @@ const DetailsStep: React.FC<{ type: ApplicantType }> = ({ type }) => {
     if (Object.keys(er).length) { document.getElementById(`dt-${Object.keys(er)[0]}`)?.focus(); return; }
     setBusy(true);
     try {
-      const user = await authService.completeSignup({
-        maritalStatus: v.maritalStatus || null, incomeLast6Months: num(v.incomeLast6Months), hasCredit: v.hasCredit,
-        monthlyCreditPayment: v.hasCredit ? num(v.monthlyCreditPayment) : null, hasFixedIncome: v.hasFixedIncome,
-        fixedMonthlyIncome: v.hasFixedIncome ? num(v.fixedMonthlyIncome) : null, minimumFunds: num(v.minimumFunds),
-        residencyStatus: v.residencyStatus || null, address: v.address || null, incomeSource: v.incomeSource || null,
-        country: v.country || null, activityStatus: v.activityStatus || null, mainActivity: v.mainActivity || null,
-        activityStartDate: v.activityStartDate || null, ceoName: v.ceoName || null,
-      });
+      const details = individual ? {
+        maritalStatus: v.maritalStatus, incomeLast6Months: num(v.incomeLast6Months),
+        hasCredit: v.hasCredit, monthlyCreditPayment: v.hasCredit ? num(v.monthlyCreditPayment) : null,
+        hasFixedIncome: v.hasFixedIncome, fixedMonthlyIncome: v.hasFixedIncome ? num(v.fixedMonthlyIncome) : null,
+        minimumFunds: num(v.minimumFunds),
+      } : foreignPerson ? {
+        residencyStatus: v.residencyStatus, address: v.address, incomeSource: v.incomeSource,
+        hasCredit: v.hasCredit, monthlyCreditPayment: v.hasCredit ? num(v.monthlyCreditPayment) : null,
+        minimumFunds: num(v.minimumFunds),
+      } : foreignCompany ? {
+        country: v.country, activityStatus: v.activityStatus, address: v.address,
+        mainActivity: v.mainActivity, ceoName: v.ceoName,
+      } : {
+        address: v.address, mainActivity: v.mainActivity, activityStartDate: v.activityStartDate,
+        ceoName: v.ceoName, minimumFunds: num(v.minimumFunds),
+      };
+      const user = await authService.completeSignup(details);
       toast(t('auth.details.done'));
       navigate(lp(cabinetHome(user)), { replace: true });
     } catch (x) {
@@ -555,6 +564,11 @@ interface AccountState {
   password: string; confirm: string; terms: boolean;
 }
 
+const emptyAccount = (): AccountState => ({
+  fullName: '', companyName: '', email: '', code: '+994', phone: '', voen: '', foreignTaxNumber: '',
+  password: '', confirm: '', terms: false,
+});
+
 export const SignupPage: React.FC = () => {
   const { t } = useTranslation();
   const lp = useLocalePath();
@@ -565,7 +579,12 @@ export const SignupPage: React.FC = () => {
   const go = (s: string) => setParams({ step: s });
 
   const [type, setType] = useState<ApplicantType>(() => authService.pendingSignup()?.type ?? 'INDIVIDUAL');
-  const [v, setV] = useState<AccountState>({ fullName: '', companyName: '', email: '', code: '+994', phone: '', voen: '', foreignTaxNumber: '', password: '', confirm: '', terms: false });
+  const [drafts, setDrafts] = useState<Record<ApplicantType, AccountState>>(() => ({
+    INDIVIDUAL: emptyAccount(), LEGAL_ENTITY: emptyAccount(),
+    FOREIGN_INDIVIDUAL: emptyAccount(), FOREIGN_ENTITY: emptyAccount(),
+  }));
+  const v = drafts[type];
+  const setV = (next: AccountState) => setDrafts(current => ({ ...current, [type]: next }));
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
@@ -693,7 +712,7 @@ export const SignupPage: React.FC = () => {
         <ConfirmationStatus email={pending.email} deliveryFailed={deliveryFailed} onContinue={() => go('details')} />
       )}
 
-      {step === 'details' && detailsType && <DetailsStep type={detailsType} />}
+      {step === 'details' && detailsType && <DetailsStep key={detailsType} type={detailsType} />}
     </AuthLayout>
   );
 };

@@ -39,9 +39,9 @@ public sealed class AuthService(
         {
             Id = Ids.New("prof"),
             UserId = userId,
-            CompanyName = input.CompanyName.Length > 0 ? input.CompanyName : req.CompanyName?.Trim() ?? string.Empty,
-            TaxIdentificationNumber = input.Voen.Length > 0 ? input.Voen : req.TaxIdentificationNumber?.Trim() ?? string.Empty,
-            BusinessActivity = req.BusinessActivity?.Trim() ?? string.Empty,
+            CompanyName = input.CompanyName,
+            TaxIdentificationNumber = input.Voen,
+            BusinessActivity = req.ApplicantType is null ? req.BusinessActivity?.Trim() ?? string.Empty : string.Empty,
             ForeignTaxNumber = input.ForeignTaxNumber,
             CreatedAt = now,
             UpdatedAt = now,

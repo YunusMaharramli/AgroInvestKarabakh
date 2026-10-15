@@ -27,7 +27,7 @@ public sealed record AssistantStatus(bool Ai, string Model);
 /// active listings and — when logged in — the user's own lands and proposals) to the prompt, asks Gemini for JSON,
 /// checks every suggested link and returns { answer, actions, suggestions, source }. Without a key, or when Gemini
 /// fails, a simple built-in helper answers.
-/// Config: Gemini:ApiKey (or GEMINI_API_KEY), Gemini:Model (default gemini-2.5-flash), Gemini:Endpoint.
+/// Config: Gemini:ApiKey (or GEMINI_API_KEY), Gemini:Model (default gemini-3.8-flash), Gemini:Endpoint.
 /// </summary>
 public static partial class AssistantEndpoints
 {
@@ -37,7 +37,7 @@ public static partial class AssistantEndpoints
     private const int MaxMessageLength = 1000;
     private const int MaxHistoryTurns = 10;
     private const string HelpLine = "[QAYNAR XƏTT]";
-    private const string DefaultModel = "gemini-2.5-flash";
+    private const string DefaultModel = "gemini-3.8-flash";
 
     public static RouteGroupBuilder MapAssistantEndpoints(this RouteGroupBuilder api)
     {

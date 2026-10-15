@@ -13,6 +13,7 @@ using QarabagInvestmentPortal.Api.Infrastructure.Auth;
 using QarabagInvestmentPortal.Api.Infrastructure.Email;
 using QarabagInvestmentPortal.Api.Infrastructure.Files;
 using QarabagInvestmentPortal.Api.Infrastructure.Frontend;
+using QarabagInvestmentPortal.Api.Infrastructure.Http;
 using QarabagInvestmentPortal.Api.Infrastructure.Import;
 using QarabagInvestmentPortal.Api.Infrastructure.Persistence;
 using System.Text.Json;
@@ -35,6 +36,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddPortalDatabase(builder.Configuration, builder.Environment.ContentRootPath);
 builder.Services.AddPortalAuth();
+builder.Services.AddApiRateLimiting();
 builder.Services.AddHttpClient<RecaptchaVerifier>(
     client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.Configure<SmtpEmailOptions>(
@@ -69,9 +71,10 @@ if (args.Length > 0 && args[0] == "import-legacy")
 await app.MigrateIfConfiguredAsync();
 
 app.UseExceptionHandler();
+app.UseRouting();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
-
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
 var api = app.MapGroup("/api");

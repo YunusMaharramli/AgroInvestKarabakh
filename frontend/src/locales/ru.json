@@ -426,7 +426,9 @@
   "reqStatus": {
     "pending": "Ожидает",
     "selected": "Выбрана",
-    "notSelected": "Не выбрана"
+    "notSelected": "Не выбрана",
+    "rejected": "Отклонена",
+    "cancelled": "Отменена из-за закрытия объявления"
   },
   "risk": {
     "low": "Низкий",

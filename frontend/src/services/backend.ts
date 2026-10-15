@@ -17,7 +17,7 @@ export function backendToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
 
-export async function backend<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {
+export async function backend<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
   const token = backendToken();
   let res: Response;

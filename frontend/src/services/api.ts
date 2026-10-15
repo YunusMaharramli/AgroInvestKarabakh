@@ -3,6 +3,8 @@ import type { AppNotification, AppUser, CabinetRole, InvestmentRequest, Land, Us
 import { db, delay, mutate, newId, subscribe } from './db';
 import { TEST_PASSWORD, SEED_USERS } from '../mocks/seed';
 import { backend, BackendError, TOKEN_KEY, type AuthResponse, type MessageResponse, type RegistrationResponse } from './backend';
+import { syncOwnerLands, toLand, type BackendLand } from './ministryLands';
+import { syncPortalProposals } from './portalProposals';
 
 /* ------------------------------------------------------------------ *
  * Mock API layer. Every function returns a Promise like a real HTTP
@@ -258,18 +260,18 @@ export const landService = {
   get(id: string): Land | undefined { return db().lands.find(l => l.id === id); },
   byOwner(ownerId: string): Land[] { return db().lands.filter(l => l.ownerId === ownerId); },
 
-  async create(land: Omit<Land, 'id' | 'createdAt' | 'views' | 'raisedAmount' | 'ownerVerified' | 'priceVolatility'>, asDraft: boolean): Promise<Land> {
-    const me = authService.currentUser()!;
-    await delay(null, 700);
-    const full: Land = {
-      ...land, id: newId('L'), createdAt: new Date().toISOString(), views: 0, raisedAmount: 0,
-      ownerVerified: me.verified, priceVolatility: 0.4, status: asDraft ? 'draft' : 'underReview',
-    };
-    mutate(d => {
-      d.lands.unshift(full);
-      if (!asDraft) d.notifications.unshift({ id: newId('N'), userId: me.id, type: 'review', textKey: 'notifications.underReview', values: { land: full.id }, link: '/owner/properties', read: false, createdAt: full.createdAt });
-    });
-    return full;
+  async create(form: FormData): Promise<void> {
+    const me = authService.currentUser();
+    if (!me || !authService.hasBackendSession()) throw new ApiError('auth.errors.notSignedIn');
+    try {
+      const created = await backend<{ land: BackendLand }>('POST', '/my/lands', form);
+      try { await syncOwnerLands(me.id); }
+      catch {
+        const land = toLand(created.land);
+        land.ownerId = me.id; land.source = 'ownerPortal'; land.status = 'underReview';
+        mutate(d => { d.lands = [land, ...d.lands.filter(l => l.id !== land.id)]; });
+      }
+    } catch (x) { throw fromBackend(x); }
   },
 
   async setStatus(id: string, status: Land['status']) {
@@ -310,53 +312,37 @@ export const requestService = {
   },
   forLand(landId: string) { return db().requests.filter(r => r.landId === landId); },
 
-  async create(input: { landId: string; amount: number; investmentModel: InvestmentRequest['investmentModel']; durationMonths: number; message: string }) {
+  async create(input: { landId: string; amount: number; investmentModel: InvestmentRequest['investmentModel']; durationMonths: number; message: string; documents?: File[] }) {
     const me = authService.currentUser();
     if (!me) throw new ApiError('auth.errors.notSignedIn');
-    await delay(null, 700);
     const land = landService.get(input.landId);
     if (!land || land.status !== 'active') throw new ApiError('requests.errors.closed');
     if (land.ownerId === me.id) throw new ApiError('requests.errors.own');
-    if (db().requests.some(r => r.landId === land.id && r.investorId === me.id)) throw new ApiError('requests.errors.duplicate');
-    const now = new Date().toISOString();
-    const req: InvestmentRequest = { ...input, id: newId('R'), investorId: me.id, status: 'pending', viewedByOwner: false, createdAt: now, updatedAt: now };
-    mutate(d => {
-      d.requests.unshift(req);
-      d.notifications.unshift({ id: newId('N'), userId: land.ownerId, type: 'request', textKey: 'notifications.newRequest', values: { land: land.id }, link: '/owner/requests', read: false, createdAt: now });
-    });
-    return req;
+    if (!authService.hasBackendSession() || !land.source) throw new ApiError('form.error', 'Demo elanına real təklif göndərmək mümkün deyil.');
+    try {
+      const detail = await backend<{ activeOpportunity: { id: string } | null }>('GET', `/lands/${land.id}`);
+      if (!detail.activeOpportunity) throw new ApiError('requests.errors.closed');
+      const form = new FormData();
+      form.append('opportunityId', detail.activeOpportunity.id);
+      form.append('proposedInvestmentAmount', String(input.amount));
+      form.append('businessPlanSummary', input.message);
+      form.append('estimatedImplementationPeriod', `${input.durationMonths} ay`);
+      form.append('contactPhone', me.phone);
+      input.documents?.forEach(file => form.append('documents', file));
+      const created = await backend<{ id: string; submittedAt: string; updatedAt: string }>('POST', '/proposals', form);
+      try { await syncPortalProposals(); }
+      catch {
+        mutate(d => { d.requests = [{ landId: input.landId, amount: input.amount, investmentModel: input.investmentModel,
+          durationMonths: input.durationMonths, message: input.message, id: created.id, investorId: me.id, status: 'pending',
+          viewedByOwner: false, source: 'portal', createdAt: created.submittedAt, updatedAt: created.updatedAt }, ...d.requests.filter(r => r.id !== created.id)]; });
+      }
+    } catch (x) { if (x instanceof ApiError) throw x; throw fromBackend(x); }
   },
 
   markViewed(id: string) {
     mutate(d => { const r = d.requests.find(x => x.id === id); if (r) r.viewedByOwner = true; });
   },
 
-  /**
-   * One-winner rule: atomically select one request, close the listing,
-   * mark every other pending request on that land "notSelected" and notify everyone.
-   */
-  async selectWinner(requestId: string) {
-    await delay(null, 600);
-    mutate(d => {
-      const win = d.requests.find(r => r.id === requestId);
-      if (!win || win.status !== 'pending') throw new ApiError('requests.errors.decided');
-      const land = d.lands.find(l => l.id === win.landId)!;
-      if (land.status !== 'active') throw new ApiError('requests.errors.closed');
-      const now = new Date().toISOString();
-      for (const r of d.requests.filter(x => x.landId === land.id && x.status === 'pending')) {
-        r.status = r.id === win.id ? 'selected' : 'notSelected';
-        r.updatedAt = now;
-        d.notifications.unshift({
-          id: newId('N'), userId: r.investorId, type: 'decision',
-          textKey: r.id === win.id ? 'notifications.selected' : 'notifications.notSelected',
-          values: { land: land.id }, link: '/investor/investments', read: false, createdAt: now,
-        });
-      }
-      land.status = 'funded';
-      land.raisedAmount = Math.max(land.raisedAmount, win.amount);
-      land.winnerRequestId = win.id;
-    });
-  },
 };
 
 /* ---------------- notifications ---------------- */

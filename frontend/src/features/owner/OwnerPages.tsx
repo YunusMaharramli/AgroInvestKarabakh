@@ -18,6 +18,8 @@ import { REGIONS, regionByKey } from '../../data/regions';
 import type { InvestmentModel, InvestmentRequest, Irrigation, Land, LandStatus, SoilType } from '../../types/agro';
 import { draftStore, useLandDrafts, type LandDraftRecord } from '../../services/drafts';
 import { LandSearchBar, matchesLandSearch } from '../shared/LandSearch';
+import { backend, BackendError } from '../../services/backend';
+import { syncOwnerLands } from '../../services/ministryLands';
 
 function useLoading(ms = 450) {
   const [loading, setLoading] = useState(true);
@@ -72,7 +74,6 @@ const RequestList: React.FC<{ requests: InvestmentRequest[]; compact?: boolean; 
   const { t } = useTranslation();
   const f = useFormat();
   const name = useLandName();
-  const [pick, setPick] = useState<InvestmentRequest | null>(null);
   return (
     <>
       <ul className="divide-y divide-line">
@@ -87,34 +88,13 @@ const RequestList: React.FC<{ requests: InvestmentRequest[]; compact?: boolean; 
                 <p className="text-xs text-muted truncate">{name(land)} · {f.date(r.createdAt)}</p>
               </div>
               <p className="font-bold text-sm">{f.azn(r.amount)}</p>
-              {r.status === 'pending' && land?.status === 'active'
-                ? <button type="button" className="btn btn-primary btn-sm" onClick={() => setPick(r)}><Trophy className="w-4 h-4" />{t('owner.req.select')}</button>
-                : <RequestBadge status={r.status} />}
+              <RequestBadge status={r.status} />
               {!compact && onView && <button type="button" className="btn btn-outline btn-sm" onClick={() => onView(r)}>{t('owner.req.view')}</button>}
             </li>
           );
         })}
       </ul>
-      <SelectWinnerDialog request={pick} onClose={() => setPick(null)} />
     </>
-  );
-};
-
-const SelectWinnerDialog: React.FC<{ request: InvestmentRequest | null; onClose: () => void }> = ({ request, onClose }) => {
-  const { t } = useTranslation();
-  const toast = useToast();
-  const [busy, setBusy] = useState(false);
-  if (!request) return null;
-  const inv = userById(request.investorId);
-  const others = requestService.forLand(request.landId).filter(r => r.status === 'pending' && r.id !== request.id).length;
-  return (
-    <ConfirmDialog open title={t('owner.req.selectTitle', { name: inv?.fullName })} text={t('owner.req.selectText', { n: others })} confirmLabel={t('owner.req.select')} busy={busy}
-      onClose={onClose} onConfirm={async () => {
-        setBusy(true);
-        try { await requestService.selectWinner(request.id); toast(t('owner.req.selectedToast', { name: inv?.fullName })); onClose(); }
-        catch (x) { toast(t(x instanceof ApiError ? x.code : 'form.error'), 'error'); }
-        finally { setBusy(false); }
-      }} />
   );
 };
 
@@ -132,9 +112,8 @@ export const OwnerRequests: React.FC = () => {
   const [sort, setSort] = useState<'date' | 'amount'>('date');
   const [page, setPage] = useState(1);
   const [view, setView] = useState<InvestmentRequest | null>(null);
-  const [pick, setPick] = useState<InvestmentRequest | null>(null);
   const PER = 8;
-  const counts = { pending: 0, selected: 0, notSelected: 0 } as Record<InvestmentRequest['status'], number>;
+  const counts: Record<InvestmentRequest['status'], number> = { pending: 0, selected: 0, notSelected: 0, rejected: 0, cancelled: 0 };
   all.forEach(r => counts[r.status]++);
   const rows = all.filter(r => r.status === tab && (!prop || r.landId === prop) && (!q || `${userById(r.investorId)?.fullName} ${name(landService.get(r.landId))}`.toLowerCase().includes(q.toLowerCase())))
     .sort((a, b) => (sort === 'amount' ? b.amount - a.amount : b.createdAt.localeCompare(a.createdAt)));
@@ -146,7 +125,6 @@ export const OwnerRequests: React.FC = () => {
   const actions = (r: InvestmentRequest) => (
     <div className="flex flex-col gap-2 items-stretch justify-end min-w-[9.5rem]">
       <button type="button" className="btn btn-outline btn-sm" onClick={() => setView(r)}>{t('owner.req.view')}</button>
-      {r.status === 'pending' && landService.get(r.landId)?.status === 'active' && <button type="button" className="btn btn-primary btn-sm" onClick={() => setPick(r)}><Trophy className="w-4 h-4" />{t('owner.req.select')}</button>}
     </div>
   );
 
@@ -157,6 +135,8 @@ export const OwnerRequests: React.FC = () => {
         { id: 'pending', label: t('reqStatus.pending'), count: counts.pending },
         { id: 'selected', label: t('reqStatus.selected'), count: counts.selected },
         { id: 'notSelected', label: t('reqStatus.notSelected'), count: counts.notSelected },
+        { id: 'rejected', label: t('reqStatus.rejected'), count: counts.rejected },
+        { id: 'cancelled', label: t('reqStatus.cancelled'), count: counts.cancelled },
       ]} />
       <div className="flex flex-col md:flex-row gap-3 my-5">
         <label className="relative flex-1"><span className="sr-only">{t('owner.req.search')}</span>
@@ -190,7 +170,7 @@ export const OwnerRequests: React.FC = () => {
                       <td className="px-4 py-3"><div className="flex items-center gap-2"><Avatar name={inv?.fullName ?? '?'} size="sm" gold /><span className="font-semibold">{inv?.fullName}</span>{inv?.verified && <BadgeCheck className="w-4 h-4 text-gold-dark" aria-label={t('owner.req.verified')} />}</div></td>
                       <td className="px-4 py-3 max-w-56 truncate">{name(landService.get(r.landId))}</td>
                       <td className="px-4 py-3 font-bold whitespace-nowrap">{f.azn(r.amount)}</td>
-                      <td className="px-3 py-3 hidden xl:table-cell">{t(`models.${r.investmentModel}`)}</td>
+                      <td className="px-3 py-3 hidden xl:table-cell">{r.source ? '—' : t(`models.${r.investmentModel}`)}</td>
                       <td className="px-3 py-3 whitespace-nowrap hidden xl:table-cell">{t('land.months', { n: r.durationMonths })}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{f.date(r.createdAt)}</td>
                       <td className="px-4 py-3"><RequestBadge status={r.status} /></td>
@@ -208,7 +188,7 @@ export const OwnerRequests: React.FC = () => {
               return (
                 <li key={r.id} className="card p-4">
                   <div className="flex items-center gap-3"><Avatar name={inv?.fullName ?? '?'} size="sm" gold /><div className="flex-1 min-w-0"><p className="font-semibold truncate">{inv?.fullName}</p><p className="text-xs text-muted truncate">{name(landService.get(r.landId))}</p></div><RequestBadge status={r.status} /></div>
-                  <p className="mt-3 text-sm"><strong>{f.azn(r.amount)}</strong> · {t(`models.${r.investmentModel}`)} · {t('land.months', { n: r.durationMonths })}</p>
+                  <p className="mt-3 text-sm"><strong>{f.azn(r.amount)}</strong>{!r.source && ` · ${t(`models.${r.investmentModel}`)}`} · {t('land.months', { n: r.durationMonths })}</p>
                   <div className="mt-3">{actions(r)}</div>
                 </li>
               );
@@ -224,8 +204,7 @@ export const OwnerRequests: React.FC = () => {
         </>
       )}
 
-      <Drawer open={!!view} onClose={() => setView(null)} title={t('owner.req.view')}
-        footer={view && view.status === 'pending' && landService.get(view.landId)?.status === 'active' ? <button type="button" className="btn btn-primary" onClick={() => { setPick(view); setView(null); }}><Trophy className="w-4 h-4" />{t('owner.req.select')}</button> : undefined}>
+      <Drawer open={!!view} onClose={() => setView(null)} title={t('owner.req.view')}>
         {view && (() => {
           const inv = userById(view.investorId);
           const land = landService.get(view.landId);
@@ -240,7 +219,7 @@ export const OwnerRequests: React.FC = () => {
                 <h3 className="eyebrow mb-3">{t('owner.req.offered')}</h3>
                 <dl className="grid grid-cols-2 gap-3 text-sm">
                   <div className="card p-3"><dt className="text-muted text-xs">{t('owner.req.amount')}</dt><dd className="font-bold">{f.azn(view.amount)}</dd></div>
-                  <div className="card p-3"><dt className="text-muted text-xs">{t('land.model')}</dt><dd className="font-bold">{t(`models.${view.investmentModel}`)}</dd></div>
+                  {!view.source && <div className="card p-3"><dt className="text-muted text-xs">{t('land.model')}</dt><dd className="font-bold">{t(`models.${view.investmentModel}`)}</dd></div>}
                   <div className="card p-3"><dt className="text-muted text-xs">{t('land.duration')}</dt><dd className="font-bold">{t('land.months', { n: view.durationMonths })}</dd></div>
                   <div className="card p-3"><dt className="text-muted text-xs">{t('owner.req.date')}</dt><dd className="font-bold">{f.date(view.createdAt)}</dd></div>
                 </dl>
@@ -259,7 +238,6 @@ export const OwnerRequests: React.FC = () => {
           );
         })()}
       </Drawer>
-      <SelectWinnerDialog request={pick} onClose={() => setPick(null)} />
     </>
   );
 };
@@ -282,12 +260,28 @@ const PropertyMenu: React.FC<{ land: Land; title: string }> = ({ land, title }) 
         <div role="menu" className="absolute right-0 top-full mt-1 w-48 rounded-xl bg-white border border-line shadow-[var(--shadow-lift)] py-1 z-20">
           <button role="menuitem" type="button" className={item} onClick={() => navigate(lp(`/owner/properties/${land.id}`))}><Eye className="w-4 h-4" />{t('owner.props.view')}</button>
           <button role="menuitem" type="button" className={item} onClick={() => { setOpen(false); toast(t('owner.props.editSoon'), 'info'); }}><FileText className="w-4 h-4" />{t('owner.props.edit')}</button>
-          {(land.status === 'active' || land.status === 'paused') && (
+          {land.source === 'ownerPortal' && (land.status === 'active' || land.status === 'closed') && (
+            <button role="menuitem" type="button" className={item} onClick={async () => {
+              setOpen(false);
+              try {
+                if (land.status === 'active') {
+                  const reason = window.prompt('Elanı bağlama səbəbini yazın:')?.trim();
+                  if (!reason) return;
+                  const detail = await backend<{ activeOpportunity: { id: string } | null }>('GET', `/lands/${land.id}`);
+                  if (!detail.activeOpportunity) throw new Error('Aktiv elan tapılmadı.');
+                  await backend('PATCH', `/opportunities/${detail.activeOpportunity.id}/status`, { status: 'CLOSED', reason });
+                } else await backend('POST', `/my/lands/${land.id}/reopen`);
+                await syncOwnerLands(land.ownerId);
+                toast(land.status === 'active' ? 'Elan bağlandı.' : 'Yenidən dərc müraciəti göndərildi.');
+              } catch (x) { toast(x instanceof BackendError ? x.message || t('form.error') : t('form.error'), 'error'); }
+            }}>{land.status === 'active' ? 'Elanı bağla' : 'Yenidən dərc üçün göndər'}</button>
+          )}
+          {!land.source && (land.status === 'active' || land.status === 'paused') && (
             <button role="menuitem" type="button" className={item} onClick={async () => { setOpen(false); const p = land.status === 'active'; await landService.setStatus(land.id, p ? 'paused' : 'active'); toast(t(p ? 'owner.props.paused' : 'owner.props.resumed')); }}>
               {land.status === 'active' ? t('owner.props.pause') : t('owner.props.resume')}
             </button>
           )}
-          <button role="menuitem" type="button" className={`${item} text-danger`} onClick={() => { setOpen(false); setDel(true); }}><Trash2 className="w-4 h-4" />{t('owner.props.delete')}</button>
+          {!land.source && <button role="menuitem" type="button" className={`${item} text-danger`} onClick={() => { setOpen(false); setDel(true); }}><Trash2 className="w-4 h-4" />{t('owner.props.delete')}</button>}
         </div>
       )}
       <ConfirmDialog open={del} danger title={t('owner.props.deleteTitle')} text={t('owner.props.deleteText')} confirmLabel={t('owner.props.delete')} onClose={() => setDel(false)}
@@ -390,8 +384,8 @@ export const OwnerProperties: React.FC = () => {
                     <TypeBadge type={l.fieldType} />
                     <h2 className="font-display text-xl text-brand leading-snug"><Link to={lp(`/owner/properties/${l.id}`)} className="hover:underline">{title}</Link></h2>
                     <p className="text-sm text-muted flex items-center gap-1"><MapPin className="w-4 h-4" aria-hidden="true" />{t(`regions.${l.region}`)} · {t('land.ha', { n: l.areaHa })}</p>
-                    <ProgressBar label={t('land.funding')} value={(l.raisedAmount / goal) * 100} tone="gold" showValue={t('land.raisedOf', { raised: f.compactAzn(l.raisedAmount), goal: f.compactAzn(goal) })} />
-                    <p className="text-xs text-muted flex gap-4 mt-auto pt-2"><span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" aria-hidden="true" />{t('land.views', { n: l.views })}</span><span className="flex items-center gap-1"><Inbox className="w-3.5 h-3.5" aria-hidden="true" />{t('land.requests', { n: reqCount })}</span></p>
+                    {!l.source && <ProgressBar label={t('land.funding')} value={(l.raisedAmount / goal) * 100} tone="gold" showValue={t('land.raisedOf', { raised: f.compactAzn(l.raisedAmount), goal: f.compactAzn(goal) })} />}
+                    <p className="text-xs text-muted flex gap-4 mt-auto pt-2">{!l.source && <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" aria-hidden="true" />{t('land.views', { n: l.views })}</span>}<span className="flex items-center gap-1"><Inbox className="w-3.5 h-3.5" aria-hidden="true" />{t('land.requests', { n: reqCount })}</span></p>
                   </div>
                 </li>
               );
@@ -437,6 +431,8 @@ export const AddLandWizard: React.FC = () => {
   useEffect(() => {
     // Opening another draft (or "add new") from the menu while on this page: load it.
     if ((opened?.id ?? null) === draftIdRef.current) return; // our own save just updated the URL
+    photoFiles.current.forEach((_, id) => { const photo = d.photos.find(p => p.id === id); if (photo) URL.revokeObjectURL(photo.url); });
+    photoFiles.current.clear(); documentFiles.current = [];
     setDraftId(opened?.id ?? null);
     setD(opened ? { ...EMPTY, ...opened.data, photos: [] } : EMPTY);
     setStep(Math.min(opened?.step ?? 0, 5));
@@ -445,6 +441,8 @@ export const AddLandWizard: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const photoFiles = useRef(new Map<string, File>());
+  const documentFiles = useRef<File[]>([]);
   const steps = t('owner.add.steps', { returnObjects: true }) as unknown as string[];
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD(x => ({ ...x, [k]: v }));
   const MAX_DESC = 600;
@@ -464,6 +462,7 @@ export const AddLandWizard: React.FC = () => {
       if (!(Number(d.durationMonths) > 0)) e.durationMonths = t('form.required');
     }
     if (s === 4 && d.photos.length === 0) e.photos = t('owner.add.errPhotos');
+    if (s === 4 && documentFiles.current.length === 0) e.documents = 'Mülkiyyət sənədinin JPG və ya PNG şəklini yükləyin.';
     setErr(e);
     return Object.keys(e).length === 0;
   };
@@ -478,7 +477,11 @@ export const AddLandWizard: React.FC = () => {
     if (!files) return;
     const imgs = Array.from(files).filter(x => x.type.startsWith('image/'));
     if (d.photos.length + imgs.length > 10) toast(t('owner.add.tooMany'), 'error');
-    const items = imgs.slice(0, 10 - d.photos.length).map(file => ({ id: `${file.name}-${file.size}-${Math.random()}`, url: URL.createObjectURL(file), name: file.name }));
+    const items = imgs.slice(0, 10 - d.photos.length).map(file => {
+      const item = { id: `${file.name}-${file.size}-${Math.random()}`, url: URL.createObjectURL(file), name: file.name };
+      photoFiles.current.set(item.id, file);
+      return item;
+    });
     set('photos', [...d.photos, ...items]);
   };
   const move = (from: number, to: number) => {
@@ -488,20 +491,37 @@ export const AddLandWizard: React.FC = () => {
     set('photos', arr);
   };
   const submit = async () => {
+    if (!photoFiles.current.size || !documentFiles.current.length) { setStep(4); toast('Foto və sənəd fayllarını yenidən seçin.', 'error'); return; }
     setBusy(true);
-    const r = regionByKey(d.region);
-    await landService.create({
-      ownerId: me.id, title: d.title.trim() || undefined, fieldType: d.fieldType, description: d.description.trim(), region: d.region, address: d.address,
-      lat: d.pin?.lat ?? r?.lat ?? 40, lng: d.pin?.lng ?? r?.lng ?? 47, areaHa: Number(d.areaHa), soilType: d.soilType as SoilType, fertilityPct: d.fertilityPct, irrigation: d.irrigation as Irrigation,
-      lastCrop: d.lastCrop, roadAccess: d.roadAccess, electricity: d.electricity, ownershipDoc: d.ownershipDoc, investmentMin: Number(d.investmentMin), investmentMax: Number(d.investmentMax),
-      investmentModel: d.investmentModel as InvestmentModel, expectedReturnPct: Number(d.expectedReturnPct), durationMonths: Number(d.durationMonths), isSpecial: d.isSpecial,
-      // Mock: blob URLs only live for this tab — the real API will store the uploaded files.
-      photos: d.photos.map(p => p.url), documents: d.documents, status: 'underReview',
-    }, false);
-    if (draftId) draftStore.remove(me.id, draftId);
-    setDraftId(null);
-    setBusy(false);
-    setDone(true);
+    try {
+      const form = new FormData();
+      const add = (key: string, value: string) => form.append(key, value);
+      add('title', d.title.trim() || name({ fieldType: d.fieldType, region: d.region }));
+      const ownerClaims = [
+        `Torpağın ünvanı: ${d.address}`,
+        `Sahibkarın bəyan etdiyi münbitlik: ${d.fertilityPct}%`,
+        `Elektrik: ${d.electricity ? 'var' : 'yoxdur'}`,
+        `Təklif olunan sərmayə aralığı: ${d.investmentMin}–${d.investmentMax} AZN`,
+        `Təklif olunan əməkdaşlıq modeli: ${d.investmentModel}`,
+        `Sahibkarın gözlədiyi gəlirlilik: ${d.expectedReturnPct}%`,
+        `Təxmini müddət: ${d.durationMonths} ay`,
+      ];
+      add('landUse', d.fieldType);
+      add('description', `${d.description.trim()}\n\nSahibkarın təqdim etdiyi əlavə məlumatlar (təsdiqlənmiş ölçü deyil):\n${ownerClaims.join('\n')}`);
+      add('intendedUse', d.fieldType);
+      add('region', d.region); add('district', d.address); add('areaHectares', d.areaHa);
+      add('latitude', String(d.pin!.lat)); add('longitude', String(d.pin!.lng));
+      add('estimatedInvestmentRequirement', d.investmentMin); add('contactPhone', me.phone);
+      add('soilQuality', d.soilType); add('waterSupply', d.irrigation);
+      add('currentUse', d.lastCrop); if (!d.roadAccess) add('roadAccessType', 'none');
+      if (d.boundary.length >= 3) add('boundary', JSON.stringify(d.boundary));
+      for (const photo of d.photos) { const file = photoFiles.current.get(photo.id); if (file) form.append('photos', file); }
+      documentFiles.current.forEach(file => form.append('documents', file));
+      await landService.create(form);
+      if (draftId) draftStore.remove(me.id, draftId);
+      setDraftId(null); setDone(true);
+    } catch (x) { toast(x instanceof ApiError ? x.detail || t(x.code) : t('form.error'), 'error'); }
+    finally { setBusy(false); }
   };
 
   if (done) {
@@ -512,7 +532,7 @@ export const AddLandWizard: React.FC = () => {
         <p className="text-muted mt-3">{t('owner.add.successText')}</p>
         <div className="flex flex-wrap justify-center gap-3 mt-8">
           <Link to={lp('/owner/properties')} className="btn btn-primary">{t('owner.add.toProperties')}</Link>
-          <button type="button" className="btn btn-outline" onClick={() => { setD(EMPTY); setStep(0); setDone(false); navigate(lp('/owner/add-land'), { replace: true }); }}>{t('owner.add.addAnother')}</button>
+          <button type="button" className="btn btn-outline" onClick={() => { photoFiles.current.clear(); documentFiles.current = []; setD(EMPTY); setStep(0); setDone(false); navigate(lp('/owner/add-land'), { replace: true }); }}>{t('owner.add.addAnother')}</button>
         </div>
       </div>
     );
@@ -624,7 +644,7 @@ export const AddLandWizard: React.FC = () => {
                       className={`relative rounded-xl overflow-hidden border-2 ${i === 0 ? 'border-gold' : 'border-transparent'} bg-white`}>
                       <img src={p.url} alt={p.name} className="w-full aspect-square object-cover" />
                       <span className="absolute top-1.5 left-1.5 p-1 rounded bg-white/90 cursor-grab" aria-hidden="true"><GripVertical className="w-3.5 h-3.5" /></span>
-                      <button type="button" onClick={() => set('photos', d.photos.filter(x => x.id !== p.id))} className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-white/95 grid place-items-center" aria-label={`${t('form.remove')}: ${p.name}`}><X className="w-4 h-4" /></button>
+                      <button type="button" onClick={() => { photoFiles.current.delete(p.id); URL.revokeObjectURL(p.url); set('photos', d.photos.filter(x => x.id !== p.id)); }} className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-white/95 grid place-items-center" aria-label={`${t('form.remove')}: ${p.name}`}><X className="w-4 h-4" /></button>
                       {i === 0 ? <span className="absolute bottom-1.5 left-1.5 rounded-full bg-gold text-forest px-2 py-0.5 text-[0.65rem] font-bold">{t('owner.add.cover')}</span>
                         : <button type="button" onClick={() => move(i, 0)} className="absolute bottom-1.5 left-1.5 rounded-full bg-white/95 px-2 py-0.5 text-[0.65rem] font-bold">{t('owner.add.makeCover')}</button>}
                     </li>
@@ -635,10 +655,11 @@ export const AddLandWizard: React.FC = () => {
             <div>
               <p className="field-label">{t('owner.add.docs')}</p>
               <label className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-[#CFC8B6] bg-white p-5 cursor-pointer hover:border-leaf">
-                <FileText className="w-6 h-6 text-leaf" aria-hidden="true" /><span><span className="font-semibold block">{t('owner.add.dropOrClick')}</span><span className="text-sm text-muted">{t('owner.add.docsHint')}</span></span>
-                <input type="file" accept="application/pdf" multiple className="sr-only" onChange={e => { const fs = Array.from(e.target.files ?? []); set('documents', [...d.documents, ...fs.map(x => ({ name: x.name, size: x.size }))]); e.target.value = ''; }} />
+                <FileText className="w-6 h-6 text-leaf" aria-hidden="true" /><span><span className="font-semibold block">{t('owner.add.dropOrClick')}</span><span className="text-sm text-muted">Mülkiyyət sənədinin JPG və ya PNG şəklini seçin</span></span>
+                <input type="file" accept="image/jpeg,image/png" multiple className="sr-only" onChange={e => { const fs = Array.from(e.target.files ?? []).filter(x => x.type === 'image/jpeg' || x.type === 'image/png'); documentFiles.current.push(...fs); set('documents', [...d.documents, ...fs.map(x => ({ name: x.name, size: x.size }))]); e.target.value = ''; }} />
               </label>
-              {d.documents.length > 0 && <ul className="mt-3 grid gap-2">{d.documents.map((x, i) => <li key={x.name + i} className="flex items-center gap-2 text-sm"><FileText className="w-4 h-4 text-muted" />{x.name}<button type="button" className="ml-auto text-danger text-xs font-bold" onClick={() => set('documents', d.documents.filter((_, k) => k !== i))}>{t('form.remove')}</button></li>)}</ul>}
+              {err.documents && <p className="field-error" role="alert">{err.documents}</p>}
+              {d.documents.length > 0 && <ul className="mt-3 grid gap-2">{d.documents.map((x, i) => <li key={x.name + i} className="flex items-center gap-2 text-sm"><FileText className="w-4 h-4 text-muted" />{x.name}<button type="button" className="ml-auto text-danger text-xs font-bold" onClick={() => { documentFiles.current.splice(i, 1); set('documents', d.documents.filter((_, k) => k !== i)); }}>{t('form.remove')}</button></li>)}</ul>}
             </div>
           </div>
         )}

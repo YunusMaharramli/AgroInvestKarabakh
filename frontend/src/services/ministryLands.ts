@@ -1,15 +1,14 @@
 import { backend } from './backend';
 import { mutate } from './db';
 import { REGIONS } from '../data/regions';
-import { CATEGORIES } from '../data/categories';
 import i18n from 'i18next';
 import type { Irrigation, Land } from '../types/agro';
 
 /** Public land as the backend returns it (GET /api/lands: only approved land). */
-interface BackendLand {
+export interface BackendLand {
   id: string; title: string; region: string; description: string; areaHectares: number; agricultureType: string;
   latitude: number; longitude: number; intendedUse: string; estimatedInvestmentRequirement: number; imageUrl: string;
-  ownerId: string | null; hasActiveOpportunity: boolean; createdAt: string;
+  ownerId: string | null; status: string; hasActiveOpportunity: boolean; createdAt: string;
   district: string | null; settlement: string | null; verification: 'ADMIN_ENTERED' | 'EVIDENCE_PENDING' | 'VERIFIED'; waterAccess: string | null;
   landUse: string; core: { boundary: unknown | null; roadAccessType: string | null }; photos: { id: string; url: string }[];
 }
@@ -26,28 +25,28 @@ function regionKey(region: string): string {
 }
 
 const irrigationFrom = (water: string | null): Irrigation =>
-  water === 'well' ? 'well' : water === 'rain_fed' || water === 'none_known' || !water ? 'none' : 'canal';
+  water === 'well' || water === 'canal' || water === 'drip' ? water : 'unknown';
 
-function toLand(b: BackendLand): Land {
+export function toLand(b: BackendLand): Land {
   const amount = Number(b.estimatedInvestmentRequirement) || 0;
   return {
     id: b.id,
     ownerId: b.ownerId ?? 'ministry',
     title: b.title,
-    fieldType: CATEGORIES.some(c => c.key === b.landUse) ? b.landUse : 'crops',
+    fieldType: b.landUse || b.agricultureType,
     description: [b.description, b.intendedUse].filter(Boolean).join('\n\n'),
     region: regionKey(b.region),
     address: [b.settlement, b.district].filter(Boolean).join(', '),
     lat: b.latitude, lng: b.longitude, areaHa: b.areaHectares,
-    // Fields the backend does not hold for these listings get neutral values; the UI shows "—" where it matters.
-    soilType: 'chestnut', fertilityPct: 60, irrigation: irrigationFrom(b.waterAccess), lastCrop: '',
-    roadAccess: !!b.core?.roadAccessType && b.core.roadAccessType !== 'none', electricity: false, ownershipDoc: 'extract',
+    // Legacy card requires numeric fields; source-backed cards never display or score these unknown values.
+    soilType: 'unknown', fertilityPct: 0, irrigation: irrigationFrom(b.waterAccess), lastCrop: '',
+    roadAccess: !!b.core?.roadAccessType && b.core.roadAccessType !== 'none', electricity: false, ownershipDoc: '',
     investmentMin: amount, investmentMax: amount, investmentModel: 'lease', expectedReturnPct: 0, durationMonths: 0,
     isSpecial: false,
     photos: b.photos?.length ? b.photos.map(p => p.url) : b.imageUrl ? [b.imageUrl] : [],
     documents: [], status: 'active', raisedAmount: 0, views: 0, ownerVerified: b.verification === 'VERIFIED',
-    priceVolatility: 0.4, createdAt: b.createdAt,
-    source: 'ministry', verification: b.verification, hasBoundary: !!b.core?.boundary,
+    priceVolatility: 0, createdAt: b.createdAt,
+    source: b.ownerId ? 'ownerPortal' : 'ministry', verification: b.verification, hasBoundary: !!b.core?.boundary,
   };
 }
 
@@ -62,10 +61,28 @@ export function syncMinistryLands(): Promise<void> {
     try {
       const rows = await backend<BackendLand[]>('GET', '/lands');
       const lands = rows.filter(r => r.hasActiveOpportunity).map(toLand);
-      mutate(d => { d.lands = [...d.lands.filter(l => l.source !== 'ministry'), ...lands]; });
+      const incoming = new Set(lands.map(l => l.id));
+      mutate(d => {
+        d.lands = [...d.lands.filter(l => l.source !== 'ministry' &&
+          !(l.source === 'ownerPortal' && (l.status === 'active' || incoming.has(l.id)))), ...lands];
+      });
     } catch { /* backend not running: keep the demo data */ } finally {
       running = null;
     }
   })();
   return running;
+}
+
+export async function syncOwnerLands(ownerId: string): Promise<void> {
+  const rows = await backend<{ land: BackendLand; opportunity: { status: string; winnerProposalId: string | null } | null }[]>('GET', '/my/lands');
+  const lands = rows.map(r => {
+    const land = toLand(r.land);
+    land.ownerId = ownerId;
+    land.source = 'ownerPortal';
+    land.status = r.land.status === 'APPROVED'
+      ? r.opportunity?.status === 'ACTIVE' ? 'active' : r.opportunity?.winnerProposalId ? 'funded' : 'closed'
+      : r.land.status === 'DRAFT' ? 'draft' : r.land.status === 'ARCHIVED' ? 'closed' : 'underReview';
+    return land;
+  });
+  mutate(d => { d.lands = [...d.lands.filter(l => l.source !== 'ownerPortal' || l.ownerId !== ownerId), ...lands]; });
 }

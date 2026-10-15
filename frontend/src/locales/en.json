@@ -426,7 +426,9 @@
   "reqStatus": {
     "pending": "Pending",
     "selected": "Selected",
-    "notSelected": "Not selected"
+    "notSelected": "Not selected",
+    "rejected": "Rejected",
+    "cancelled": "Cancelled because listing closed"
   },
   "risk": {
     "low": "Low",

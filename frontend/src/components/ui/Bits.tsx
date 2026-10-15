@@ -44,7 +44,7 @@ export const StatusBadge: React.FC<{ status: LandStatus }> = ({ status }) => {
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${LAND_STATUS[status]}`}>{t(`status.${status}`)}</span>;
 };
 
-const REQ_STATUS: Record<RequestStatus, string> = { pending: 'bg-[#FFF1D6] text-[#7A4D00]', selected: 'bg-brand text-white', notSelected: 'bg-[#F6E1DF] text-[#8E1F17]' };
+const REQ_STATUS: Record<RequestStatus, string> = { pending: 'bg-[#FFF1D6] text-[#7A4D00]', selected: 'bg-brand text-white', notSelected: 'bg-[#F6E1DF] text-[#8E1F17]', rejected: 'bg-[#F6E1DF] text-[#8E1F17]', cancelled: 'bg-[#ECE7DA] text-muted' };
 export const RequestBadge: React.FC<{ status: RequestStatus }> = ({ status }) => {
   const { t } = useTranslation();
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${REQ_STATUS[status]}`}>{t(`reqStatus.${status}`)}</span>;

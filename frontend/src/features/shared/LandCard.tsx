@@ -15,7 +15,7 @@ export const TypeBadge: React.FC<{ type: string }> = ({ type }) => {
   const { t } = useTranslation();
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 border border-line px-2.5 py-1 text-xs font-bold text-ink max-w-full">
-      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: groupColor(type) }} aria-hidden="true" /><span className="truncate">{t(`fieldTypes.${type}`)}</span>
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: groupColor(type) }} aria-hidden="true" /><span className="truncate">{t(`fieldTypes.${type}`, { defaultValue: type })}</span>
     </span>
   );
 };
@@ -50,14 +50,14 @@ export const LandResultCard: React.FC<{ land: Land; score: LandScore; href: stri
             <h3 className="font-display text-xl text-brand leading-snug"><Link to={href} className="hover:underline">{title}</Link></h3>
             <p className="text-sm text-muted flex items-center gap-1 mt-1"><MapPin className="w-4 h-4" aria-hidden="true" />{t(`regions.${land.region}`)} · {t('land.ha', { n: land.areaHa })}</p>
           </div>
-          <ScoreGauge value={score.suitability} />
+          {!score.unavailable && <ScoreGauge value={score.suitability} />}
         </div>
         <dl className="grid grid-cols-2 gap-3 text-sm">
-          <div><dt className="text-muted text-xs font-semibold">{t('land.required')}</dt><dd className="font-bold">{f.compactAzn(land.investmentMin)} – {f.compactAzn(land.investmentMax)}</dd></div>
+          <div><dt className="text-muted text-xs font-semibold">{t('land.required')}</dt><dd className="font-bold">{land.source ? f.compactAzn(land.investmentMin) : `${f.compactAzn(land.investmentMin)} – ${f.compactAzn(land.investmentMax)}`}</dd></div>
           <div><dt className="text-muted text-xs font-semibold">{t('land.return')}</dt><dd className="font-bold text-leaf-dark">{land.expectedReturnPct ? `${land.expectedReturnPct}%` : '—'}</dd></div>
         </dl>
-        <ProgressBar label={t('land.fertility')} value={land.fertilityPct} />
-        <div><RiskBadge level={score.risk} factors={score.riskFactors} /></div>
+        {!land.source && <ProgressBar label={t('land.fertility')} value={land.fertilityPct} />}
+        {!score.unavailable && <div><RiskBadge level={score.risk} factors={score.riskFactors} /></div>}
         <div className="mt-auto pt-2 flex items-center justify-between gap-3 border-t border-line">
           <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer pt-3">
             <input type="checkbox" checked={has(land.id)} onChange={() => toggle(land.id)} className="w-4 h-4 accent-[#1F4D2E]" />{t('land.addCompare')}

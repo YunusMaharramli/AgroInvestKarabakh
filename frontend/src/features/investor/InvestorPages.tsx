@@ -28,7 +28,8 @@ export const InvestorOverview: React.FC = () => {
   useEffect(() => { const id = setTimeout(() => setLoading(false), 450); return () => clearTimeout(id); }, []);
   const selected = reqs.filter(r => r.status === 'selected');
   const pending = reqs.filter(r => r.status === 'pending');
-  const avg = selected.length ? selected.reduce((s, r) => s + (landService.get(r.landId)?.expectedReturnPct ?? 0), 0) / selected.length : 0;
+  const measured = selected.filter(r => !landService.get(r.landId)?.source);
+  const avg = measured.length ? measured.reduce((s, r) => s + (landService.get(r.landId)?.expectedReturnPct ?? 0), 0) / measured.length : null;
   const recommended = useMemo(() => lands.filter(l => l.status === 'active' && l.ownerId !== me.id)
     .map(l => ({ land: l, score: scoreLand(l, me.preferences) })).sort((a, b) => b.score.suitability - a.score.suitability).slice(0, 3), [lands, me.preferences]);
   return (
@@ -38,7 +39,7 @@ export const InvestorOverview: React.FC = () => {
         <StatCard label={t('investor.kpi.invested')} value={f.compactAzn(selected.reduce((s, r) => s + r.amount, 0))} icon={<Coins className="w-5 h-5" />} accent />
         <StatCard label={t('investor.kpi.active')} value={String(selected.length)} icon={<Activity className="w-5 h-5" />} />
         <StatCard label={t('investor.kpi.pending')} value={String(pending.length)} icon={<Clock className="w-5 h-5" />} />
-        <StatCard label={t('investor.kpi.avgReturn')} value={`${avg.toFixed(1)}%`} icon={<Percent className="w-5 h-5" />} accent />
+        <StatCard label={t('investor.kpi.avgReturn')} value={avg === null ? '—' : `${avg.toFixed(1)}%`} icon={<Percent className="w-5 h-5" />} accent />
       </div>
       <div className="flex items-end justify-between gap-4 mb-5">
         <div><h2 className="font-display text-2xl text-brand">{t('investor.recommended')}</h2><p className="text-muted text-sm">{t('investor.recommendedText')}</p></div>
@@ -85,8 +86,8 @@ export const InvestorSearch: React.FC = () => {
       (!filters.fieldTypes.length || filters.fieldTypes.includes(l.fieldType)) &&
       (!filters.regions.length || filters.regions.includes(l.region)) &&
       l.areaHa >= filters.areaMin && l.areaHa <= filters.areaMax &&
-      l.durationMonths >= filters.durationMin && l.durationMonths <= filters.durationMax &&
-      l.expectedReturnPct >= filters.minReturn && (!filters.irrigationOnly || l.irrigation !== 'none'),
+      (l.source ? filters.durationMin === 0 : l.durationMonths >= filters.durationMin && l.durationMonths <= filters.durationMax) &&
+      (l.source ? filters.minReturn === 0 && !filters.irrigationOnly : l.expectedReturnPct >= filters.minReturn && (!filters.irrigationOnly || l.irrigation !== 'none')),
     ).map(l => ({ land: l, score: scoreLand(l, filters) }));
     const by: Record<SortKey, (a: typeof rows[0], b: typeof rows[0]) => number> = {
       best: (a, b) => b.score.suitability - a.score.suitability || a.score.riskValue - b.score.riskValue,
@@ -205,6 +206,8 @@ export const InvestorInvestments: React.FC = () => {
         { id: 'pending', label: t('investor.inv.pending'), count: count('pending') },
         { id: 'selected', label: t('investor.inv.selected'), count: count('selected') },
         { id: 'notSelected', label: t('investor.inv.notSelected'), count: count('notSelected') },
+        { id: 'rejected', label: t('reqStatus.rejected'), count: count('rejected') },
+        { id: 'cancelled', label: t('reqStatus.cancelled'), count: count('cancelled') },
       ]} />
       <div className="mt-6">
         {rows.length === 0 ? <EmptyState title={t('investor.inv.empty')} action={<Link to={lp('/investor/search')} className="btn btn-primary">{t('investor.inv.emptyCta')}</Link>} /> : (
@@ -219,7 +222,7 @@ export const InvestorInvestments: React.FC = () => {
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
                         <h2 className="font-display text-xl text-brand leading-snug"><Link to={lp(`/investor/lands/${r.landId}`)} className="hover:underline">{name(land)}</Link></h2>
-                        <p className="text-sm text-muted">{f.azn(r.amount)} · {t(`models.${r.investmentModel}`)} · {f.date(r.createdAt)}</p>
+                        <p className="text-sm text-muted">{f.azn(r.amount)}{!r.source && ` · ${t(`models.${r.investmentModel}`)}`} · {f.date(r.createdAt)}</p>
                       </div>
                       <RequestBadge status={r.status} />
                     </div>
@@ -265,7 +268,7 @@ export const InvestorSaved: React.FC = () => {
               <div className="p-5 flex flex-col gap-3 flex-1">
                 <TypeBadge type={l.fieldType} />
                 <h2 className="font-display text-xl text-brand"><Link to={lp(`/investor/lands/${l.id}`)} className="hover:underline">{name(l)}</Link></h2>
-                <p className="text-sm text-muted">{f.compactAzn(l.investmentMin)} – {f.compactAzn(l.investmentMax)} · {l.expectedReturnPct}%</p>
+                <p className="text-sm text-muted">{l.source ? f.compactAzn(l.investmentMin) : `${f.compactAzn(l.investmentMin)} – ${f.compactAzn(l.investmentMax)} · ${l.expectedReturnPct}%`}</p>
                 <div className="mt-auto flex gap-2 pt-2">
                   <button type="button" className="btn btn-outline btn-sm flex-1" onClick={() => landService.toggleSaved(me.id, l.id)}>{t('form.remove')}</button>
                   <button type="button" className="btn btn-outline btn-sm flex-1" aria-pressed={has(l.id)} onClick={() => toggle(l.id)}>{has(l.id) ? t('land.inCompare') : t('land.addCompare')}</button>

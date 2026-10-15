@@ -53,9 +53,22 @@ export const ComparePage: React.FC = () => {
 
   const rows = useMemo<Row[]>(() => {
     if (!a || !b) return [];
+    if (a.source || b.source) {
+      const unknown = (l: Land, value: string) => l.source ? '—' : value;
+      return [
+        { key: 'region', label: t('land.region'), a: t(`regions.${a.region}`), b: t(`regions.${b.region}`), better: null },
+        { key: 'type', label: t('land.fieldType'), a: t(`fieldTypes.${a.fieldType}`), b: t(`fieldTypes.${b.fieldType}`), better: null },
+        { key: 'area', label: t('land.area'), a: t('land.ha', { n: a.areaHa }), b: t('land.ha', { n: b.areaHa }), better: null },
+        { key: 'investment', label: t('land.required'), a: f.azn(a.investmentMin), b: f.azn(b.investmentMin), better: null },
+        { key: 'return', label: t('land.return'), a: unknown(a, `${a.expectedReturnPct}%`), b: unknown(b, `${b.expectedReturnPct}%`), better: null },
+        { key: 'fertility', label: t('land.fertility'), a: unknown(a, `${a.fertilityPct}%`), b: unknown(b, `${b.fertilityPct}%`), better: null },
+        { key: 'soil', label: t('land.soil'), a: unknown(a, t(`soil.${a.soilType}`)), b: unknown(b, t(`soil.${b.soilType}`)), better: null },
+        { key: 'irrigation', label: t('land.irrigation'), a: unknown(a, t(`irrigationTypes.${a.irrigation}`)), b: unknown(b, t(`irrigationTypes.${b.irrigation}`)), better: null },
+      ];
+    }
     const sa = scoreLand(a, me.preferences), sb = scoreLand(b, me.preferences);
     const yn = (x: boolean) => (x ? t('form.yes') : t('form.no'));
-    const water = (l: Land) => ({ none: 0, canal: 1, well: 2, drip: 3 })[l.irrigation];
+    const water = (l: Land) => ({ none: 0, canal: 1, well: 2, drip: 3, unknown: 0 })[l.irrigation];
     const riskNum = { low: 0, medium: 1, high: 2 };
     return [
       { key: 'region', label: t('land.region'), a: t(`regions.${a.region}`), b: t(`regions.${b.region}`), better: null },
@@ -89,11 +102,12 @@ export const ComparePage: React.FC = () => {
 
   const radar = useMemo(() => {
     if (!a || !b) return [];
+    if (a.source || b.source) return [];
     const axis = (l: Land) => {
       const s = scoreLand(l, me.preferences);
       return {
         fertility: l.fertilityPct, suitability: s.suitability, return: Math.min(100, (l.expectedReturnPct / 25) * 100),
-        lowRisk: Math.round((1 - landRisk(l).value) * 100), water: ({ none: 10, canal: 55, well: 70, drip: 100 })[l.irrigation],
+        lowRisk: Math.round((1 - landRisk(l).value) * 100), water: ({ none: 10, canal: 55, well: 70, drip: 100, unknown: 0 })[l.irrigation],
         affordability: Math.round(100 - Math.min(100, (l.investmentMin / 1000000) * 100)),
       };
     };
@@ -118,7 +132,7 @@ export const ComparePage: React.FC = () => {
   return (
     <>
       <PageTitle title={t('compare.title')} subtitle={t('compare.subtitle')} />
-      {a && b && (
+      {a && b && !a.source && !b.source && (
         <div className="rounded-[1.25rem] bg-forest text-cream p-6 mb-6 flex gap-4 items-start" role="status">
           <Trophy className="w-8 h-8 text-gold shrink-0" aria-hidden="true" />
           <div>
@@ -155,7 +169,7 @@ export const ComparePage: React.FC = () => {
             </table>
           </div>
           <div className="grid lg:grid-cols-2 gap-6 mt-6">
-            <section className="card p-6">
+            {!a.source && !b.source && <section className="card p-6">
               <h2 className="font-display text-2xl text-brand mb-2">{t('compare.radar')}</h2>
               <div className="h-80" role="img" aria-label={t('compare.radar')}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -169,7 +183,7 @@ export const ComparePage: React.FC = () => {
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
-            </section>
+            </section>}
             <section className="grid sm:grid-cols-2 gap-4 content-start">
               {[a, b].map((l, i) => (
                 <div key={l.id} className="card p-5 flex flex-col gap-3">

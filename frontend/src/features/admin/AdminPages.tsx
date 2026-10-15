@@ -65,6 +65,7 @@ export const AdminShell: React.FC = () => {
   const nav = [
     { to: lp('/admin'), label: t('admin.nav.lands'), icon: <LayoutGrid className="w-5 h-5" />, end: true },
     { to: lp('/admin/lands/new'), label: t('admin.nav.add'), icon: <Plus className="w-5 h-5" /> },
+    { to: lp('/admin/workflow'), label: 'Müraciətlər', icon: <FileText className="w-5 h-5" /> },
   ];
   return (
     <div className="min-h-[100svh] bg-cream">
@@ -96,7 +97,7 @@ export const AdminShell: React.FC = () => {
           <Suspense fallback={<div className="skeleton h-40" />}><Outlet /></Suspense>
         </main>
       </div>
-      <nav aria-label={t('admin.badge')} className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-line grid grid-cols-2">
+      <nav aria-label={t('admin.badge')} className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-line grid grid-cols-3">
         {nav.map(n => (
           <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `flex flex-col items-center gap-0.5 py-2 text-xs font-bold ${isActive ? 'text-brand' : 'text-muted'}`}>
             <span aria-hidden="true">{n.icon}</span>{n.label}

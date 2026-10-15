@@ -13,6 +13,7 @@ import { Modal, useToast } from '../../components/ui/Overlay';
 import { SingleLandMap } from '../../components/map/LandsMap';
 import { useCompare } from '../compare/CompareContext';
 import type { InvestmentModel, Land } from '../../types/agro';
+import { backend } from '../../services/backend';
 
 const Lightbox: React.FC<{ photos: string[]; index: number; onClose: () => void; alt: string }> = ({ photos, index, onClose, alt }) => {
   const { t } = useTranslation();
@@ -47,18 +48,26 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
   const [message, setMessage] = useState('');
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [documents, setDocuments] = useState<File[]>([]);
+  const [requiresDocuments, setRequiresDocuments] = useState(false);
+  useEffect(() => {
+    if (!open || !land.source) return;
+    void backend<{ activeOpportunity: { proposalDocumentsRequired: boolean } | null }>('GET', `/lands/${land.id}`)
+      .then(d => setRequiresDocuments(!!d.activeOpportunity?.proposalDocumentsRequired)).catch(() => undefined);
+  }, [open, land.id, land.source]);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const er: Record<string, string> = {};
     const a = Number(amount);
-    if (!(a >= land.investmentMin && a <= land.investmentMax)) er.amount = t('investor.detail.between', { min: f.azn(land.investmentMin), max: f.azn(land.investmentMax) });
+    if (land.source ? !(a > 0) : !(a >= land.investmentMin && a <= land.investmentMax)) er.amount = land.source ? t('form.required') : t('investor.detail.between', { min: f.azn(land.investmentMin), max: f.azn(land.investmentMax) });
     if (!(Number(duration) > 0)) er.duration = t('form.required');
     if (message.trim().length < 10) er.message = t('form.minLength', { n: 10 });
+    if (requiresDocuments && documents.length === 0) er.documents = 'Bu elan üçün ən azı bir sənəd əlavə edin.';
     setErr(er);
     if (Object.keys(er).length) return;
     setBusy(true);
     try {
-      await requestService.create({ landId: land.id, amount: a, investmentModel: model, durationMonths: Number(duration), message: message.trim() });
+      await requestService.create({ landId: land.id, amount: a, investmentModel: model, durationMonths: Number(duration), message: message.trim(), documents });
       toast(t('investor.detail.sentToast'));
       onClose();
     } catch (x) {
@@ -68,15 +77,15 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
   return (
     <Modal open={open} onClose={onClose} title={t('investor.detail.modalTitle')}>
       <form onSubmit={submit} noValidate className="grid gap-4">
-        <Field label={t('investor.detail.amount')} htmlFor="inv-amount" error={err.amount} hint={t('investor.detail.between', { min: f.azn(land.investmentMin), max: f.azn(land.investmentMax) })}>
+        <Field label={t('investor.detail.amount')} htmlFor="inv-amount" error={err.amount} hint={land.source ? `${t('land.required')}: ${f.azn(land.investmentMin)}` : t('investor.detail.between', { min: f.azn(land.investmentMin), max: f.azn(land.investmentMax) })}>
           <input id="inv-amount" className="field" type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)} aria-invalid={!!err.amount} data-autofocus />
         </Field>
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label={t('land.model')} htmlFor="inv-model">
+          {!land.source && <Field label={t('land.model')} htmlFor="inv-model">
             <select id="inv-model" className="field" value={model} onChange={e => setModel(e.target.value as InvestmentModel)}>
               {(['profitSharing', 'lease', 'jointVenture'] as const).map(m => <option key={m} value={m}>{t(`models.${m}`)}</option>)}
             </select>
-          </Field>
+          </Field>}
           <Field label={t('owner.add.duration')} htmlFor="inv-dur" error={err.duration}>
             <input id="inv-dur" className="field" type="number" value={duration} onChange={e => setDuration(e.target.value)} />
           </Field>
@@ -84,6 +93,9 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
         <Field label={t('investor.detail.message')} htmlFor="inv-msg" error={err.message}>
           <textarea id="inv-msg" className="field min-h-28" value={message} onChange={e => setMessage(e.target.value)} aria-invalid={!!err.message} />
         </Field>
+        {land.source && <Field label="Təklif sənədləri" htmlFor="inv-docs" error={err.documents} optional={!requiresDocuments}>
+          <input id="inv-docs" className="field" type="file" accept="application/pdf,image/jpeg,image/png" multiple onChange={e => setDocuments(Array.from(e.target.files ?? []))} />
+        </Field>}
         <div className="flex justify-end gap-3">
           <button type="button" className="btn btn-outline" onClick={onClose}>{t('form.cancel')}</button>
           <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? t('form.loading') : t('investor.detail.send')}</button>
@@ -109,6 +121,15 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [invest, setInvest] = useState(false);
   const [why, setWhy] = useState(false);
+  const [contactPhone, setContactPhone] = useState<string | null>(null);
+
+  useEffect(() => {
+    setContactPhone(null);
+    if (!land?.source || !myRequest) return;
+    void backend<{ opportunities: { contactPhone: string | null; myProposal: { id: string } | null }[] }>('GET', `/lands/${land.id}`)
+      .then(d => setContactPhone(d.opportunities.find(o => o.myProposal?.id === myRequest.id)?.contactPhone ?? null))
+      .catch(() => undefined);
+  }, [land?.id, land?.source, myRequest?.id]);
 
   useEffect(() => { if (land && mode !== 'owner') landService.addView(land.id); }, [id]);
   const score = useMemo(() => (land ? scoreLand(land, me?.preferences ?? {}) : null), [land, me?.preferences]);
@@ -127,14 +148,13 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
     [t('land.electricity'), land.electricity ? t('form.yes') : t('form.no')], [t('land.duration'), land.durationMonths ? t('land.months', { n: land.durationMonths }) : '—'],
     [t('land.model'), t(`models.${land.investmentModel}`)], [t('land.return'), land.expectedReturnPct ? `${land.expectedReturnPct}%` : '—'], [t('land.area'), t('land.ha', { n: land.areaHa })],
   ];
-  const ministry = land.source === 'ministry'
-    ? ministryFacts(land, facts, t)
-    : null;
+  const ministry = land.source === 'ministry' ? ministryFacts(land, facts, t)
+    : land.source === 'ownerPortal' ? <p className="mb-4 text-sm text-muted">Bu elanın torpaq məlumatları sahibkar tərəfindən təqdim edilib və dərcdən əvvəl nazirlik tərəfindən yoxlanılıb. Göstərilməyən göstəricilər barədə məlumat yoxdur.</p> : null;
 
   let cta: React.ReactNode;
   if (mode === 'owner' || isOwn) cta = <p className="flex items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-muted"><Info className="w-4 h-4 shrink-0 text-brand" aria-hidden="true" />{t('investor.detail.ownListing')}</p>;
   else if (land.status !== 'active') cta = <p className="text-sm font-semibold text-muted">{t('investor.detail.notAccepting')}</p>;
-  else if (myRequest) cta = <p className="text-sm font-semibold text-brand">{t('investor.detail.alreadySent')}</p>;
+  else if (myRequest) cta = <div className="text-sm font-semibold text-brand"><p>{t('investor.detail.alreadySent')}</p>{contactPhone && <p className="mt-2">Əlaqə nömrəsi: {contactPhone}</p>}</div>;
   else if (!me) cta = <Link to={lp('/login')} className="btn btn-primary w-full">{t('investor.detail.loginToInvest')}</Link>;
   else cta = <button type="button" className="btn btn-primary w-full" onClick={() => setInvest(true)}>{t('investor.detail.send')}</button>;
 
@@ -145,11 +165,11 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
       <div>
         <p className="text-xs font-bold uppercase tracking-wider text-muted">{t('land.required')}</p>
         <p className="mt-2 flex flex-wrap items-baseline gap-x-2 font-sans text-[1.75rem] font-extrabold leading-tight text-brand tabular-nums">
-          <span>{compact(land.investmentMin)}</span><span className="font-semibold text-muted" aria-hidden="true">–</span><span>{compact(land.investmentMax)}</span>
+          <span>{compact(land.investmentMin)}</span>{!land.source && <><span className="font-semibold text-muted" aria-hidden="true">–</span><span>{compact(land.investmentMax)}</span></>}
           <span className="text-base font-bold text-muted">AZN</span>
         </p>
       </div>
-      <div className="rounded-xl bg-[#F7F5EF] p-4">
+      {!land.source && <div className="rounded-xl bg-[#F7F5EF] p-4">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-sm font-semibold text-ink">{t('land.fundingProgress')}</span>
           <span className="text-sm font-extrabold text-brand tabular-nums">{fundedPct}%</span>
@@ -162,7 +182,7 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
           <span>{t('land.raised', { amount: f.compactAzn(land.raisedAmount) })}</span>
           <span>{t('land.goal', { amount: f.compactAzn(goal) })}</span>
         </div>
-      </div>
+      </div>}
       {cta}
       {mode !== 'owner' && (
         <div className="flex gap-2">
@@ -196,7 +216,7 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2 mb-3">
             <TypeBadge type={land.fieldType} />
-            {land.ownerVerified && <VerifiedBadge />}
+            {!land.source && land.ownerVerified && <VerifiedBadge />}
             {land.isSpecial && <span className="inline-flex items-center gap-1 rounded-full bg-gold text-forest px-2.5 py-1 text-xs font-bold"><Star className="w-3 h-3" aria-hidden="true" />{t('land.special')}</span>}
             {mode === 'owner' && <StatusBadge status={land.status} />}
             {land.source === 'ministry' && <span className="inline-flex items-center gap-1 rounded-full bg-sage text-brand px-2.5 py-1 text-xs font-bold"><Landmark className="w-3 h-3" aria-hidden="true" />{t('ministry.badge')}</span>}
@@ -206,13 +226,13 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
 
           {mode === 'owner' && (
             <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="card p-4"><p className="text-xs text-muted font-semibold flex items-center gap-1"><Eye className="w-3.5 h-3.5" />{t('owner.props.ownerStats')}</p><p className="font-bold mt-1">{t('land.views', { n: land.views })}</p></div>
+              {!land.source && <div className="card p-4"><p className="text-xs text-muted font-semibold flex items-center gap-1"><Eye className="w-3.5 h-3.5" />{t('owner.props.ownerStats')}</p><p className="font-bold mt-1">{t('land.views', { n: land.views })}</p></div>}
               <div className="card p-4"><p className="text-xs text-muted font-semibold flex items-center gap-1"><Inbox className="w-3.5 h-3.5" />{t('owner.nav.requests')}</p><p className="font-bold mt-1">{t('land.requests', { n: requestCount })}</p></div>
             </div>
           )}
 
           {/* Three metrics, larger + "Why this score?" */}
-          <div className="card p-6 mt-6">
+          {!score.unavailable && <div className="card p-6 mt-6">
             <div className="grid sm:grid-cols-3 gap-6 items-center">
               <div className="flex justify-center"><ScoreGauge value={score.suitability} size={96} /></div>
               <div className="flex justify-center"><RiskBadge level={score.risk} factors={score.riskFactors} size="lg" /></div>
@@ -230,7 +250,7 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
                 ))}
               </ul>
             )}
-          </div>
+          </div>}
 
           <div className="lg:hidden mt-6">{box}</div>
 
@@ -238,7 +258,7 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
             <h2 className="font-display text-2xl text-brand mb-4">{t('land.keyFacts')}</h2>
             {ministry}
             <dl className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-line rounded-2xl overflow-hidden border border-line">
-              {(land.source === 'ministry' ? facts.filter(([k]) => ![t('land.soil'), t('land.lastCrop'), t('land.electricity'), t('land.model')].includes(k)) : facts).map(([k, v]) => <div key={k} className="bg-white p-4"><dt className="text-xs font-semibold text-muted">{k}</dt><dd className="font-bold mt-1">{v}</dd></div>)}
+              {(land.source ? facts.filter(([k]) => k === t('land.area')) : facts).map(([k, v]) => <div key={k} className="bg-white p-4"><dt className="text-xs font-semibold text-muted">{k}</dt><dd className="font-bold mt-1">{v}</dd></div>)}
             </dl>
           </section>
           {land.description && <section className="mt-8"><h2 className="font-display text-2xl text-brand mb-3">{t('land.description')}</h2><p className="text-ink/80 leading-relaxed whitespace-pre-line">{land.description}</p></section>}

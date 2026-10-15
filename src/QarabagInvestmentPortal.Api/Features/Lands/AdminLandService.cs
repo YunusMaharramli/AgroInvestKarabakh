@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using QarabagInvestmentPortal.Api.Features.Notifications;
 using QarabagInvestmentPortal.Api.Features.Opportunities;
+using QarabagInvestmentPortal.Api.Features.Proposals;
 using QarabagInvestmentPortal.Api.Infrastructure.Files;
 using QarabagInvestmentPortal.Api.Infrastructure.Http;
 using QarabagInvestmentPortal.Api.Infrastructure.Persistence;
@@ -287,6 +288,12 @@ public sealed class AdminLandService(
         if (opportunity is { WinnerProposalId: not null })
             return AdminLandResult.Fail(409, "Bu elan üzrə qalib artıq seçilib; yeni elan üçün sahəni arxivdən çıxarın.");
 
+        // Older databases may still contain a draft opportunity with proposals from before
+        // unpublishing closed the round. Never revive that round on a new publication.
+        if (opportunity is { Status: OpportunityStatus.Draft } &&
+            await db.Proposals.AnyAsync(p => p.OpportunityId == opportunity.Id, ct))
+            await SetUnpublishedAsync(land, opportunity, adminId, "Köhnə elan yenidən aktivləşdirilmədi.", ct);
+
         var now = clock.GetUtcNow();
         if (opportunity is null || opportunity.Status is OpportunityStatus.Closed or OpportunityStatus.Rejected)
         {
@@ -326,11 +333,14 @@ public sealed class AdminLandService(
         if (string.IsNullOrEmpty(reason) || reason.Length > 1000) return AdminLandResult.Fail(400, "Dərcdən çıxarma səbəbini yazın (ən çox 1000 simvol).", new Dictionary<string, string> { ["reason"] = "Səbəbi yazın." });
         var land = await Managed().Include(l => l.Documents).Include(l => l.Photos).FirstOrDefaultAsync(l => l.Id == id, ct);
         if (land is null) return NotFound();
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await LockLandOpportunitiesAsync(id, ct);
+        await db.Entry(land).ReloadAsync(ct);
         if (land.Status != LandStatus.Approved) return AdminLandResult.Fail(400, "Sahə dərc olunmayıb.");
         var opportunity = await LatestOpportunityAsync(id, ct);
         if (opportunity is { WinnerProposalId: not null }) return AdminLandResult.Fail(409, "Qalib seçilmiş elanı dərcdən çıxarmaq olmaz; sahəni arxivləşdirin.");
         await SetUnpublishedAsync(land, opportunity, adminId, reason, ct);
-        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         return AdminLandResult.Success((await GetAsync(id, adminId, ct))!);
     }
 
@@ -342,6 +352,8 @@ public sealed class AdminLandService(
         if (land is null) return NotFound();
         if (land.Status == LandStatus.Archived) return AdminLandResult.Fail(409, "Sahə artıq arxivdədir.");
 
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await LockLandOpportunitiesAsync(id, ct);
         var now = clock.GetUtcNow();
         var open = await db.Opportunities.Where(o => o.LandId == id && (o.Status == OpportunityStatus.Active || o.Status == OpportunityStatus.Draft)).ToListAsync(ct);
         foreach (var o in open)
@@ -350,6 +362,7 @@ public sealed class AdminLandService(
             o.ClosedAt = now;
             o.ClosureReason = "Sahə arxivləşdirildi: " + reason;
             o.UpdatedAt = now;
+            await CancelOpenProposalsAsync(o, adminId, o.ClosureReason, now, ct);
         }
         land.Status = LandStatus.Archived;
         land.ArchivedAt = now;
@@ -357,6 +370,7 @@ public sealed class AdminLandService(
         land.UpdatedAt = now;
         Audit(id, adminId, "archived", reason);
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         return AdminLandResult.Success((await GetAsync(id, adminId, ct))!);
     }
 
@@ -493,17 +507,47 @@ public sealed class AdminLandService(
 
     private async Task SetUnpublishedAsync(Land land, InvestmentOpportunity? opportunity, string adminId, string reason, CancellationToken ct)
     {
+        var ownsTransaction = db.Database.CurrentTransaction is null;
+        await using var tx = ownsTransaction ? await db.Database.BeginTransactionAsync(ct) : null;
+        await LockLandOpportunitiesAsync(land.Id, ct);
+        if (opportunity is not null) await db.Entry(opportunity).ReloadAsync(ct);
         var now = clock.GetUtcNow();
         land.Status = LandStatus.Draft;
         land.UpdatedById = adminId;
         land.UpdatedAt = now;
-        if (opportunity is { Status: OpportunityStatus.Active })
+        if (opportunity is { Status: OpportunityStatus.Active or OpportunityStatus.Draft })
         {
-            opportunity.Status = OpportunityStatus.Draft;
+            opportunity.Status = OpportunityStatus.Closed;
+            opportunity.ClosedAt = now;
+            opportunity.ClosureReason = reason;
             opportunity.UpdatedAt = now;
+            await CancelOpenProposalsAsync(opportunity, adminId, reason, now, ct);
         }
         Audit(land.Id, adminId, "unpublished", reason);
-        await Task.CompletedTask;
+        await db.SaveChangesAsync(ct);
+        if (tx is not null) await tx.CommitAsync(ct);
+    }
+
+    private Task LockLandOpportunitiesAsync(string landId, CancellationToken ct) =>
+        db.Database.ExecuteSqlRawAsync(
+            "SELECT 1 FROM portal.investment_opportunities WHERE \"LandId\" = {0} FOR UPDATE", [landId], ct);
+
+    private async Task CancelOpenProposalsAsync(InvestmentOpportunity opportunity, string adminId, string reason, DateTimeOffset now, CancellationToken ct)
+    {
+        var open = await db.Proposals.Where(p => p.OpportunityId == opportunity.Id && p.Status == ProposalStatus.Open).ToListAsync(ct);
+        foreach (var proposal in open)
+        {
+            proposal.Status = ProposalStatus.Cancelled;
+            proposal.DecidedAt = now;
+            proposal.UpdatedAt = now;
+            db.ProposalHistory.Add(new ProposalHistoryEntry
+            {
+                Id = Ids.New("phist"), ProposalId = proposal.Id, Status = "CANCELLED", ChangedBy = adminId,
+                Comment = reason, CreatedAt = now,
+            });
+            notifications.Notify(proposal.InvestorId, "İnvestisiya elanı bağlandı",
+                $"“{opportunity.Title}” elanı bağlandığı üçün təklifiniz ləğv edildi. Səbəb: {reason}");
+        }
     }
 
     private Task<InvestmentOpportunity?> LatestOpportunityAsync(string landId, CancellationToken ct) =>

@@ -17,6 +17,7 @@ export interface ScoreBreakdown {
 }
 
 export interface LandScore {
+  unavailable?: boolean;
   suitability: number; // 0..100
   breakdown: ScoreBreakdown;
   risk: RiskLevel;
@@ -47,6 +48,9 @@ export function landRisk(land: Land): { level: RiskLevel; value: number; factors
 const TOL: Record<RiskTolerance, number> = { low: 0.3, medium: 0.45, high: 0.7 };
 
 export function scoreLand(land: Land, f: Partial<SearchFilters>): LandScore {
+  // The API has no measured fertility, price-volatility or return data for these records.
+  // Do not derive a risk or suitability claim from client-side placeholders.
+  if (land.source) return { unavailable: true, suitability: 0, breakdown: { budget: 0, fieldType: 0, fertility: 0, risk: 0, region: 0 }, risk: 'medium', riskValue: 0, riskFactors: [] };
   const risk = landRisk(land);
 
   // Budget fit: overlap between the investor's range and the land's required range

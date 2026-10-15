@@ -28,9 +28,12 @@ const ComparePage = lazy(() => import('../features/compare/ComparePage').then(m 
 const AdminShell = lazy(() => import('../features/admin/AdminPages').then(m => ({ default: m.AdminShell })));
 const AdminLandsPage = lazy(() => import('../features/admin/AdminPages').then(m => ({ default: m.AdminLandsPage })));
 const AdminLandEditor = lazy(() => import('../features/admin/AdminPages').then(m => ({ default: m.AdminLandEditor })));
+const AdminWorkflowPage = lazy(() => import('../features/admin/AdminWorkflowPage').then(m => ({ default: m.AdminWorkflowPage })));
 
 import { CompareProvider } from '../features/compare/CompareContext';
-import { syncMinistryLands } from '../services/ministryLands';
+import { syncMinistryLands, syncOwnerLands } from '../services/ministryLands';
+import { syncPortalProposals } from '../services/portalProposals';
+import { authService } from '../services/api';
 
 /** Keeps i18next, <html lang> and storage in sync with the /:lang prefix; fixes unknown prefixes. */
 const LangGuard: React.FC = () => {
@@ -61,6 +64,10 @@ const PublicLayout: React.FC = () => (
 const OwnerLayout: React.FC = () => {
   const { t } = useTranslation();
   const lp = useLocalePath();
+  useEffect(() => {
+    const me = authService.currentUser();
+    if (me && authService.hasBackendSession()) void syncOwnerLands(me.id).then(syncPortalProposals).catch(() => undefined);
+  }, []);
   return <CabinetShell role="landowner" nav={[
     { to: lp('/owner'), label: t('owner.nav.overview'), icon: <Home className="w-5 h-5" />, end: true },
     { to: lp('/owner/add-land'), label: t('owner.nav.add'), icon: <Plus className="w-5 h-5" /> },
@@ -74,6 +81,9 @@ const OwnerLayout: React.FC = () => {
 const InvestorLayout: React.FC = () => {
   const { t } = useTranslation();
   const lp = useLocalePath();
+  useEffect(() => {
+    if (authService.hasBackendSession()) void syncMinistryLands().then(syncPortalProposals).catch(() => undefined);
+  }, []);
   return <CabinetShell role="investor" nav={[
     { to: lp('/investor'), label: t('investor.nav.overview'), icon: <Compass className="w-5 h-5" />, end: true },
     { to: lp('/investor/search'), label: t('investor.nav.search'), icon: <Search className="w-5 h-5" /> },
@@ -86,7 +96,11 @@ const InvestorLayout: React.FC = () => {
 
 export const AppRouter: React.FC = () => {
   // Listings published by the ministry (real backend) join the site's land lists.
-  useEffect(() => { void syncMinistryLands(); }, []);
+  useEffect(() => {
+    void syncMinistryLands().then(() => {
+      if (authService.hasBackendSession()) return syncPortalProposals();
+    }).catch(() => undefined);
+  }, []);
   return (
   <BrowserRouter>
     <ToastProvider>
@@ -134,6 +148,7 @@ export const AppRouter: React.FC = () => {
               </Route>
               <Route path="admin" element={<React.Suspense fallback={null}><AdminShell /></React.Suspense>}>
                 <Route index element={<AdminLandsPage />} />
+                <Route path="workflow" element={<AdminWorkflowPage />} />
                 <Route path="lands/new" element={<AdminLandEditor />} />
                 <Route path="lands/:id" element={<AdminLandEditor />} />
               </Route>

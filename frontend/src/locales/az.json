@@ -426,7 +426,9 @@
   "reqStatus": {
     "pending": "Gözləyir",
     "selected": "Seçildi",
-    "notSelected": "Seçilmədi"
+    "notSelected": "Seçilmədi",
+    "rejected": "Rədd edildi",
+    "cancelled": "Elan bağlandığı üçün ləğv edildi"
   },
   "risk": {
     "low": "Aşağı",

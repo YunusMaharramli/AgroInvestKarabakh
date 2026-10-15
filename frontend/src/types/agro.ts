@@ -30,10 +30,10 @@ export interface AppUser {
   notify?: { email: boolean; sms: boolean; push: boolean };
 }
 
-export type Irrigation = 'none' | 'canal' | 'well' | 'drip';
+export type Irrigation = 'none' | 'canal' | 'well' | 'drip' | 'unknown';
 export type InvestmentModel = 'profitSharing' | 'lease' | 'jointVenture';
 export type LandStatus = 'draft' | 'underReview' | 'active' | 'funded' | 'closed' | 'paused';
-export type SoilType = 'chernozem' | 'chestnut' | 'alluvial' | 'grayBrown' | 'mountainMeadow' | 'sandyLoam';
+export type SoilType = 'chernozem' | 'chestnut' | 'alluvial' | 'grayBrown' | 'mountainMeadow' | 'sandyLoam' | 'unknown';
 
 export interface Land {
   id: string;
@@ -69,18 +69,15 @@ export interface Land {
   priceVolatility: number; // 0..1, used by the mock risk score
   createdAt: string;
   winnerRequestId?: string | null;
-  /** Land published by the ministry through the real backend (admin land management). */
-  source?: 'ministry';
+  /** Real API listing; unlike demo rows, unspecified agricultural facts are unknown. */
+  source?: 'ministry' | 'ownerPortal';
   /** Backend verification status: entering data or uploading a file never makes a land "VERIFIED". */
   verification?: 'ADMIN_ENTERED' | 'EVIDENCE_PENDING' | 'VERIFIED';
   hasBoundary?: boolean;
 }
 
-/**
- * One-winner rule (decided with the client): the landowner selects ONE investor per listing;
- * the listing closes and all other pending requests become "notSelected".
- */
-export type RequestStatus = 'pending' | 'selected' | 'notSelected';
+/** Ministry decisions are authoritative for real proposals. */
+export type RequestStatus = 'pending' | 'selected' | 'notSelected' | 'rejected' | 'cancelled';
 
 export interface InvestmentRequest {
   id: string;
@@ -94,6 +91,7 @@ export interface InvestmentRequest {
   viewedByOwner: boolean;
   createdAt: string;
   updatedAt: string;
+  source?: 'portal';
 }
 
 export interface AppNotification {

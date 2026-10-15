@@ -1,94 +1,52 @@
-# Qarabag Investment Portal
+# AgroInvest Qarabağ
 
-AgroInvest Qarabağ: a portal where land owners in Karabakh find investors for their
-agricultural land, and investors send proposals. ASP.NET Core (.NET 10) backend,
-React 19 + Vite frontend, PostgreSQL database.
+Agricultural investment competition portal for Qarabağ, adapted to the requirements in `Musabiqe.pdf`. Ministry administrators publish farm areas and competitions. Entrepreneurs browse and compare them, apply with a proposed amount, business plan and documents, then follow their application by reference number. Administrators review applications, request additional information and record decisions.
 
-## Layout
+## Project structure
 
-```text
-src/QarabagInvestmentPortal.Api     the only backend project (HTTP host + all features)
-  Features/                         one folder per business area
-    Users/          register, login, profile (roles: USER, ADMIN)
-    Lands/          owner land submission, admin review queue
-    Opportunities/  "Investment Opportunities" (one active listing per land)
-    Proposals/      investor proposals, winner selection
-    Documents/      authorized download of private documents
-    Favorites/  Notifications/  Recommendations/  Admin/  Assistant/
-  Infrastructure/
-    Persistence/    AppDbContext (single DbContext, schema "portal") + EF Core migrations
-    Auth/           session authentication, policies SignedIn / Admin
-    Files/          private file storage (outside the web root)
-    Validation/     Azerbaijani phone number rules
-    Import/         one-time import of the legacy JSON demo data
-    Frontend/       serves the built React app
-frontend/                           React app (Vite, Tailwind)
-tests/                              unit, integration (real PostgreSQL), architecture tests
-```
+- `src/QarabagInvestmentPortal.Api`: ASP.NET Core API, feature folders and one `AppDbContext` in PostgreSQL schema `portal`.
+- `frontend`: React 19 and Vite application. The existing visual design is retained.
+- `tests`: unit, architecture and PostgreSQL integration projects.
+- `docs/ektis-integration.md`: simulated EKTİS boundary and future integration work.
 
-It is a folder-based modular monolith: features live in folders inside one project and
-share one `AppDbContext`. Each feature keeps its entities, DTOs, services and endpoints
-together. Endpoints stay thin; rules live in focused services.
+Roles are `USER` and `ADMIN`. Administrators manage the catalog and review applications; signed-in users submit applications and read their own history. Uploaded documents remain private and are downloaded through authorized `/api/documents/...` endpoints. The old owner-submitted land workflow is no longer available through the portal.
 
-## Business rules
+## Local run
 
-- Two roles only. A `USER` can submit their own land and also send proposals to
-  other people's land. An `ADMIN` reviews land and can see everything.
-- Only the land owner submits land, with JPG/PNG ownership documents. The admin
-  approves it (the land profile and its listing are published), requests more
-  documents, or rejects it.
-- Each land has at most one active investment opportunity (enforced by a partial
-  unique index). The responsible party is the owner for owner listings and the admin
-  for older admin (demo) listings.
-- Investors send proposals with the existing form. A contact phone is asked only if
-  the user's profile has none; it is validated as an Azerbaijani number and a
-  snapshot is saved with the proposal. Proposal documents (PDF/JPG/PNG, 10 MB each)
-  are required only when the listing lists required documents.
-- The listing's phone number is shown as plain text only to users who sent a
-  proposal (and to the responsible party / admins).
-- The responsible party selects one winner. In one transaction the listing is closed,
-  new proposals are blocked, the other open proposals become `NOT_SELECTED`, and
-  everyone is notified.
-- Documents are stored privately (land and proposal documents separately). Admins
-  can view all; owners can view proposals and documents only for their listings.
-
-## Run locally
-
-See `docs/local-database.md` for the database. Then:
+See `docs/local-database.md` for database setup. Do not remove the Docker volume if it contains existing data.
 
 ```powershell
-docker compose up -d                      # PostgreSQL (5433) + Mailpit (1025 / 8025)
-cd frontend; npm install; npm run build; cd ..
+docker compose up -d
+cd frontend
+npm install
+npm run build
+cd ..
 dotnet run --project src/QarabagInvestmentPortal.Api
 ```
 
-Open http://localhost:3000 — the API also serves the built frontend (it finds the
-`frontend` folder by itself; `Frontend:Path` overrides it).
+The API serves the built site at `http://localhost:3000`. For frontend development, run `npm run dev` inside `frontend` and open `http://localhost:5173`. Email confirmation and password reset messages go to Mailpit at `http://localhost:8025` in development. In Development, the API applies EF Core migrations at startup when `Database:MigrateOnStartup` is enabled.
 
-Sign-up sends a confirmation **link** (no code). In development every email goes to
-Mailpit: open http://localhost:8025, open the email and click the link
-(`http://localhost:3000/confirm-email?token=...`, valid 24 hours). Password reset works
-the same way (`/reset-password?token=...`). For frontend work with hot reload run
-`npm run dev` in `frontend` (http://localhost:5173, `/api` is proxied to port 3000),
-but open the email links on port 3000 or rebuild with `npm run build`.
+In VS Code, open the project folder and choose **Terminal → Run Task → Start database**, then **Run Portal**. Build the frontend before the first run or after changing React files. Open `http://localhost:3000` once the API reports that it is listening.
 
-In Development the API applies EF Core migrations on start
-(`Database:MigrateOnStartup`). Configuration keys:
+The API uses `ConnectionStrings:Portal` or the `POSTGRES_*` settings. `Storage:RootPath` selects the private document folder. `Gemini:ApiKey` is optional for the assistant. Keep secrets in environment variables or `.env`, never in source control.
 
-| Key | Purpose |
-| --- | --- |
-| `ConnectionStrings:Portal` | Optional. Otherwise built from `POSTGRES_*` variables or the `.env` file |
-| `Storage:RootPath` | Private document folder (default `App_Data/files`) |
-| `Frontend:Path` | Optional. Frontend folder whose `dist` is served (default: the repository's `frontend`) |
-| `Gemini:ApiKey`, `Gemini:Model` | Optional AI assistant. Never commit the key |
+## Competition workflow
 
-## Tests
+1. An admin creates a farm area, adds its geographic and agricultural details, sets competition conditions and a deadline, and publishes it.
+2. A visitor searches, filters and compares published opportunities. A registered entrepreneur selects one and submits an application. The API issues an `AGRO-YYYY-NNNN` reference.
+3. The applicant sees receipt, review, additional information and decision states in their cabinet, with history and notifications. An additional information request can be answered with a message and private documents.
+4. An admin reviews applications, rejects one with a reason, or selects a winner. Selecting a winner closes the competition and records outcomes for the other pending applications. Archiving or withdrawing a competition cancels its pending applications and notifies applicants.
+
+The EKTİS endpoint is an admin-only **simulation**. It exports a versioned payload and records a local simulation receipt. It sends nothing to the government system.
+
+## Checks
 
 ```powershell
+dotnet build src/QarabagInvestmentPortal.Api
 dotnet test tests/QarabagInvestmentPortal.UnitTests
 dotnet test tests/QarabagInvestmentPortal.ArchitectureTests
-dotnet test tests/QarabagInvestmentPortal.IntegrationTests   # needs PostgreSQL
+cd frontend
+npm run build
 ```
 
-Integration tests create and drop their own database, `qarabag_investment_test`,
-on the same server.
+PostgreSQL integration tests use a separate test database and require a running database server.

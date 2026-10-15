@@ -22,7 +22,7 @@ public static class ProposalEndpoints
 
         api.MapPatch("/opportunities/{id}/status", async (string id, CloseOpportunityRequest req, ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
             (await service.SetStatusAsync(id, req.Status, req.Reason, ViewerOf(user), ct)).ToResult(r => Results.Ok(r)))
-            .RequireAuthorization(Policies.SignedIn);
+            .RequireAuthorization(Policies.Admin);
 
         // ------------------------------------------------ proposals (was "applications")
         var proposals = api.MapGroup("/proposals").RequireAuthorization(Policies.SignedIn);
@@ -37,8 +37,7 @@ public static class ProposalEndpoints
         proposals.MapGet("/sent", async (ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
             Results.Ok(await service.SentAsync(ViewerOf(user), ct)));
 
-        proposals.MapGet("/received", async (ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
-            Results.Ok(await service.ReceivedAsync(ViewerOf(user), ct)));
+
 
         proposals.MapGet("/{id}", async (string id, ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
             await service.GetAsync(id, ViewerOf(user), ct) is { } dto ? Results.Ok(dto) : ApiResults.NotFound("Təklif tapılmadı."));
@@ -52,6 +51,14 @@ public static class ProposalEndpoints
             (await service.RejectAsync(id, req.Reason, ViewerOf(user), ct)).ToResult(r => Results.Ok(r)))
             .RequireAuthorization(Policies.Admin);
 
+        api.MapPost("/admin/proposals/{id}/review", async (string id, ReviewApplicationRequest req, ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
+            (await service.ReviewAsync(id, req, ViewerOf(user), ct)).ToResult(r => Results.Ok(r)))
+            .RequireAuthorization(Policies.Admin);
+        proposals.MapPost("/{id}/supplements", async (string id, HttpRequest request, ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
+        {
+            if (!request.HasFormContentType) return ApiResults.BadRequest("Forma düzgün deyil.");
+            return (await service.SupplementAsync(id, ViewerOf(user), await request.ReadFormAsync(ct), ct)).ToResult(r => Results.Ok(r));
+        });
         return api;
     }
 

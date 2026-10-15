@@ -10,6 +10,8 @@ public enum ProposalStatus
     NotSelected,
     Rejected,
     Cancelled,
+    UnderReview,
+    InformationRequested,
 }
 
 /// <summary>An investor's offer for an investment opportunity.</summary>
@@ -21,6 +23,10 @@ public sealed class Proposal
     public InvestmentOpportunity? Opportunity { get; set; }
     public string InvestorId { get; set; } = string.Empty;
     public User? Investor { get; set; }
+
+    public string ApplicantType { get; set; } = "individual";
+    public string ApplicantName { get; set; } = string.Empty;
+    public string? TaxNumber { get; set; }
 
     public decimal ProposedInvestmentAmount { get; set; }
     public string BusinessPlanSummary { get; set; } = string.Empty;

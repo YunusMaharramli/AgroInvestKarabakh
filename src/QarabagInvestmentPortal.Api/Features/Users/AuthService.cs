@@ -12,27 +12,26 @@ public sealed class AuthService(
     TimeProvider clock,
     LoginAttemptService loginAttempts,
     EmailConfirmationService emailConfirmation,
+    AuthActionTokenService tokens,
     ILogger<AuthService> logger)
 {
+    public static readonly TimeSpan SignupTokenLifetime = TimeSpan.FromHours(24);
+
+    /// <summary>Sign-up step 1 for any applicant type: creates the account (role USER) and emails the confirmation link.</summary>
     public async Task<Outcome<RegistrationResponse>> RegisterAsync(
         RegisterRequest req,
         CancellationToken ct)
     {
-        var firstName = req.FirstName?.Trim() ?? string.Empty;
-        var lastName = req.LastName?.Trim() ?? string.Empty;
-        var email = req.Email?.Trim().ToLowerInvariant() ?? string.Empty;
-        var password = req.Password ?? string.Empty;
+        var (input, error) = ApplicantSignupRules.ValidateRegistration(req);
+        if (input is null)
+            return Outcome<RegistrationResponse>.Fail(400, error!);
 
-        if (firstName.Length == 0 || lastName.Length == 0 || email.Length == 0 || string.IsNullOrWhiteSpace(req.Phone) || password.Length == 0)
-            return Outcome<RegistrationResponse>.Fail(400, "Bütün məcburi sahələr doldurulmalıdır.");
-        if (password != req.ConfirmPassword)
-            return Outcome<RegistrationResponse>.Fail(400, "Daxil edilən şifrələr bir-biri ilə uyğun gəlmir.");
-        if (password.Length < 6)
-            return Outcome<RegistrationResponse>.Fail(400, "Şifrə ən azı 6 simvoldan ibarət olmalıdır.");
-        if (!AzerbaijaniPhone.TryNormalize(req.Phone, out var phone))
-            return Outcome<RegistrationResponse>.Fail(400, AzerbaijaniPhone.InvalidMessage);
-        if (await db.Users.AnyAsync(u => u.Email == email, ct))
+        if (await db.Users.AnyAsync(u => u.Email == input.Email, ct))
             return Outcome<RegistrationResponse>.Fail(409, "Bu elektron poçt ünvanı artıq sistemdə qeydiyyatdan keçib.");
+
+        if (input.Type is ApplicantType.LegalEntity or ApplicantType.ForeignEntity && input.Voen.Length > 0 &&
+            await db.Users.AnyAsync(u => u.ApplicantType != null && u.Profile != null && u.Profile.TaxIdentificationNumber == input.Voen, ct))
+            return Outcome<RegistrationResponse>.Fail(409, "Bu VÖEN ilə artıq hesab yaradılıb.");
 
         var now = clock.GetUtcNow();
         var userId = Ids.New("usr");
@@ -40,27 +39,33 @@ public sealed class AuthService(
         {
             Id = Ids.New("prof"),
             UserId = userId,
-            CompanyName = req.CompanyName?.Trim() ?? string.Empty,
-            TaxIdentificationNumber = req.TaxIdentificationNumber?.Trim() ?? string.Empty,
+            CompanyName = input.CompanyName.Length > 0 ? input.CompanyName : req.CompanyName?.Trim() ?? string.Empty,
+            TaxIdentificationNumber = input.Voen.Length > 0 ? input.Voen : req.TaxIdentificationNumber?.Trim() ?? string.Empty,
             BusinessActivity = req.BusinessActivity?.Trim() ?? string.Empty,
+            ForeignTaxNumber = input.ForeignTaxNumber,
             CreatedAt = now,
             UpdatedAt = now,
         };
         var user = new User
         {
             Id = userId,
-            FirstName = firstName,
-            LastName = lastName,
-            Email = email,
-            Phone = phone,
+            FirstName = input.FirstName,
+            LastName = input.LastName,
+            Email = input.Email,
+            Phone = input.Phone,
             Role = UserRole.User,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            // Older clients (no applicant type) keep the previous one-step sign-up.
+            ApplicantType = req.ApplicantType,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(input.Password),
             CreatedAt = now,
             UpdatedAt = now,
             Profile = profile,
         };
         db.Users.Add(user);
         await db.SaveChangesAsync(ct);
+
+        var signupToken = req.ApplicantType is null ? null
+            : await tokens.IssueAsync(user.Id, AuthTokenPurpose.SignupContinuation, SignupTokenLifetime, ct);
 
         try
         {
@@ -75,14 +80,72 @@ public sealed class AuthService(
                 new RegistrationResponse(
                     "Hesab yaradıldı, amma təsdiq məktubu göndərilə bilmədi. Bir neçə dəqiqədən sonra yenidən göndərməyi yoxlayın.",
                     true,
-                    true));
+                    true,
+                    signupToken));
         }
 
         return Outcome<RegistrationResponse>.Success(
             new RegistrationResponse(
                 "Hesab yaradıldı. E-poçtunuza göndərilən linklə ünvanınızı təsdiqləyin.",
                 true,
-                false));
+                false,
+                signupToken));
+    }
+
+    /// <summary>Sign-up: is the email confirmed yet? Read with the sign-up token; the token is not used up.</summary>
+    public async Task<Outcome<SignupStatusResponse>> SignupStatusAsync(string? signupToken, CancellationToken ct)
+    {
+        var userId = await tokens.PeekAsync(signupToken, AuthTokenPurpose.SignupContinuation, ct);
+        var user = userId is null ? null : await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null)
+            return Outcome<SignupStatusResponse>.Fail(404, "Qeydiyyat sessiyası tapılmadı və ya vaxtı bitib. Daxil olub qeydiyyatı tamamlayın.");
+
+        return Outcome<SignupStatusResponse>.Success(new SignupStatusResponse(
+            user.Email, user.ApplicantType, user.EmailConfirmedAt is not null, user.NeedsOnboarding));
+    }
+
+    /// <summary>
+    /// Sign-up, last step: saves the additional information and signs the applicant in.
+    /// The applicant is found by the signed-in session or, right after sign-up, by the sign-up token.
+    /// </summary>
+    public async Task<Outcome<AuthResponse>> CompleteOnboardingAsync(
+        string? signedInUserId, InvestorDetailsRequest req, HttpResponse response, CancellationToken ct)
+    {
+        // The sign-up token wins: a browser may still carry another account's session cookie.
+        var userId = await tokens.PeekAsync(req.SignupToken, AuthTokenPurpose.SignupContinuation, ct) ?? signedInUserId;
+        if (userId is null)
+            return Outcome<AuthResponse>.Fail(401, "Qeydiyyat sessiyası tapılmadı və ya vaxtı bitib. Daxil olub qeydiyyatı tamamlayın.");
+
+        var user = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null)
+            return Outcome<AuthResponse>.Fail(401, "Giriş tələb olunur.");
+        if (user.Role != UserRole.User || user.ApplicantType is not { } type)
+            return Outcome<AuthResponse>.Fail(403, "Bu hesab üçün əlavə məlumat tələb olunmur.");
+        if (user.EmailConfirmedAt is null)
+            return Outcome<AuthResponse>.Fail(403, "Əvvəlcə e-poçt ünvanınızı təsdiqləyin.");
+        if (user.OnboardingCompletedAt is not null)
+            return Outcome<AuthResponse>.Fail(409, "Qeydiyyat artıq tamamlanıb. Daxil olun.");
+
+        var now = clock.GetUtcNow();
+        var (details, error) = ApplicantSignupRules.ValidateDetails(type, req, DateOnly.FromDateTime(now.UtcDateTime));
+        if (details is null)
+            return Outcome<AuthResponse>.Fail(400, error!);
+
+        user.Profile ??= new UserProfile { Id = Ids.New("prof"), UserId = user.Id, CreatedAt = now };
+        ApplicantSignupRules.Apply(user.Profile, details);
+        user.Profile.UpdatedAt = now;
+        user.OnboardingCompletedAt = now;
+        user.UpdatedAt = now;
+        await db.SaveChangesAsync(ct);
+
+        // The sign-up is finished: any sign-up token of this account is no longer needed.
+        await db.AuthActionTokens
+            .Where(t => t.UserId == user.Id && t.Purpose == AuthTokenPurpose.SignupContinuation && t.UsedAt == null)
+            .ExecuteUpdateAsync(x => x.SetProperty(t => t.UsedAt, (DateTimeOffset?)now), ct);
+
+        var token = sessions.Create(user, response);
+        return Outcome<AuthResponse>.Success(new AuthResponse(
+            "Qeydiyyat tamamlandı. İnvestor kabinetinizə xoş gəlmisiniz.", token, UserDto.From(user), ProfileDto.From(user.Profile)));
     }
 
     public async Task<Outcome<AuthResponse>> LoginAsync(
@@ -131,6 +194,9 @@ public sealed class AuthService(
     HttpResponse response,
     CancellationToken ct)
     {
+        if (await db.Users.AnyAsync(u => u.Id == userId && u.Role == UserRole.Admin, ct))
+            return Outcome<MessageResponse>.Fail(403, AdminAccounts.PasswordLockedMessage);
+
         if (string.IsNullOrEmpty(req.CurrentPassword) ||
             string.IsNullOrEmpty(req.NewPassword) ||
             string.IsNullOrEmpty(req.ConfirmNewPassword))
@@ -139,13 +205,15 @@ public sealed class AuthService(
         if (req.NewPassword != req.ConfirmNewPassword)
             return Outcome<MessageResponse>.Fail(400, "Yeni şifrələr uyğun gəlmir.");
 
-        // Hələlik qeydiyyatdakı mövcud qayda ilə eynidir.
-        if (req.NewPassword.Length < 6)
-            return Outcome<MessageResponse>.Fail(400, "Şifrə ən azı 6 simvol olmalıdır.");
+        if (req.NewPassword.Length < ApplicantSignupRules.MinPasswordLength)
+            return Outcome<MessageResponse>.Fail(400, $"Şifrə ən azı {ApplicantSignupRules.MinPasswordLength} simvol olmalıdır.");
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user is null)
             return Outcome<MessageResponse>.Fail(401, "Giriş tələb olunur.");
+
+        if (user.Role == UserRole.Admin)
+            return Outcome<MessageResponse>.Fail(403, AdminAccounts.PasswordLockedMessage);
 
         if (!BCrypt.Net.BCrypt.Verify(req.CurrentPassword, user.PasswordHash))
             return Outcome<MessageResponse>.Fail(400, "Hazırkı şifrə yanlışdır.");

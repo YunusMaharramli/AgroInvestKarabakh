@@ -22,6 +22,9 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Local administrator list (git-ignored); see Features/Users/AdminAccounts.cs.
+builder.Configuration.AddJsonFile("admins.local.json", optional: true, reloadOnChange: false);
+
 // Uploads: up to 10 files × 10 MB.
 const long maxRequestBytes = 110L * 1024 * 1024;
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = maxRequestBytes);
@@ -54,15 +57,14 @@ builder.Services.AddSingleton<PrivateFileStorage>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<OpportunityQueries>();
-builder.Services.AddScoped<LandSubmissionService>();
-builder.Services.AddScoped<LandReviewService>();
 builder.Services.AddScoped<AdminLandService>();
+builder.Services.AddScoped<EktisIntegrationService>();
 builder.Services.AddScoped<ProposalService>();
-builder.Services.AddScoped<ChatService>();
-builder.Services.AddSignalR();
 builder.Services.AddScoped<LegacyJsonImporter>();
-builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<LoginAttemptService>();
+builder.Services.Configure<AdminAccountsOptions>(
+    builder.Configuration.GetSection(AdminAccountsOptions.SectionName));
+builder.Services.AddScoped<AdminAccountSeeder>();
 
 var app = builder.Build();
 
@@ -73,6 +75,7 @@ if (args.Length > 0 && args[0] == "import-legacy")
 }
 
 await app.MigrateIfConfiguredAsync();
+await app.SeedAdminAccountsAsync();
 
 app.UseExceptionHandler();
 app.UseRouting();
@@ -86,7 +89,6 @@ api.MapAuthEndpoints()
     .MapLandEndpoints()
     .MapAdminLandEndpoints()
     .MapOpportunityAndProposalEndpoints()
-    .MapChatEndpoints()
     .MapDocumentEndpoints()
     .MapFavoriteEndpoints()
     .MapNotificationEndpoints()
@@ -94,7 +96,7 @@ api.MapAuthEndpoints()
     .MapRecommendationEndpoints()
     .MapAssistantEndpoints();
 
-app.MapHub<ChatHub>("/hubs/chat").RequireAuthorization(Policies.SignedIn);
+
 
 app.UseBuiltFrontend();
 

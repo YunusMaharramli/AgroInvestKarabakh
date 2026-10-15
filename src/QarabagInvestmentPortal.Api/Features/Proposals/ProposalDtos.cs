@@ -14,7 +14,7 @@ public sealed record ProposalDto(
     string ContactPhone, ProposalStatus Status, DateTimeOffset SubmittedAt, DateTimeOffset UpdatedAt, DateTimeOffset? DecidedAt,
     PersonDto? User, OpportunityDto? Opportunity, LandDto? Land,
     IReadOnlyList<ProposalDocumentDto> Documents, IReadOnlyList<ProposalHistoryDto> StatusHistory,
-    bool CanSelectWinner);
+    bool CanSelectWinner, string ApplicantType, string ApplicantName, string? TaxNumber);
 
 public sealed record ProposalDocumentDto(string Id, string FileName, string MimeType, long FileSize, DateTimeOffset UploadedAt, string Url)
 {
@@ -29,3 +29,5 @@ public sealed record ProposalHistoryDto(string Id, string NewStatus, string Chan
 
 public sealed record WinnerSelectedResponse(string Message, OpportunityDto Opportunity, int NotSelectedCount);
 public sealed record RejectProposalRequest(string? Reason);
+
+public sealed record ReviewApplicationRequest(ProposalStatus Status, string? Comment);

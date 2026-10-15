@@ -6,3 +6,4 @@
 **/dist/
 **/App_Data/
 **/.env.local
+**/admins.local.json

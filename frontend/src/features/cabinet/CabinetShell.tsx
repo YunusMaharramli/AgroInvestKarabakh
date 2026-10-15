@@ -110,7 +110,8 @@ export const CabinetShell: React.FC<{ role: CabinetRole; nav: NavItem[] }> = ({ 
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
 
   if (!user) return <Navigate to={lp('/login')} replace />;
-  if (!user.roles.includes(role)) return <Navigate to={lp('/choose-cabinet')} replace />;
+  if (user.isAdmin) return <Navigate to={lp('/admin')} replace />;
+  if (user.needsOnboarding) return <Navigate to={lp('/signup?step=details')} replace />;
 
   const other: CabinetRole = role === 'landowner' ? 'investor' : 'landowner';
   const hasOther = user.roles.includes(other);
@@ -132,15 +133,7 @@ export const CabinetShell: React.FC<{ role: CabinetRole; nav: NavItem[] }> = ({ 
           </Link>
           <span className={`hidden md:inline-flex rounded-full px-3 py-1 text-xs font-bold ${investor ? 'bg-[#F4ECD6] text-gold-dark' : 'bg-sage text-brand'}`}>{investor ? t('cabinet.investorBadge') : t('cabinet.ownerBadge')}</span>
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            {hasOther ? (
-              <button type="button" onClick={switchTo} className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold text-brand hover:bg-sage">
-                <Repeat className="w-4 h-4" aria-hidden="true" />{other === 'investor' ? t('cabinet.switchToInvestor') : t('cabinet.switchToOwner')}
-              </button>
-            ) : (
-              <button type="button" onClick={() => setBecome(true)} className="hidden sm:inline-flex px-3 py-2 rounded-full text-sm font-bold text-leaf-dark hover:bg-sage">
-                {other === 'investor' ? t('cabinet.becomeInvestor') : t('cabinet.becomeOwner')}
-              </button>
-            )}
+
             <Notifications userId={user.id} />
             <LanguageSwitcher className="hidden sm:inline-flex" />
             <AccountMenu role={role} />
@@ -164,7 +157,6 @@ export const CabinetShell: React.FC<{ role: CabinetRole; nav: NavItem[] }> = ({ 
             ))}
           </nav>
           <div className="p-3 border-t border-line">
-            {!hasOther && <button type="button" onClick={() => setBecome(true)} className={`w-full mb-2 rounded-xl px-3 py-2 text-xs font-bold text-leaf-dark hover:bg-sage ${collapsed ? 'sr-only' : ''}`}>{other === 'investor' ? t('cabinet.becomeInvestor') : t('cabinet.becomeOwner')}</button>}
             <button type="button" onClick={() => setCollapsed(c => !c)} className="w-full flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-muted hover:bg-sage" aria-label={collapsed ? t('cabinet.expand') : t('cabinet.collapse')}>
               {collapsed ? <ChevronsRight className="w-5 h-5" /> : <><ChevronsLeft className="w-5 h-5" />{t('cabinet.collapse')}</>}
             </button>
@@ -172,7 +164,6 @@ export const CabinetShell: React.FC<{ role: CabinetRole; nav: NavItem[] }> = ({ 
         </aside>
 
         <main id="main" className={`flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-8 ${investor ? 'pb-44 lg:pb-32' : 'pb-28 lg:pb-12'}`}>
-          {hasOther && <button type="button" onClick={switchTo} className="sm:hidden mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-brand"><Repeat className="w-4 h-4" />{other === 'investor' ? t('cabinet.switchToInvestor') : t('cabinet.switchToOwner')}</button>}
           <Suspense fallback={<div className="grid gap-4" aria-busy="true"><div className="skeleton h-10 w-72" /><div className="skeleton h-40" /><div className="skeleton h-40" /></div>}><Outlet /></Suspense>
         </main>
       </div>
@@ -188,13 +179,7 @@ export const CabinetShell: React.FC<{ role: CabinetRole; nav: NavItem[] }> = ({ 
 
       {investor && !/\/investor\/(compare|settings)/.test(pathname) && <CompareBar />}
 
-      <ConfirmDialog open={become} onClose={() => setBecome(false)} title={t('cabinet.becomeTitle', { cabinet: otherCabinetName })} text={t('cabinet.becomeText', { cabinet: otherCabinetName })}
-        confirmLabel={t('cabinet.becomeConfirm')} onConfirm={async () => {
-          await authService.addRole(other);
-          setBecome(false);
-          toast(t('notifications.roleAdded'));
-          navigate(lp(other === 'investor' ? '/investor' : '/owner'));
-        }} />
+
     </div>
   );
 };

@@ -3,7 +3,13 @@
 public enum AuthTokenPurpose
 {
     EmailConfirmation,
-    PasswordReset
+    PasswordReset,
+
+    /// <summary>
+    /// Lets the browser that started a sign-up follow it: see whether the email is confirmed yet and
+    /// send the additional information afterwards. Used once, when the sign-up is completed.
+    /// </summary>
+    SignupContinuation
 }
 
 public sealed class AuthActionToken

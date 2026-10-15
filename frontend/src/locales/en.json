@@ -89,7 +89,7 @@
     "reportSend": "Send report"
   },
   "footer": {
-    "brandText": "AGROInvest brings landowners and investors together to grow Azerbaijan's farms. Explore <inv>investment opportunities</inv> or <own>list your land</own> in a few minutes.",
+    "brandText": "Explore published farm areas, submit your business plan and track your application.",
     "member": "Already a member?",
     "login": "Log in",
     "visit": "Visit Us",
@@ -130,18 +130,18 @@
   "home": {
     "slides": [
       {
-        "title": "Invest in Growth",
-        "text": "Back real farms across Azerbaijan and share in every harvest.",
+        "title": "Agricultural investment competitions for Karabakh",
+        "text": "Explore published farm areas, submit your business plan and track your application.",
         "cta": "Learn more"
       },
       {
-        "title": "Your Land, Our Investors",
-        "text": "List your fields in minutes and meet investors who believe in the land.",
+        "title": "Apply to a competition online",
+        "text": "Select a farm area and provide applicant details and required documents.",
         "cta": "Learn more"
       },
       {
-        "title": "Grow Together",
-        "text": "A trusted marketplace for agricultural land, built for owners and investors alike.",
+        "title": "Transparent application review",
+        "text": "Follow your application from registration to an administrative decision.",
         "cta": "Learn more"
       }
     ],
@@ -150,17 +150,17 @@
     "play": "Play slideshow",
     "whatEyebrow": "About the platform",
     "whatTitle": "What is AGROInvest?",
-    "whatText": "AGROInvest is a digital marketplace where farm owners list agricultural land that needs capital, and investors find, compare and fund the projects that suit them. Every listing is reviewed, and every step — from first request to final decision — is transparent.",
+    "whatText": "Explore published farm areas, submit your business plan and track your application.",
     "videoEyebrow": "How it works",
     "videoTitle": "Getting Started with AGROInvest",
     "videoText": "A short walkthrough: how to sign up, log in and find your way around the site.",
     "banner": "From Soil to Success",
-    "ownersEyebrow": "For landowners",
-    "ownersTitle": "Turn your land into a growing business",
-    "ownersText": "List your fields, orchards or pastures for free, set your own investment terms and choose the investor you trust. Our team reviews every listing so serious investors can find you with confidence.",
+    "ownersEyebrow": "Applications",
+    "ownersTitle": "Apply to a competition online",
+    "ownersText": "Select a farm area and provide applicant details and required documents.",
     "investorsEyebrow": "For investors",
     "investorsTitle": "Invest in land you can see and understand",
-    "investorsText": "Search verified listings by budget, region and field type, see a suitability score for each one, compare two lands side by side and send your request in a few clicks.",
+    "investorsText": "Follow your application from registration to an administrative decision.",
     "learnMore": "Learn more"
   },
   "video": {
@@ -170,25 +170,25 @@
   },
   "about": {
     "title": "About AGROInvest",
-    "intro": "We believe Azerbaijan's land can feed more families and create more jobs when the right people work together. AGROInvest makes that partnership simple, safe and transparent.",
+    "intro": "Explore published farm areas, submit your business plan and track your application.",
     "storyEyebrow": "Our story",
     "storyTitle": "Why we started",
     "facts": [
       {
-        "title": "Founded",
-        "text": "AGROInvest was founded in 2025 in Baku by a small team of agronomists and software engineers."
+        "title": "Agricultural investment competitions for Karabakh",
+        "text": "Explore published farm areas, submit your business plan and track your application."
       },
       {
-        "title": "Our mission",
-        "text": "To bring capital and know-how to agricultural land that is ready to grow — especially in the regions being restored."
+        "title": "Apply to a competition online",
+        "text": "Select a farm area and provide applicant details and required documents."
       },
       {
-        "title": "What we do",
-        "text": "We list and review land, match it with investors, and keep every request and decision transparent."
+        "title": "Transparent application review",
+        "text": "Follow your application from registration to an administrative decision."
       },
       {
-        "title": "Who we serve",
-        "text": "Farm and land owners who need investment, and private or company investors who want real, local projects."
+        "title": "EKTİS",
+        "text": "Structured data and a mock API for future integration."
       }
     ],
     "stats": {
@@ -200,7 +200,7 @@
     "teamTitle": "The team",
     "team": "Founders: [Name Surname] (agronomy), [Name Surname] (finance), [Name Surname] (technology).",
     "videoEyebrow": "Learn more",
-    "videoText": "Watch how AGROInvest connects a family orchard in Zangilan with an investor from Baku — from the first visit to the first harvest.",
+    "videoText": "Select a farm area and provide applicant details and required documents.",
     "videoCaption": "Filmed by [Studio name], 2026"
   },
   "investments": {
@@ -424,9 +424,13 @@
     "paused": "Paused"
   },
   "reqStatus": {
-    "pending": "Pending",
-    "selected": "Selected",
-    "notSelected": "Not selected"
+    "pending": "Received",
+    "underReview": "Under review",
+    "informationRequested": "Additional information required",
+    "selected": "Decision made — selected",
+    "notSelected": "Decision made — not selected",
+    "rejected": "Decision made — rejected",
+    "cancelled": "Competition closed"
   },
   "risk": {
     "low": "Low",
@@ -454,8 +458,6 @@
     "forgot": "Forgot password?",
     "login": "Log in",
     "or": "or",
-    "google": "Continue with Google",
-    "googleSoon": "Google sign-in will be available soon.",
     "noAccount": "Don't have an account?",
     "signup": "Sign up",
     "devTitle": "Test accounts (development only)",
@@ -474,8 +476,8 @@
     "step": "Step {{n}} of {{total}}",
     "steps": [
       "Account",
-      "Cabinet",
-      "Profile"
+      "Confirm",
+      "Details"
     ],
     "fullName": "Full name",
     "email": "Email",
@@ -541,7 +543,10 @@
       "linkInvalid": "This link is invalid or has expired.",
       "noToken": "The link is incomplete: the token is missing.",
       "fullName": "Enter your first and last name.",
-      "recaptcha": "Please complete the robot check."
+      "recaptcha": "Please complete the robot check.",
+      "company": "Enter the company name.",
+      "voen": "The TIN (VÖEN) must have 10 digits.",
+      "foreignTax": "Enter a valid foreign tax number."
     },
     "verifyNext": "The link is valid for 24 hours. After confirming, log in to choose your cabinet.",
     "deliveryFailed": "Your account was created, but the email could not be sent. Wait a few minutes and send the link again.",
@@ -557,7 +562,91 @@
     "resetSave": "Save new password",
     "resetDone": "Password updated. Log in with your new password.",
     "captchaTitle": "Security check",
-    "captchaHint": "Confirm that you are not a robot to continue."
+    "captchaHint": "Confirm that you are not a robot to continue.",
+    "companyName": "Company name",
+    "companyFullName": "Full company name",
+    "companyEmail": "Company email",
+    "voen": "TIN (VÖEN)",
+    "voenAz": "TIN (VÖEN) in Azerbaijan",
+    "voenHint": "10-digit Azerbaijani taxpayer identification number.",
+    "foreignTax": "Foreign tax number",
+    "continueSignup": "Continue sign-up",
+    "applicant": {
+      "title": "Who are you signing up as?",
+      "INDIVIDUAL": "Individual",
+      "LEGAL_ENTITY": "Legal entity",
+      "FOREIGN": "Foreign applicant",
+      "FOREIGN_INDIVIDUAL": "Foreign individual",
+      "FOREIGN_ENTITY": "Foreign legal entity"
+    },
+    "egov": {
+      "title": "With government services",
+      "mygov": "With myGov ID",
+      "asan": "With Asan İmza",
+      "sima": "With SİMA İmza",
+      "eqanun": "With e-qanun.az",
+      "visitor": "Visitor account for foreign citizens",
+      "soon": "This sign-in method will be available soon.",
+      "info": {
+        "mygov": "Single government identity account (myGov ID).",
+        "asan": "Mobile electronic signature: Asan İmza.",
+        "sima": "Electronic signature with the SİMA mobile app.",
+        "eqanun": "e-qanun.az electronic signature for legal entities.",
+        "visitor": "Visitor account for people who are not citizens of Azerbaijan."
+      }
+    },
+    "status": {
+      "pending": "Waiting for confirmation…",
+      "confirmed": "Email confirmed",
+      "check": "Check again",
+      "expired": "The sign-up session was not found or has expired. If you have confirmed your email, log in to finish signing up."
+    },
+    "details": {
+      "title": "About you",
+      "companyTitle": "About the company",
+      "subtitle": "This information is kept in your investor profile. Applicant type:",
+      "maritalStatus": "Marital status",
+      "single": "Single",
+      "married": "Married",
+      "income6": "Income over the last 6 months (AZN)",
+      "hasCredit": "Do you have a loan?",
+      "hasCreditQ": "Do you have an existing loan?",
+      "creditPayment": "Monthly payment of the existing loan (AZN)",
+      "hasFixedIncome": "Do you have a fixed income?",
+      "fixedIncome": "Fixed monthly income (AZN)",
+      "minInitial": "Minimum funds for the initial payment (AZN)",
+      "minProject": "Minimum funds you would put into a project (AZN)",
+      "minCompany": "Minimum company funds for a project (AZN)",
+      "residency": "Living status in Azerbaijan",
+      "residencyOptions": {
+        "PERMANENT_RESIDENT": "Permanent residence permit",
+        "TEMPORARY_RESIDENT": "Temporary residence permit",
+        "NON_RESIDENT": "Not living in Azerbaijan"
+      },
+      "address": "Address",
+      "incomeSource": "Source of income",
+      "country": "Company's country",
+      "chooseCountry": "Choose the country",
+      "choose": "Choose",
+      "activityStatus": "Status in Azerbaijan",
+      "activityStatusOptions": {
+        "BRANCH": "Branch in Azerbaijan",
+        "REPRESENTATIVE_OFFICE": "Representative office",
+        "SUBSIDIARY": "Subsidiary",
+        "NOT_REGISTERED": "Not registered in Azerbaijan"
+      },
+      "mainActivity": "Main field of activity",
+      "activity": "Field of activity",
+      "startDate": "Date business started",
+      "ceo": "Head of the company (CEO)",
+      "finish": "Finish sign-up",
+      "done": "Sign-up complete. Welcome to your investor panel!",
+      "errors": {
+        "choose": "Make a choice.",
+        "amount": "Enter a valid amount.",
+        "date": "The date cannot be in the future."
+      }
+    }
   },
   "cabinet": {
     "ownerBadge": "Landowner Cabinet",
@@ -755,15 +844,15 @@
       "overview": "Overview",
       "search": "Find Land",
       "compare": "AgroComparison",
-      "investments": "My Investments",
+      "investments": "Applications",
       "saved": "Saved Lands",
       "settings": "Profile & Settings"
     },
     "kpi": {
-      "invested": "Total invested",
-      "active": "Active investments",
+      "invested": "Proposed investment",
+      "active": "Decision made — selected",
       "pending": "Pending requests",
-      "avgReturn": "Average expected return"
+      "avgReturn": "Applications"
     },
     "recommended": "Recommended for you",
     "recommendedText": "Best matches for your saved preferences.",
@@ -807,31 +896,31 @@
         "region": "Region match"
       },
       "weight": "weight {{w}}%",
-      "send": "Send investment request",
+      "send": "Submit",
       "loginToInvest": "Log in to invest",
       "notAccepting": "This listing is no longer accepting requests.",
       "ownListing": "This is your own listing.",
       "alreadySent": "You have already sent a request for this land.",
-      "modalTitle": "Send investment request",
+      "modalTitle": "Applications",
       "amount": "Amount (AZN)",
-      "message": "Message to the owner",
+      "message": "Investment and business plan",
       "sentToast": "Request sent! You can follow it in My Investments.",
       "goal": "Goal: {{amount}}",
       "between": "Between {{min}} and {{max}}"
     },
     "inv": {
-      "title": "My Investments",
+      "title": "Applications",
       "pending": "Pending",
       "selected": "Selected",
       "notSelected": "Not selected",
       "timeline": [
-        "Sent",
-        "Viewed",
+        "Received",
+        "Under review",
         "Decision"
       ],
       "empty": "Nothing here yet.",
       "emptyCta": "Find land",
-      "otherSelected": "The owner selected another investor for this land."
+      "otherSelected": "Decision made — not selected"
     },
     "saved": {
       "title": "Saved Lands",
@@ -908,7 +997,11 @@
     "savedToast": "Your changes were saved.",
     "errors": {
       "currentPassword": "The current password is incorrect."
-    }
+    },
+    "investorProfile": "Investor profile",
+    "applicantType": "Applicant type",
+    "profileEmpty": "The additional information has not been filled in yet.",
+    "adminPassword": "Admin passwords are managed in the database only and cannot be changed."
   },
   "common": {
     "azn": "{{value}} AZN",
@@ -1215,5 +1308,35 @@
       "soil_analysis": "Soil analysis (result)",
       "water_analysis": "Water analysis (result)"
     }
+  },
+  "competition": {
+    "applications": "Applications",
+    "competitions": "Active competitions",
+    "proposedInvestment": "Proposed investment",
+    "applicantType": "Applicant type",
+    "applicantName": "Entrepreneur / company name",
+    "individual": "Individual entrepreneur",
+    "company": "Company",
+    "taxNumber": "Tax identification number (VÖEN)",
+    "documents": "Documents (PDF, JPG, PNG; 10 MB each)",
+    "deadline": "Application deadline",
+    "supplement": "Additional information",
+    "submit": "Submit",
+    "confirm": "Confirm",
+    "comment": "Comment / decision reason",
+    "commentRequired": "Enter the reason or the information required.",
+    "review": "Review status",
+    "all": "All",
+    "status": {
+      "SUBMITTED": "Received",
+      "OPEN": "Received",
+      "UNDER_REVIEW": "Under review",
+      "INFORMATION_REQUESTED": "Additional information required",
+      "SELECTED": "Decision made — selected",
+      "NOT_SELECTED": "Decision made — not selected",
+      "REJECTED": "Decision made — rejected",
+      "CANCELLED": "Competition closed"
+    },
+    "simulation": "Simulation"
   }
 }

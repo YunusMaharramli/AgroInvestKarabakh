@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, Inbox, Info, Landmark, MapPin, ShieldAlert, ShieldCheck, Star, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
-import { landService, requestService, useCurrentUser, useDbValue, ApiError } from '../../services/api';
+import { landService, requestService, useCurrentUser, useDbValue, ApiError, errorText } from '../../services/api';
 import { scoreLand, WEIGHTS } from '../../services/scoring';
 import { useFormat, useLocalePath } from '../../app/i18n';
 import { useLandName } from './landText';
@@ -43,7 +43,13 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
   const toast = useToast();
   const [amount, setAmount] = useState(String(land.investmentMin));
   const [model, setModel] = useState<InvestmentModel>(land.investmentModel);
-  const [duration, setDuration] = useState(String(land.durationMonths));
+  const me = useCurrentUser();
+  const [duration, setDuration] = useState(String(land.durationMonths || 24));
+  const [applicantType, setApplicantType] = useState('individual');
+  const [applicantName, setApplicantName] = useState(me?.fullName ?? '');
+  const [taxNumber, setTaxNumber] = useState('');
+  const [contactPhone, setContactPhone] = useState(me?.phone ?? '');
+  const [documents, setDocuments] = useState<File[]>([]);
   const [message, setMessage] = useState('');
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -51,24 +57,28 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
     e.preventDefault();
     const er: Record<string, string> = {};
     const a = Number(amount);
-    if (!(a >= land.investmentMin && a <= land.investmentMax)) er.amount = t('investor.detail.between', { min: f.azn(land.investmentMin), max: f.azn(land.investmentMax) });
+    if (!(a > 0)) er.amount = t('form.required');
     if (!(Number(duration) > 0)) er.duration = t('form.required');
     if (message.trim().length < 10) er.message = t('form.minLength', { n: 10 });
     setErr(er);
     if (Object.keys(er).length) return;
     setBusy(true);
     try {
-      await requestService.create({ landId: land.id, amount: a, investmentModel: model, durationMonths: Number(duration), message: message.trim() });
+      await requestService.create({ landId: land.id, amount: a, investmentModel: model, durationMonths: Number(duration), message: message.trim(), applicantType, applicantName, taxNumber, contactPhone, documents });
       toast(t('investor.detail.sentToast'));
       onClose();
     } catch (x) {
-      toast(t(x instanceof ApiError ? x.code : 'form.error'), 'error');
+      toast(errorText(t, x), 'error');
     } finally { setBusy(false); }
   };
   return (
     <Modal open={open} onClose={onClose} title={t('investor.detail.modalTitle')}>
-      <form onSubmit={submit} noValidate className="grid gap-4">
-        <Field label={t('investor.detail.amount')} htmlFor="inv-amount" error={err.amount} hint={t('investor.detail.between', { min: f.azn(land.investmentMin), max: f.azn(land.investmentMax) })}>
+      <form onSubmit={submit} className="grid gap-4">
+        <Field label={t('competition.applicantType')} htmlFor="inv-type"><select id="inv-type" className="field" value={applicantType} onChange={e => setApplicantType(e.target.value)}><option value="individual">{t('competition.individual')}</option><option value="company">{t('competition.company')}</option></select></Field>
+        <Field label={t('competition.applicantName')} htmlFor="inv-name"><input id="inv-name" className="field" value={applicantName} onChange={e => setApplicantName(e.target.value)} required minLength={3} maxLength={200} /></Field>
+        <Field label={t('competition.taxNumber')} htmlFor="inv-tax"><input id="inv-tax" className="field" value={taxNumber} onChange={e => setTaxNumber(e.target.value)} required={applicantType === 'company'} pattern="[0-9]{10}" maxLength={10} /></Field>
+        <Field label={t('auth.phone')} htmlFor="inv-phone"><input id="inv-phone" className="field" value={contactPhone} onChange={e => setContactPhone(e.target.value)} required /></Field>
+        <Field label={t('investor.detail.amount')} htmlFor="inv-amount" error={err.amount} hint={`${t('admin.form.investment')}: ${f.azn(land.investmentMin)}`}>
           <input id="inv-amount" className="field" type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)} aria-invalid={!!err.amount} data-autofocus />
         </Field>
         <div className="grid sm:grid-cols-2 gap-4">
@@ -84,6 +94,7 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
         <Field label={t('investor.detail.message')} htmlFor="inv-msg" error={err.message}>
           <textarea id="inv-msg" className="field min-h-28" value={message} onChange={e => setMessage(e.target.value)} aria-invalid={!!err.message} />
         </Field>
+        <Field label={t('competition.documents')} htmlFor="inv-documents" hint={land.requiredDocuments?.join(', ')}><input id="inv-documents" className="field" type="file" multiple accept=".pdf,.jpg,.jpeg,.png" required={!!land.requiredDocuments?.length} onChange={e => setDocuments(Array.from(e.target.files ?? []))} /></Field>
         <div className="flex justify-end gap-3">
           <button type="button" className="btn btn-outline" onClick={onClose}>{t('form.cancel')}</button>
           <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? t('form.loading') : t('investor.detail.send')}</button>
@@ -133,7 +144,7 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
 
   let cta: React.ReactNode;
   if (mode === 'owner' || isOwn) cta = <p className="flex items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-muted"><Info className="w-4 h-4 shrink-0 text-brand" aria-hidden="true" />{t('investor.detail.ownListing')}</p>;
-  else if (land.status !== 'active') cta = <p className="text-sm font-semibold text-muted">{t('investor.detail.notAccepting')}</p>;
+  else if (land.status !== 'active' || !land.acceptingApplications || me?.isAdmin) cta = <p className="text-sm font-semibold text-muted">{t('investor.detail.notAccepting')}</p>;
   else if (myRequest) cta = <p className="text-sm font-semibold text-brand">{t('investor.detail.alreadySent')}</p>;
   else if (!me) cta = <Link to={lp('/login')} className="btn btn-primary w-full">{t('investor.detail.loginToInvest')}</Link>;
   else cta = <button type="button" className="btn btn-primary w-full" onClick={() => setInvest(true)}>{t('investor.detail.send')}</button>;
@@ -149,19 +160,10 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
           <span className="text-base font-bold text-muted">AZN</span>
         </p>
       </div>
-      <div className="rounded-xl bg-[#F7F5EF] p-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-sm font-semibold text-ink">{t('land.fundingProgress')}</span>
-          <span className="text-sm font-extrabold text-brand tabular-nums">{fundedPct}%</span>
-        </div>
-        <div className="mt-2 h-2.5 rounded-full bg-[#E6E0D0] overflow-hidden" role="progressbar" aria-label={t('land.fundingProgress')}
-          aria-valuenow={fundedPct} aria-valuemin={0} aria-valuemax={100} aria-valuetext={t('land.raisedOf', { raised: f.compactAzn(land.raisedAmount), goal: f.compactAzn(goal) })}>
-          <div className="h-full rounded-full bg-gold" style={{ width: `${fundedPct}%` }} />
-        </div>
-        <div className="mt-2 flex justify-between gap-3 text-xs text-muted tabular-nums">
-          <span>{t('land.raised', { amount: f.compactAzn(land.raisedAmount) })}</span>
-          <span>{t('land.goal', { amount: f.compactAzn(goal) })}</span>
-        </div>
+      <div className="rounded-xl bg-[#F7F5EF] p-4 text-sm">
+        <p className="font-semibold">{t('competition.deadline')}: {land.applicationDeadline ? f.date(land.applicationDeadline) : '—'}</p>
+        {land.eligibilityConditions?.map(c => <p key={c} className="mt-2 text-muted">{c}</p>)}
+        {!!land.requiredDocuments?.length && <p className="mt-2 text-muted">{t('competition.documents')}: {land.requiredDocuments.join(', ')}</p>}
       </div>
       {cta}
       {mode !== 'owner' && (

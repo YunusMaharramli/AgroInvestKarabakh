@@ -22,6 +22,15 @@ public static class AuthEndpoints
                 r, statusCode: StatusCodes.Status201Created));
     });
 
+        // Sign-up: the browser that started it follows the email confirmation, then sends the additional information.
+        auth.MapPost("/signup/status",
+            async (SignupStatusRequest req, AuthService service, CancellationToken ct) =>
+                (await service.SignupStatusAsync(req.SignupToken, ct)).ToResult(r => Results.Ok(r)));
+
+        auth.MapPost("/signup/details",
+            async (InvestorDetailsRequest req, ClaimsPrincipal principal, AuthService service, HttpResponse response, CancellationToken ct) =>
+                (await service.CompleteOnboardingAsync(principal.UserId(), req, response, ct)).ToResult(r => Results.Ok(r)));
+
         auth.MapPost("/confirm-email",
             async (ConfirmEmailRequest req,
                    EmailConfirmationService service,

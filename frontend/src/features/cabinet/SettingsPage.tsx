@@ -6,10 +6,58 @@ import { authService, useCurrentUser, errorText } from '../../services/api';
 import { PageTitle, Avatar } from './CabinetShell';
 import { Chips, Field, Segmented, Toggle } from '../../components/ui/Bits';
 import { useToast } from '../../components/ui/Overlay';
-import { applyLang, LANGS, Lang, useLang } from '../../app/i18n';
+import { applyLang, LANGS, Lang, useFormat, useLang } from '../../app/i18n';
+import { countryName } from '../../data/countries';
 import { CATEGORIES } from '../../data/categories';
 import { REGIONS } from '../../data/regions';
 import type { CabinetRole, RiskTolerance } from '../../types/agro';
+
+/** Read-only summary of what the investor entered at sign-up (applicant type and additional information). */
+const InvestorProfileCard: React.FC = () => {
+  const { t } = useTranslation();
+  const lang = useLang();
+  const fmt = useFormat();
+  const me = useCurrentUser()!;
+  const p = me.investorProfile;
+  const money = (n: number | null | undefined) => (n === null || n === undefined ? null : fmt.azn(n));
+  const yesNo = (b: boolean | null | undefined) => (b === null || b === undefined ? null : b ? t('form.yes') : t('form.no'));
+  const rows: [string, string | null | undefined][] = !p ? [] : [
+    [t('auth.companyName'), p.companyName || null],
+    [t('auth.voen'), p.taxIdentificationNumber || null],
+    [t('auth.foreignTax'), p.foreignTaxNumber],
+    [t('auth.details.country'), p.country ? countryName(p.country, lang) : null],
+    [t('auth.details.activityStatus'), p.activityStatus ? t(`auth.details.activityStatusOptions.${p.activityStatus}`) : null],
+    [t('auth.details.activity'), p.businessActivity || null],
+    [t('auth.details.startDate'), p.activityStartDate ? fmt.date(p.activityStartDate) : null],
+    [t('auth.details.ceo'), p.ceoName],
+    [t('auth.details.residency'), p.residencyStatus ? t(`auth.details.residencyOptions.${p.residencyStatus}`) : null],
+    [t('auth.details.address'), p.address],
+    [t('auth.details.incomeSource'), p.incomeSource],
+    [t('auth.details.maritalStatus'), p.maritalStatus ? t(p.maritalStatus === 'MARRIED' ? 'auth.details.married' : 'auth.details.single') : null],
+    [t('auth.details.income6'), money(p.incomeLast6Months)],
+    [t('auth.details.hasCredit'), yesNo(p.hasCredit)],
+    [t('auth.details.creditPayment'), money(p.monthlyCreditPayment)],
+    [t('auth.details.hasFixedIncome'), yesNo(p.hasFixedIncome)],
+    [t('auth.details.fixedIncome'), money(p.fixedMonthlyIncome)],
+    [me.applicantType === 'INDIVIDUAL' ? t('auth.details.minInitial') : me.applicantType === 'LEGAL_ENTITY' ? t('auth.details.minCompany') : t('auth.details.minProject'), money(p.minimumFunds)],
+  ];
+  const filled = rows.filter((r): r is [string, string] => !!r[1]);
+  return (
+    <section className="card p-6 xl:col-span-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <h2 className="font-display text-2xl text-brand">{t('settings.investorProfile')}</h2>
+        <span className="inline-flex items-center gap-2 rounded-full bg-[#F4ECD6] text-gold-dark px-4 py-1.5 text-sm font-bold">{t('settings.applicantType')}: {t(`auth.applicant.${me.applicantType}`)}</span>
+      </div>
+      {filled.length === 0 ? <p className="text-muted">{t('settings.profileEmpty')}</p> : (
+        <dl className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+          {filled.map(([label, value]) => (
+            <div key={label}><dt className="text-xs font-bold uppercase tracking-wide text-muted">{label}</dt><dd className="font-semibold mt-1 break-words">{value}</dd></div>
+          ))}
+        </dl>
+      )}
+    </section>
+  );
+};
 
 /** Profile & Settings (3.6 / 4.6), shared by both cabinets. */
 export const SettingsPage: React.FC<{ role: CabinetRole }> = ({ role }) => {
@@ -89,6 +137,14 @@ export const SettingsPage: React.FC<{ role: CabinetRole }> = ({ role }) => {
           </section>
         )}
 
+        {role === 'investor' && me.applicantType && <InvestorProfileCard />}
+
+        {me.isAdmin ? (
+          <section className="card p-6 xl:col-span-2">
+            <h2 className="font-display text-2xl text-brand mb-2">{t('settings.password')}</h2>
+            <p className="text-muted">{t('settings.adminPassword')}</p>
+          </section>
+        ) : (
         <section className="card p-6 xl:col-span-2">
           <h2 className="font-display text-2xl text-brand mb-4">{t('settings.password')}</h2>
           <form className="grid sm:grid-cols-[1fr_1fr_auto] gap-4 items-end" onSubmit={async e => {
@@ -102,6 +158,7 @@ export const SettingsPage: React.FC<{ role: CabinetRole }> = ({ role }) => {
             <button type="submit" className="btn btn-primary">{t('settings.updatePw')}</button>
           </form>
         </section>
+        )}
       </div>
     </>
   );

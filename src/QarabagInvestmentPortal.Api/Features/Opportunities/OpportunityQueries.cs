@@ -34,7 +34,7 @@ public sealed class OpportunityQueries(AppDbContext db, TimeProvider clock)
     {
         var query = db.Opportunities.AsNoTracking().Include(o => o.Land).ThenInclude(l => l!.Photos).AsQueryable();
         if (!viewer.IsAdmin)
-            query = query.Where(o => o.Land!.Status == LandStatus.Approved
+            query = query.Where(o => o.Source == OpportunitySource.Admin && o.Land!.Status == LandStatus.Approved
                 && o.Status != OpportunityStatus.Draft && o.Status != OpportunityStatus.Rejected);
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<OpportunityStatus>(status.Replace("_", ""), true, out var s))
             query = query.Where(o => o.Status == s);
@@ -47,7 +47,7 @@ public sealed class OpportunityQueries(AppDbContext db, TimeProvider clock)
     public async Task<OpportunityDto?> GetAsync(string id, Viewer viewer, CancellationToken ct)
     {
         var o = await db.Opportunities.AsNoTracking().Include(x => x.Land).ThenInclude(l => l!.Photos).FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (o is null) return null;
+        if (o is null || (o.Source != OpportunitySource.Admin && !viewer.IsAdmin)) return null;
         if ((o.Land!.Status != LandStatus.Approved
                 || o.Status is OpportunityStatus.Draft or OpportunityStatus.Rejected)
             && !viewer.IsAdmin && o.Land.OwnerId != viewer.UserId) return null;

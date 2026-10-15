@@ -40,6 +40,27 @@ public sealed class AuthActionTokenService(AppDbContext db, TimeProvider clock)
         return rawToken;
     }
 
+    /// <summary>The user a still-valid token belongs to, without using the token up.</summary>
+    public async Task<string?> PeekAsync(
+        string? rawToken,
+        AuthTokenPurpose purpose,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(rawToken))
+            return null;
+
+        var now = clock.GetUtcNow();
+        var hash = AuthTokenCodec.Hash(rawToken);
+        return await db.AuthActionTokens
+            .AsNoTracking()
+            .Where(t => t.TokenHash == hash &&
+                        t.Purpose == purpose &&
+                        t.UsedAt == null &&
+                        t.ExpiresAt > now)
+            .Select(t => t.UserId)
+            .SingleOrDefaultAsync(ct);
+    }
+
     public async Task<string?> ConsumeAsync(
         string? rawToken,
         AuthTokenPurpose purpose,

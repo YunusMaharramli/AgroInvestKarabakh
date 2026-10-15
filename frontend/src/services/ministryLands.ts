@@ -6,7 +6,7 @@ import i18n from 'i18next';
 import type { Irrigation, Land } from '../types/agro';
 
 /** Public land as the backend returns it (GET /api/lands: only approved land). */
-interface BackendLand {
+export interface BackendLand {
   id: string; title: string; region: string; description: string; areaHectares: number; agricultureType: string;
   latitude: number; longitude: number; intendedUse: string; estimatedInvestmentRequirement: number; imageUrl: string;
   ownerId: string | null; hasActiveOpportunity: boolean; createdAt: string;
@@ -28,7 +28,7 @@ function regionKey(region: string): string {
 const irrigationFrom = (water: string | null): Irrigation =>
   water === 'well' ? 'well' : water === 'rain_fed' || water === 'none_known' || !water ? 'none' : 'canal';
 
-function toLand(b: BackendLand): Land {
+export function toLand(b: BackendLand): Land {
   const amount = Number(b.estimatedInvestmentRequirement) || 0;
   return {
     id: b.id,
@@ -51,21 +51,25 @@ function toLand(b: BackendLand): Land {
   };
 }
 
+export interface BackendCompetition {
+  id: string; landId: string; title: string; description: string;
+  status: string; acceptingProposals: boolean; applicationDeadline: string | null;
+  requiredDocuments: string[]; eligibilityConditions: string[]; land: BackendLand | null;
+}
 let running: Promise<void> | null = null;
-
-/**
- * Brings the land published through the real backend (ministry / admin listings) into the site's land lists,
- * so investors see it next to the demo data. Runs at start-up and after an admin publishes or unpublishes.
- */
 export function syncMinistryLands(): Promise<void> {
   running ??= (async () => {
     try {
-      const rows = await backend<BackendLand[]>('GET', '/lands');
-      const lands = rows.filter(r => r.hasActiveOpportunity).map(toLand);
-      mutate(d => { d.lands = [...d.lands.filter(l => l.source !== 'ministry'), ...lands]; });
-    } catch { /* backend not running: keep the demo data */ } finally {
-      running = null;
-    }
+      const rows = await backend<BackendCompetition[]>('GET', '/opportunities');
+      const lands = rows.filter(r => r.land && ['ACTIVE', 'CLOSED'].includes(r.status)).map(r => ({
+        ...toLand(r.land!), title: r.title, description: r.description || r.land!.description,
+        opportunityId: r.id, applicationDeadline: r.applicationDeadline,
+        acceptingApplications: r.acceptingProposals, requiredDocuments: r.requiredDocuments,
+        eligibilityConditions: r.eligibilityConditions,
+        status: r.status === 'ACTIVE' ? 'active' as const : 'closed' as const,
+      }));
+      mutate(d => { d.lands = lands; });
+    } finally { running = null; }
   })();
   return running;
 }

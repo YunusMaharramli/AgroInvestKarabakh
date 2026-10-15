@@ -31,6 +31,10 @@ public sealed class PasswordResetService(
         if (user is null)
             return result;
 
+        // Administrator passwords are managed in the database only: no reset by email.
+        if (user.Role == UserRole.Admin)
+            return Outcome<MessageResponse>.Fail(403, AdminAccounts.PasswordLockedMessage);
+
         var lastCreatedAt = await db.AuthActionTokens
             .Where(t => t.UserId == user.Id &&
                         t.Purpose == AuthTokenPurpose.PasswordReset)
@@ -81,9 +85,9 @@ public sealed class PasswordResetService(
         if (req.NewPassword != req.ConfirmNewPassword)
             return Outcome<MessageResponse>.Fail(400, "Yeni şifrələr uyğun gəlmir.");
 
-        if (req.NewPassword.Length < 6)
+        if (req.NewPassword.Length < ApplicantSignupRules.MinPasswordLength)
             return Outcome<MessageResponse>.Fail(
-                400, "Şifrə ən azı 6 simvol olmalıdır.");
+                400, $"Şifrə ən azı {ApplicantSignupRules.MinPasswordLength} simvol olmalıdır.");
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
@@ -97,6 +101,9 @@ public sealed class PasswordResetService(
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user is null)
             return Outcome<MessageResponse>.Fail(400, "İstifadəçi tapılmadı.");
+
+        if (user.Role == UserRole.Admin)
+            return Outcome<MessageResponse>.Fail(403, AdminAccounts.PasswordLockedMessage);
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
         user.UpdatedAt = clock.GetUtcNow();

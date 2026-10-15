@@ -11,6 +11,18 @@ export interface UserPreferences {
   riskTolerance: RiskTolerance;
 }
 
+/** Investor (applicant) type chosen at sign-up. Profile data only: it is not a permission role. */
+export type ApplicantType = 'INDIVIDUAL' | 'LEGAL_ENTITY' | 'FOREIGN_INDIVIDUAL' | 'FOREIGN_ENTITY';
+
+/** Investor profile as the backend sends it (fields of the applicant's type are filled). */
+export interface InvestorProfile {
+  companyName: string; taxIdentificationNumber: string; businessActivity: string;
+  foreignTaxNumber: string | null; country: string | null; activityStatus: string | null; activityStartDate: string | null;
+  ceoName: string | null; address: string | null; maritalStatus: 'SINGLE' | 'MARRIED' | null; incomeLast6Months: number | null;
+  residencyStatus: string | null; incomeSource: string | null; hasCredit: boolean | null; monthlyCreditPayment: number | null;
+  hasFixedIncome: boolean | null; fixedMonthlyIncome: number | null; minimumFunds: number | null;
+}
+
 export interface AppUser {
   id: string;
   fullName: string;
@@ -20,6 +32,11 @@ export interface AppUser {
   roles: CabinetRole[];
   /** Ministry administrator (from the backend account role). Admin pages are also checked on the server. */
   isAdmin?: boolean;
+  /** Investor type from sign-up (null/undefined for admins and older accounts). */
+  applicantType?: ApplicantType | null;
+  /** True until the applicant has sent the additional sign-up information. */
+  needsOnboarding?: boolean;
+  investorProfile?: InvestorProfile | null;
   verified: boolean;
   preferences: UserPreferences;
   investorType?: 'individual' | 'company';
@@ -68,6 +85,11 @@ export interface Land {
   ownerVerified: boolean;
   priceVolatility: number; // 0..1, used by the mock risk score
   createdAt: string;
+  opportunityId?: string;
+  applicationDeadline?: string | null;
+  acceptingApplications?: boolean;
+  requiredDocuments?: string[];
+  eligibilityConditions?: string[];
   winnerRequestId?: string | null;
   /** Land published by the ministry through the real backend (admin land management). */
   source?: 'ministry';
@@ -80,7 +102,7 @@ export interface Land {
  * One-winner rule (decided with the client): the landowner selects ONE investor per listing;
  * the listing closes and all other pending requests become "notSelected".
  */
-export type RequestStatus = 'pending' | 'selected' | 'notSelected';
+export type RequestStatus = 'pending' | 'underReview' | 'informationRequested' | 'selected' | 'notSelected' | 'rejected' | 'cancelled';
 
 export interface InvestmentRequest {
   id: string;
@@ -92,6 +114,13 @@ export interface InvestmentRequest {
   message: string;
   status: RequestStatus;
   viewedByOwner: boolean;
+  referenceNumber?: string;
+  opportunityId?: string;
+  applicantType?: string;
+  applicantName?: string;
+  taxNumber?: string | null;
+  history?: { id: string; newStatus: string; changedBy: string; comment: string; createdAt: string }[];
+  documents?: { id: string; fileName: string; url: string }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -102,6 +131,8 @@ export interface AppNotification {
   type: 'request' | 'decision' | 'review' | 'system';
   /** Translation key + values, so notifications follow the UI language. */
   textKey: string;
+  title?: string;
+  message?: string;
   values?: Record<string, string | number>;
   link?: string;
   read: boolean;

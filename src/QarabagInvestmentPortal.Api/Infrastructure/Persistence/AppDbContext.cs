@@ -53,6 +53,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.LastName).HasMaxLength(100).IsRequired();
             e.Property(x => x.Phone).HasMaxLength(32);
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.ApplicantType).HasConversion<string>().HasMaxLength(32);
             e.Property(x => x.PasswordHash).HasMaxLength(200).IsRequired();
             e.Ignore(x => x.FullName);
             e.HasOne(x => x.Profile).WithOne().HasForeignKey<UserProfile>(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
@@ -100,6 +101,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.CompanyName).HasMaxLength(200);
             e.Property(x => x.TaxIdentificationNumber).HasMaxLength(20);
             e.Property(x => x.BusinessActivity).HasMaxLength(1000);
+            e.Property(x => x.ForeignTaxNumber).HasMaxLength(40);
+            e.Property(x => x.Country).HasMaxLength(2);
+            e.Property(x => x.ActivityStatus).HasMaxLength(32);
+            e.Property(x => x.CeoName).HasMaxLength(200);
+            e.Property(x => x.Address).HasMaxLength(500);
+            e.Property(x => x.MaritalStatus).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.ResidencyStatus).HasMaxLength(32);
+            e.Property(x => x.IncomeSource).HasMaxLength(500);
+            e.Property(x => x.IncomeLast6Months).HasPrecision(18, 2);
+            e.Property(x => x.MonthlyCreditPayment).HasPrecision(18, 2);
+            e.Property(x => x.FixedMonthlyIncome).HasPrecision(18, 2);
+            e.Property(x => x.MinimumFunds).HasPrecision(18, 2);
+            e.HasIndex(x => x.TaxIdentificationNumber);
         });
 
         modelBuilder.Entity<Land>(e =>
@@ -241,7 +255,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.BusinessPlanSummary).HasMaxLength(4000);
             e.Property(x => x.EstimatedImplementationPeriod).HasMaxLength(100);
             e.Property(x => x.ContactPhone).HasMaxLength(32);
-            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+            e.Property(x => x.ApplicantType).HasMaxLength(16);
+            e.Property(x => x.ApplicantName).HasMaxLength(200);
+            e.Property(x => x.TaxNumber).HasMaxLength(10);
 
             // One proposal per investor per opportunity, and at most one winner per opportunity.
             e.HasIndex(x => new { x.OpportunityId, x.InvestorId }).IsUnique();

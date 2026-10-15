@@ -1,5 +1,5 @@
 import type { AppNotification, AppUser, InvestmentRequest, Land } from '../types/agro';
-import { SEED_LANDS, SEED_NOTIFICATIONS, SEED_REQUESTS, SEED_USERS } from '../mocks/seed';
+
 
 /**
  * Tiny mock database kept in localStorage so actions survive a page refresh
@@ -16,16 +16,12 @@ export interface MockDb {
 }
 
 const KEY = 'agroinvest_mock_db';
-const VERSION = 3;
+const VERSION = 4;
 
 function seed(): MockDb {
   return {
     version: VERSION,
-    users: structuredClone(SEED_USERS),
-    lands: structuredClone(SEED_LANDS),
-    requests: structuredClone(SEED_REQUESTS),
-    notifications: structuredClone(SEED_NOTIFICATIONS),
-    saved: { 'u-investor': ['L-102', 'L-113'], 'u-both': ['L-109'] },
+    users: [], lands: [], requests: [], notifications: [], saved: {},
   };
 }
 
@@ -47,7 +43,7 @@ export function db(): MockDb {
 }
 
 function persist() {
-  try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* ignore */ }
+  try { localStorage.setItem(KEY, JSON.stringify({ ...cache, lands: [], requests: [], notifications: [], saved: {} })); } catch { /* ignore */ }
 }
 
 /** Apply a change, save it and notify subscribers (React components re-read data). */

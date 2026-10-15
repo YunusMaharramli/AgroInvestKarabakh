@@ -1,3 +1,4 @@
+import { ApplicationHistory } from '../shared/ApplicationHistory';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +28,7 @@ export const InvestorOverview: React.FC = () => {
   const [loading, setLoading] = useState(true);
   useEffect(() => { const id = setTimeout(() => setLoading(false), 450); return () => clearTimeout(id); }, []);
   const selected = reqs.filter(r => r.status === 'selected');
-  const pending = reqs.filter(r => r.status === 'pending');
+  const pending = reqs.filter(r => ['pending', 'underReview', 'informationRequested'].includes(r.status));
   const avg = selected.length ? selected.reduce((s, r) => s + (landService.get(r.landId)?.expectedReturnPct ?? 0), 0) / selected.length : 0;
   const recommended = useMemo(() => lands.filter(l => l.status === 'active' && l.ownerId !== me.id)
     .map(l => ({ land: l, score: scoreLand(l, me.preferences) })).sort((a, b) => b.score.suitability - a.score.suitability).slice(0, 3), [lands, me.preferences]);
@@ -38,7 +39,7 @@ export const InvestorOverview: React.FC = () => {
         <StatCard label={t('investor.kpi.invested')} value={f.compactAzn(selected.reduce((s, r) => s + r.amount, 0))} icon={<Coins className="w-5 h-5" />} accent />
         <StatCard label={t('investor.kpi.active')} value={String(selected.length)} icon={<Activity className="w-5 h-5" />} />
         <StatCard label={t('investor.kpi.pending')} value={String(pending.length)} icon={<Clock className="w-5 h-5" />} />
-        <StatCard label={t('investor.kpi.avgReturn')} value={`${avg.toFixed(1)}%`} icon={<Percent className="w-5 h-5" />} accent />
+        <StatCard label={t('investor.kpi.avgReturn')} value={String(reqs.length)} icon={<Percent className="w-5 h-5" />} accent />
       </div>
       <div className="flex items-end justify-between gap-4 mb-5">
         <div><h2 className="font-display text-2xl text-brand">{t('investor.recommended')}</h2><p className="text-muted text-sm">{t('investor.recommendedText')}</p></div>
@@ -202,7 +203,8 @@ export const InvestorInvestments: React.FC = () => {
     <>
       <PageTitle title={t('investor.inv.title')} />
       <Tabs label={t('investor.inv.title')} value={tab} onChange={setTab} tabs={[
-        { id: 'pending', label: t('investor.inv.pending'), count: count('pending') },
+        { id: 'pending', label: t('reqStatus.pending'), count: count('pending') },
+        ...(['underReview', 'informationRequested', 'rejected', 'cancelled'] as const).map(id => ({ id, label: t('reqStatus.' + id), count: count(id) })),
         { id: 'selected', label: t('investor.inv.selected'), count: count('selected') },
         { id: 'notSelected', label: t('investor.inv.notSelected'), count: count('notSelected') },
       ]} />
@@ -211,7 +213,7 @@ export const InvestorInvestments: React.FC = () => {
           <ul className="grid gap-4">
             {rows.map(r => {
               const land = landService.get(r.landId);
-              const stage = r.status !== 'pending' ? 2 : r.viewedByOwner ? 1 : 0;
+              const stage = ['selected','notSelected','rejected','cancelled'].includes(r.status) ? 2 : r.status !== 'pending' ? 1 : 0;
               return (
                 <li key={r.id} className="card p-4 sm:p-5 flex flex-col sm:flex-row gap-4">
                   <Photo src={land?.photos[0]} alt="" className="w-full sm:w-36 h-32 sm:h-28 rounded-xl shrink-0" />
@@ -232,6 +234,7 @@ export const InvestorInvestments: React.FC = () => {
                         </li>
                       ))}
                     </ol>
+                    <ApplicationHistory application={r} canSupplement />
                     {r.status === 'notSelected' && <p className="mt-3 text-sm rounded-xl bg-[#F6E1DF] text-[#8E1F17] px-3 py-2">{t('investor.inv.otherSelected')}</p>}
                   </div>
                 </li>

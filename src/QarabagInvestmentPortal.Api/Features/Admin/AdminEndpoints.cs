@@ -40,6 +40,7 @@ public static class AdminEndpoints
         admin.MapGet("/analytics", async (AppDbContext db, CancellationToken ct) =>
         {
             var proposals = await db.Proposals.AsNoTracking()
+                .Where(p => p.Opportunity!.Source == OpportunitySource.Admin)
                 .Select(p => new { p.Status, p.ProposedInvestmentAmount, p.SubmittedAt, p.Opportunity!.Land!.Region, p.Opportunity.Land.AgricultureType })
                 .ToListAsync(ct);
 
@@ -52,10 +53,10 @@ public static class AdminEndpoints
 
             return Results.Ok(new AnalyticsDto(
                 TotalApplications: proposals.Count,
-                ActiveCompetitions: await db.Opportunities.CountAsync(o => o.Status == OpportunityStatus.Active, ct),
-                PublishedLands: await db.Lands.CountAsync(l => l.Status == LandStatus.Approved, ct),
-                PendingLandReviews: await db.Lands.CountAsync(l => l.Status == LandStatus.PendingReview || l.Status == LandStatus.DocumentsRequested, ct),
-                OpenProposals: proposals.Count(p => p.Status == ProposalStatus.Open),
+                ActiveCompetitions: await db.Opportunities.CountAsync(o => o.Source == OpportunitySource.Admin && o.Status == OpportunityStatus.Active, ct),
+                PublishedLands: await db.Lands.CountAsync(l => l.Status == LandStatus.Approved && l.EntrySource != LandEntrySource.Owner, ct),
+                PendingLandReviews: 0,
+                OpenProposals: proposals.Count(p => ProposalService.IsPending(p.Status)),
                 SelectedProposals: proposals.Count(p => p.Status == ProposalStatus.Selected),
                 NotSelectedProposals: proposals.Count(p => p.Status == ProposalStatus.NotSelected),
                 TotalProposedInvestment: proposals.Sum(p => p.ProposedInvestmentAmount),
@@ -63,7 +64,9 @@ public static class AdminEndpoints
                 ApplicationsBySector: proposals.GroupBy(p => p.AgricultureType).Select(g => new SectorStat(g.Key, g.Count())).ToList(),
                 ApplicationsByStatus:
                 [
-                    new StatusStat("OPEN", "Açıq", proposals.Count(p => p.Status == ProposalStatus.Open)),
+                    new StatusStat("OPEN", "Qəbul edilib", proposals.Count(p => p.Status == ProposalStatus.Open)),
+                    new StatusStat("UNDER_REVIEW", "Baxılır", proposals.Count(p => p.Status == ProposalStatus.UnderReview)),
+                    new StatusStat("INFORMATION_REQUESTED", "Əlavə məlumat tələb olunur", proposals.Count(p => p.Status == ProposalStatus.InformationRequested)),
                     new StatusStat("SELECTED", "Qalib seçilib", proposals.Count(p => p.Status == ProposalStatus.Selected)),
                     new StatusStat("NOT_SELECTED", "Seçilməyib", proposals.Count(p => p.Status == ProposalStatus.NotSelected)),
                     new StatusStat("REJECTED", "Rədd edilib", proposals.Count(p => p.Status == ProposalStatus.Rejected)),
@@ -72,32 +75,10 @@ public static class AdminEndpoints
                 Timeline: timeline));
         });
 
-        // Simulated EKTİS integration (demo; no real government system is called).
-        admin.MapPost("/integrations/ektis/sync", async (JsonObject body, AppDbContext db, TimeProvider clock, CancellationToken ct) =>
-        {
-            var now = clock.GetUtcNow();
-            var token = $"EKTIS-{now.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture)[^8..]}";
-            var response = new JsonObject
-            {
-                ["status"] = 200,
-                ["syncToken"] = token,
-                ["systemName"] = "Elektron Kənd Təsərrüfatı İnformasiya Sistemi (EKTİS)",
-                ["message"] = "EKTİS sinxronizasiyası uğurla tamamlandı.",
-            };
-            var syncType = body["syncType"]?.ToString() ?? "SYNC";
-            var log = new IntegrationLog
-            {
-                Id = Ids.New("log"),
-                IntegrationType = $"EKTIS_{syncType}",
-                Status = "SUCCESS",
-                RequestPayload = body.ToJsonString(),
-                ResponsePayload = response.ToJsonString(),
-                CreatedAt = now,
-            };
-            db.IntegrationLogs.Add(log);
-            await db.SaveChangesAsync(ct);
-            return Results.Ok(new EktisSyncResponse("EKTİS inteqrasiya sinxronizasiyası uğurla tamamlandı.", IntegrationLogDto.From(log), response));
-        });
+        admin.MapGet("/integrations/ektis/export", async (EktisIntegrationService service, CancellationToken ct) =>
+            Results.Ok(await service.ExportAsync(ct)));
+        admin.MapPost("/integrations/ektis/sync", async (EktisIntegrationService service, CancellationToken ct) =>
+            Results.Ok(await service.SimulateAsync(ct)));
 
         admin.MapGet("/integrations/ektis/logs", async (AppDbContext db, CancellationToken ct) =>
         {

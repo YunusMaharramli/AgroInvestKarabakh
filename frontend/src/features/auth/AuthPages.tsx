@@ -1,21 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type ReCAPTCHA from 'react-google-recaptcha';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
-import { AlertCircle, Eye, EyeOff, Loader2, Mail, Map as MapIcon, TrendingUp, CheckCircle2, Upload } from 'lucide-react';
+import { AlertCircle, Building2, CheckCircle2, Eye, EyeOff, Globe2, Info, KeyRound, Landmark, Loader2, Mail, ShieldCheck, Smartphone, UserRound } from 'lucide-react';
 import { Logo } from '../../components/layout/Logo';
 import { LanguageSwitcher } from '../../components/layout/LanguageSwitcher';
 import { RecaptchaField } from '../../components/RecaptchaField';
 import { useLocalePath } from '../../app/i18n';
 import { authService, useCurrentUser, ApiError, errorText } from '../../services/api';
 import { MAILPIT_URL, isLocalDev } from '../../services/backend';
-import { TEST_PASSWORD } from '../../mocks/seed';
 import { cabinetHome } from './routing';
-import { Chips, Field } from '../../components/ui/Bits';
+import { Field, Segmented } from '../../components/ui/Bits';
+import { countryOptions } from '../../data/countries';
+import type { ApplicantType } from '../../types/agro';
 import { useToast } from '../../components/ui/Overlay';
-import { REGIONS } from '../../data/regions';
-import { CATEGORIES } from '../../data/categories';
-import type { CabinetRole } from '../../types/agro';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -65,14 +63,34 @@ const PasswordInput: React.FC<{ id: string; value: string; onChange: (v: string)
   );
 };
 
-const GoogleButton: React.FC = () => {
+type EGovMethod = 'mygov' | 'asan' | 'sima' | 'eqanun' | 'visitor';
+const EGOV_ICONS: Record<EGovMethod, React.ReactNode> = {
+  mygov: <ShieldCheck className="w-5 h-5" aria-hidden="true" />,
+  asan: <KeyRound className="w-5 h-5" aria-hidden="true" />,
+  sima: <Smartphone className="w-5 h-5" aria-hidden="true" />,
+  eqanun: <Landmark className="w-5 h-5" aria-hidden="true" />,
+  visitor: <Globe2 className="w-5 h-5" aria-hidden="true" />,
+};
+
+/** State e-service sign-in options (myGov ID, ASAN İmza, SİMA, e-qanun.az). Shown in the design; not connected yet. */
+const EGovOptions: React.FC<{ methods: EGovMethod[] }> = ({ methods }) => {
   const { t } = useTranslation();
   const toast = useToast();
   return (
-    <button type="button" onClick={() => toast(t('auth.googleSoon'), 'info')} className="btn w-full bg-white border border-line text-ink hover:bg-sand">
-      <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true"><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.6 3.8-5.5 3.8-3.3 0-6-2.7-6-6.1s2.7-6.1 6-6.1c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.1 14.6 2 12 2 6.5 2 2 6.5 2 12s4.5 10 10 10c5.8 0 9.6-4 9.6-9.8 0-.7-.1-1.2-.2-1.7H12z" /></svg>
-      {t('auth.google')}
-    </button>
+    <ul className="grid gap-3" aria-label={t('auth.egov.title')}>
+      {methods.map(m => (
+        <li key={m} className="relative">
+          <button type="button" onClick={() => toast(t('auth.egov.soon'), 'info')}
+            className="w-full flex items-center gap-4 rounded-2xl border border-line bg-white pl-4 pr-14 py-4 text-left transition hover:border-brand hover:shadow-sm focus-visible:border-brand">
+            <span className="w-10 h-10 shrink-0 rounded-xl bg-sage text-brand grid place-items-center">{EGOV_ICONS[m]}</span>
+            <span className="font-bold text-brand">{t(`auth.egov.${m}`)}</span>
+          </button>
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted" title={t(`auth.egov.info.${m}`)}>
+            <Info className="w-5 h-5" aria-hidden="true" /><span className="sr-only">{t(`auth.egov.info.${m}`)}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 };
 
@@ -82,8 +100,7 @@ const OrDivider: React.FC = () => {
 };
 
 const PENDING_EMAIL_KEY = 'agroinvest_pending_email';
-const readPendingEmail = () => { try { return sessionStorage.getItem(PENDING_EMAIL_KEY) ?? ''; } catch { return ''; } };
-const savePendingEmail = (e: string) => { try { sessionStorage.setItem(PENDING_EMAIL_KEY, e); } catch { /* ignore */ } };
+const readPendingEmail = () => { try { return authService.pendingSignup()?.email ?? sessionStorage.getItem(PENDING_EMAIL_KEY) ?? ''; } catch { return ''; } };
 
 const Alert: React.FC<{ tone?: 'error' | 'ok' | 'info'; children: React.ReactNode }> = ({ tone = 'error', children }) => (
   <p role={tone === 'error' ? 'alert' : 'status'} className={`rounded-xl px-4 py-3 text-sm font-semibold ${tone === 'error' ? 'bg-[#F6E1DF] text-[#8E1F17]' : tone === 'ok' ? 'bg-sage text-brand' : 'bg-[#FBF6E8] text-gold-dark'}`}>{children}</p>
@@ -170,7 +187,6 @@ export const LoginPage: React.FC = () => {
       recaptchaRef.current?.reset();
     }
   };
-  const fill = (email: string) => { setId(email); setPw(TEST_PASSWORD); };
   return (
     <AuthLayout image="/images/site/photo-21.jpg" quote={t('auth.quoteLogin')}>
       <h1 className="font-display text-4xl text-brand">{t('auth.loginTitle')}</h1>
@@ -191,19 +207,9 @@ export const LoginPage: React.FC = () => {
         <button type="submit" className="btn btn-primary w-full" disabled={busy}>{busy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}{t('auth.login')}</button>
       </form>
       <OrDivider />
-      <GoogleButton />
+      <EGovOptions methods={['mygov', 'asan', 'sima']} />
       <p className="text-center text-sm mt-8">{t('auth.noAccount')} <Link to={lp('/signup')} className="font-bold text-leaf-dark hover:underline">{t('auth.signup')}</Link></p>
-      {import.meta.env.VITE_HIDE_TEST_ACCOUNTS !== 'true' ? (
-        <aside className="mt-8 rounded-2xl border border-dashed border-gold bg-[#FBF6E8] p-4 text-sm" aria-label={t('auth.devTitle')}>
-          <p className="font-bold text-gold-dark">{t('auth.devTitle')}</p>
-          <ul className="mt-2 grid gap-1">
-            {[['both@agroinvest.az', t('auth.devBoth')], ['owner@agroinvest.az', t('auth.devOwner')], ['investor@agroinvest.az', t('auth.devInvestor')]].map(([e, d]) => (
-              <li key={e}><button type="button" onClick={() => fill(e)} className="font-mono text-xs underline hover:text-brand">{e}</button> — {d}</li>
-            ))}
-          </ul>
-          <p className="mt-2 text-muted">{t('auth.devText', { pw: TEST_PASSWORD })}</p>
-        </aside>
-      ) : null}
+
     </AuthLayout>
   );
 };
@@ -254,7 +260,7 @@ export const ForgotPage: React.FC = () => {
   );
 };
 
-/* ---------- 1.4 Sign-up flow ---------- */
+/* ---------- 1.4 Sign-up flow: applicant type → account → email confirmation → additional information ---------- */
 function strength(pw: string) {
   let s = 0;
   if (pw.length >= 8) s++;
@@ -264,14 +270,16 @@ function strength(pw: string) {
   return pw ? s : 0;
 }
 const COUNTRY_CODES = [['+994', '🇦🇿 +994'], ['+90', '🇹🇷 +90'], ['+7', '🇷🇺 +7'], ['+995', '🇬🇪 +995'], ['+1', '🇺🇸 +1'], ['+44', '🇬🇧 +44']];
+const VOEN_RE = /^\d{10}$/;
+const FOREIGN_TAX_RE = /^[A-Za-z0-9][A-Za-z0-9 ./-]{2,39}$/;
 
 const StepHeader: React.FC<{ n: number }> = ({ n }) => {
   const { t } = useTranslation();
   const steps = t('auth.steps', { returnObjects: true }) as unknown as string[];
   return (
     <div className="mb-8">
-      <p className="text-xs font-bold uppercase tracking-wider text-muted mb-2">{t('auth.step', { n, total: 3 })}</p>
-      <ol className="flex gap-2" aria-label={t('auth.step', { n, total: 3 })}>
+      <p className="text-xs font-bold uppercase tracking-wider text-muted mb-2">{t('auth.step', { n, total: steps.length })}</p>
+      <ol className="flex gap-2" aria-label={t('auth.step', { n, total: steps.length })}>
         {steps.map((s, i) => (
           <li key={s} className="flex-1" aria-current={i + 1 === n ? 'step' : undefined}>
             <span className={`block h-1.5 rounded-full ${i + 1 <= n ? 'bg-brand' : 'bg-line'}`} />
@@ -283,41 +291,311 @@ const StepHeader: React.FC<{ n: number }> = ({ n }) => {
   );
 };
 
+type MainType = 'INDIVIDUAL' | 'LEGAL_ENTITY' | 'FOREIGN';
+const isCompany = (type: ApplicantType) => type === 'LEGAL_ENTITY' || type === 'FOREIGN_ENTITY';
+
+/** Applicant type picker shown above the sign-up form. The foreign choice splits into individual / entity. */
+const ApplicantTypePicker: React.FC<{ value: ApplicantType; onChange: (v: ApplicantType) => void }> = ({ value, onChange }) => {
+  const { t } = useTranslation();
+  const main: MainType = value === 'FOREIGN_INDIVIDUAL' || value === 'FOREIGN_ENTITY' ? 'FOREIGN' : value;
+  const options: { key: MainType; icon: React.ReactNode }[] = [
+    { key: 'INDIVIDUAL', icon: <UserRound className="w-5 h-5" aria-hidden="true" /> },
+    { key: 'LEGAL_ENTITY', icon: <Building2 className="w-5 h-5" aria-hidden="true" /> },
+    { key: 'FOREIGN', icon: <Globe2 className="w-5 h-5" aria-hidden="true" /> },
+  ];
+  return (
+    <fieldset className="mb-6">
+      <legend className="field-label mb-2">{t('auth.applicant.title')}</legend>
+      <div role="radiogroup" aria-label={t('auth.applicant.title')} className="grid grid-cols-3 gap-2">
+        {options.map(o => {
+          const active = o.key === main;
+          return (
+            <button key={o.key} type="button" role="radio" aria-checked={active}
+              onClick={() => onChange(o.key === 'FOREIGN' ? (main === 'FOREIGN' ? value : 'FOREIGN_INDIVIDUAL') : o.key)}
+              className={`rounded-2xl border px-2 py-3 text-xs sm:text-sm font-bold flex flex-col items-center gap-1.5 text-center transition ${active ? 'border-brand bg-sage text-brand shadow-sm' : 'border-line bg-white text-muted hover:border-brand hover:text-ink'}`}>
+              {o.icon}{t(`auth.applicant.${o.key}`)}
+            </button>
+          );
+        })}
+      </div>
+      {main === 'FOREIGN' && (
+        <div className="mt-3">
+          <Segmented label={t('auth.applicant.FOREIGN')} value={value} onChange={onChange}
+            options={[{ value: 'FOREIGN_INDIVIDUAL' as ApplicantType, label: t('auth.applicant.FOREIGN_INDIVIDUAL') }, { value: 'FOREIGN_ENTITY' as ApplicantType, label: t('auth.applicant.FOREIGN_ENTITY') }]} />
+        </div>
+      )}
+    </fieldset>
+  );
+};
+
+/** Waiting for the email confirmation: asks the server every few seconds and when the tab comes back into focus. */
+const ConfirmationStatus: React.FC<{ email: string; deliveryFailed: boolean; onContinue: () => void }> = ({ email, deliveryFailed, onContinue }) => {
+  const { t } = useTranslation();
+  const lp = useLocalePath();
+  const [state, setState] = useState<'pending' | 'confirmed' | 'expired'>('pending');
+  const [checking, setChecking] = useState(false);
+  const check = useCallback(async () => {
+    const pending = authService.pendingSignup();
+    if (!pending) { setState('expired'); return; }
+    setChecking(true);
+    try { const s = await authService.signupStatus(pending.token); setState(s.emailConfirmed ? 'confirmed' : 'pending'); }
+    catch (x) { if (x instanceof ApiError && x.status === 404) setState('expired'); }
+    finally { setChecking(false); }
+  }, []);
+  useEffect(() => {
+    if (state !== 'pending') return;
+    void check();
+    const timer = window.setInterval(() => { void check(); }, 4000);
+    const onFocus = () => { void check(); };
+    window.addEventListener('focus', onFocus);
+    return () => { clearInterval(timer); window.removeEventListener('focus', onFocus); };
+  }, [state, check]);
+
+  return (
+    <div className="text-center">
+      <StepHeader n={2} />
+      <span className={`w-16 h-16 rounded-full grid place-items-center mx-auto mb-5 ${state === 'confirmed' ? 'bg-sage text-brand' : 'bg-[#FBF6E8] text-gold-dark'}`}>
+        {state === 'confirmed' ? <CheckCircle2 className="w-8 h-8" aria-hidden="true" /> : <Mail className="w-8 h-8" aria-hidden="true" />}
+      </span>
+      <h1 className="font-display text-4xl text-brand">{t('auth.verifyTitle')}</h1>
+      <p className="text-muted mt-3">{t('auth.verifyText', { email })}</p>
+      <div className="mt-6" aria-live="polite">
+        {state === 'confirmed' && <span className="inline-flex items-center gap-2 rounded-full bg-sage text-brand px-4 py-2 font-bold"><CheckCircle2 className="w-5 h-5" aria-hidden="true" />{t('auth.status.confirmed')}</span>}
+        {state === 'pending' && <span className="inline-flex items-center gap-2 rounded-full bg-[#FBF6E8] text-gold-dark px-4 py-2 font-bold"><Loader2 className={`w-5 h-5 ${checking ? 'animate-spin' : ''}`} aria-hidden="true" />{t('auth.status.pending')}</span>}
+        {state === 'expired' && <div className="text-left"><Alert>{t('auth.status.expired')}</Alert></div>}
+      </div>
+      {deliveryFailed && state === 'pending' && <div className="mt-5 text-left"><Alert tone="info">{t('auth.deliveryFailed')}</Alert></div>}
+      <button type="button" className="btn btn-primary w-full mt-8" disabled={state !== 'confirmed'} onClick={onContinue}>{t('form.continue')}</button>
+      {state === 'pending' && (
+        <>
+          <button type="button" onClick={() => void check()} className="text-sm font-bold text-leaf-dark hover:underline mt-4" disabled={checking}>{t('auth.status.check')}</button>
+          <MailpitHint />
+          <ResendLink email={email} />
+        </>
+      )}
+      <p className="text-center text-sm mt-8"><Link to={lp('/login')} className="font-bold text-leaf-dark hover:underline">{t('auth.backLogin')}</Link></p>
+    </div>
+  );
+};
+
+const YesNo: React.FC<{ label: string; value: boolean | null; onChange: (v: boolean) => void; error?: string; id: string }> = ({ label, value, onChange, error, id }) => {
+  const { t } = useTranslation();
+  return (
+    <div id={id}>
+      <p className="field-label">{label}</p>
+      <Segmented label={label} value={value === null ? '' : value ? 'yes' : 'no'} onChange={v => onChange(v === 'yes')}
+        options={[{ value: 'yes', label: t('form.yes') }, { value: 'no', label: t('form.no') }]} />
+      {error && <p className="field-error" role="alert">{error}</p>}
+    </div>
+  );
+};
+
+interface DetailsState {
+  maritalStatus: '' | 'SINGLE' | 'MARRIED'; incomeLast6Months: string; hasCredit: boolean | null; monthlyCreditPayment: string;
+  hasFixedIncome: boolean | null; fixedMonthlyIncome: string; minimumFunds: string; residencyStatus: string; address: string;
+  incomeSource: string; country: string; activityStatus: string; mainActivity: string; activityStartDate: string; ceoName: string;
+}
+const EMPTY_DETAILS: DetailsState = {
+  maritalStatus: '', incomeLast6Months: '', hasCredit: null, monthlyCreditPayment: '', hasFixedIncome: null, fixedMonthlyIncome: '',
+  minimumFunds: '', residencyStatus: '', address: '', incomeSource: '', country: '', activityStatus: '', mainActivity: '',
+  activityStartDate: '', ceoName: '',
+};
+const RESIDENCY = ['PERMANENT_RESIDENT', 'TEMPORARY_RESIDENT', 'NON_RESIDENT'];
+const ACTIVITY_STATUS = ['BRANCH', 'REPRESENTATIVE_OFFICE', 'SUBSIDIARY', 'NOT_REGISTERED'];
+
+/** Last sign-up step: the additional information for the applicant's type; finishing signs the investor in. */
+const DetailsStep: React.FC<{ type: ApplicantType }> = ({ type }) => {
+  const { t, i18n } = useTranslation();
+  const lp = useLocalePath();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const [v, setV] = useState<DetailsState>(EMPTY_DETAILS);
+  const [err, setErr] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const countries = useMemo(() => countryOptions(i18n.language), [i18n.language]);
+  const today = new Date().toISOString().slice(0, 10);
+  const set = <K extends keyof DetailsState>(k: K, value: DetailsState[K]) => setV(prev => ({ ...prev, [k]: value }));
+  const text = (k: keyof DetailsState) => ({ id: `dt-${k}`, value: v[k] as string, 'aria-invalid': !!err[k], onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => set(k, e.target.value as never) });
+  const money = (k: keyof DetailsState) => ({ ...text(k), type: 'number', min: 0, step: '0.01', inputMode: 'decimal' as const, className: 'field' });
+  const num = (s: string) => (s.trim() === '' ? null : Number(s));
+
+  const individual = type === 'INDIVIDUAL';
+  const foreignPerson = type === 'FOREIGN_INDIVIDUAL';
+  const foreignCompany = type === 'FOREIGN_ENTITY';
+  const legal = type === 'LEGAL_ENTITY';
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const er: Record<string, string> = {};
+    const need = (k: keyof DetailsState, msg = t('form.required')) => { const x = v[k]; if (x === null || (typeof x === 'string' && !x.trim())) er[k] = msg; };
+    const amount = (k: keyof DetailsState, positive = false) => {
+      need(k, t('auth.details.errors.amount'));
+      const n = num(v[k] as string);
+      if (!er[k] && (n === null || Number.isNaN(n) || n < 0 || (positive && n === 0))) er[k] = t('auth.details.errors.amount');
+    };
+    if (individual) {
+      need('maritalStatus', t('auth.details.errors.choose'));
+      amount('incomeLast6Months');
+      need('hasCredit', t('auth.details.errors.choose'));
+      if (v.hasCredit) amount('monthlyCreditPayment', true);
+      need('hasFixedIncome', t('auth.details.errors.choose'));
+      if (v.hasFixedIncome) amount('fixedMonthlyIncome', true);
+      amount('minimumFunds');
+    }
+    if (foreignPerson) {
+      need('residencyStatus', t('auth.details.errors.choose')); need('address'); need('incomeSource');
+      need('hasCredit', t('auth.details.errors.choose'));
+      if (v.hasCredit) amount('monthlyCreditPayment', true);
+      amount('minimumFunds');
+    }
+    if (foreignCompany) { need('country', t('auth.details.errors.choose')); need('activityStatus', t('auth.details.errors.choose')); need('address'); need('mainActivity'); need('ceoName'); }
+    if (legal) {
+      need('address'); need('mainActivity'); need('activityStartDate'); need('ceoName'); amount('minimumFunds');
+      if (!er.activityStartDate && v.activityStartDate > today) er.activityStartDate = t('auth.details.errors.date');
+    }
+    setErr(er);
+    if (Object.keys(er).length) { document.getElementById(`dt-${Object.keys(er)[0]}`)?.focus(); return; }
+    setBusy(true);
+    try {
+      const user = await authService.completeSignup({
+        maritalStatus: v.maritalStatus || null, incomeLast6Months: num(v.incomeLast6Months), hasCredit: v.hasCredit,
+        monthlyCreditPayment: v.hasCredit ? num(v.monthlyCreditPayment) : null, hasFixedIncome: v.hasFixedIncome,
+        fixedMonthlyIncome: v.hasFixedIncome ? num(v.fixedMonthlyIncome) : null, minimumFunds: num(v.minimumFunds),
+        residencyStatus: v.residencyStatus || null, address: v.address || null, incomeSource: v.incomeSource || null,
+        country: v.country || null, activityStatus: v.activityStatus || null, mainActivity: v.mainActivity || null,
+        activityStartDate: v.activityStartDate || null, ceoName: v.ceoName || null,
+      });
+      toast(t('auth.details.done'));
+      navigate(lp(cabinetHome(user)), { replace: true });
+    } catch (x) {
+      setErr({ form: errorText(t, x) });
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <StepHeader n={3} />
+      <h1 className="font-display text-4xl text-brand">{isCompany(type) ? t('auth.details.companyTitle') : t('auth.details.title')}</h1>
+      <p className="text-muted mt-2 mb-8">{t('auth.details.subtitle')} <span className="font-semibold text-ink">{t(`auth.applicant.${type}`)}</span></p>
+      {err.form && <div className="mb-5"><Alert>{err.form}</Alert></div>}
+      <form onSubmit={submit} noValidate className="grid sm:grid-cols-2 gap-5">
+        {individual && (
+          <>
+            <div id="dt-maritalStatus" className="sm:col-span-2">
+              <p className="field-label">{t('auth.details.maritalStatus')}</p>
+              <Segmented label={t('auth.details.maritalStatus')} value={v.maritalStatus} onChange={x => set('maritalStatus', x)}
+                options={[{ value: 'SINGLE' as const, label: t('auth.details.single') }, { value: 'MARRIED' as const, label: t('auth.details.married') }]} />
+              {err.maritalStatus && <p className="field-error" role="alert">{err.maritalStatus}</p>}
+            </div>
+            <Field label={t('auth.details.income6')} htmlFor="dt-incomeLast6Months" error={err.incomeLast6Months} className="sm:col-span-2"><input {...money('incomeLast6Months')} /></Field>
+          </>
+        )}
+        {foreignPerson && (
+          <>
+            <Field label={t('auth.details.residency')} htmlFor="dt-residencyStatus" error={err.residencyStatus} className="sm:col-span-2">
+              <select className="field" {...text('residencyStatus')}>
+                <option value="">{t('auth.details.choose')}</option>
+                {RESIDENCY.map(r => <option key={r} value={r}>{t(`auth.details.residencyOptions.${r}`)}</option>)}
+              </select>
+            </Field>
+            <Field label={t('auth.details.address')} htmlFor="dt-address" error={err.address} className="sm:col-span-2"><input className="field" autoComplete="street-address" {...text('address')} /></Field>
+            <Field label={t('auth.details.incomeSource')} htmlFor="dt-incomeSource" error={err.incomeSource} className="sm:col-span-2"><input className="field" {...text('incomeSource')} /></Field>
+          </>
+        )}
+        {(individual || foreignPerson) && (
+          <>
+            <div className="sm:col-span-2"><YesNo id="dt-hasCredit" label={individual ? t('auth.details.hasCredit') : t('auth.details.hasCreditQ')} value={v.hasCredit} onChange={x => set('hasCredit', x)} error={err.hasCredit} /></div>
+            {v.hasCredit && <Field label={t('auth.details.creditPayment')} htmlFor="dt-monthlyCreditPayment" error={err.monthlyCreditPayment} className="sm:col-span-2"><input {...money('monthlyCreditPayment')} /></Field>}
+          </>
+        )}
+        {individual && (
+          <>
+            <div className="sm:col-span-2"><YesNo id="dt-hasFixedIncome" label={t('auth.details.hasFixedIncome')} value={v.hasFixedIncome} onChange={x => set('hasFixedIncome', x)} error={err.hasFixedIncome} /></div>
+            {v.hasFixedIncome && <Field label={t('auth.details.fixedIncome')} htmlFor="dt-fixedMonthlyIncome" error={err.fixedMonthlyIncome} className="sm:col-span-2"><input {...money('fixedMonthlyIncome')} /></Field>}
+          </>
+        )}
+        {foreignCompany && (
+          <>
+            <Field label={t('auth.details.country')} htmlFor="dt-country" error={err.country}>
+              <select className="field" {...text('country')}>
+                <option value="">{t('auth.details.chooseCountry')}</option>
+                {countries.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+              </select>
+            </Field>
+            <Field label={t('auth.details.activityStatus')} htmlFor="dt-activityStatus" error={err.activityStatus}>
+              <select className="field" {...text('activityStatus')}>
+                <option value="">{t('auth.details.choose')}</option>
+                {ACTIVITY_STATUS.map(s => <option key={s} value={s}>{t(`auth.details.activityStatusOptions.${s}`)}</option>)}
+              </select>
+            </Field>
+          </>
+        )}
+        {(foreignCompany || legal) && (
+          <>
+            <Field label={t('auth.details.address')} htmlFor="dt-address" error={err.address} className="sm:col-span-2"><input className="field" autoComplete="street-address" {...text('address')} /></Field>
+            <Field label={foreignCompany ? t('auth.details.mainActivity') : t('auth.details.activity')} htmlFor="dt-mainActivity" error={err.mainActivity} className="sm:col-span-2"><input className="field" {...text('mainActivity')} /></Field>
+            {legal && <Field label={t('auth.details.startDate')} htmlFor="dt-activityStartDate" error={err.activityStartDate}><input className="field" type="date" max={today} {...text('activityStartDate')} /></Field>}
+            <Field label={t('auth.details.ceo')} htmlFor="dt-ceoName" error={err.ceoName} className={legal ? '' : 'sm:col-span-2'}><input className="field" {...text('ceoName')} /></Field>
+          </>
+        )}
+        {!foreignCompany && (
+          <Field label={individual ? t('auth.details.minInitial') : legal ? t('auth.details.minCompany') : t('auth.details.minProject')} htmlFor="dt-minimumFunds" error={err.minimumFunds} className="sm:col-span-2">
+            <input {...money('minimumFunds')} />
+          </Field>
+        )}
+        <button type="submit" className="btn btn-primary w-full sm:col-span-2" disabled={busy}>{busy && <Loader2 className="w-4 h-4 animate-spin" />}{t('auth.details.finish')}</button>
+      </form>
+    </>
+  );
+};
+
+interface AccountState {
+  fullName: string; companyName: string; email: string; code: string; phone: string; voen: string; foreignTaxNumber: string;
+  password: string; confirm: string; terms: boolean;
+}
+
 export const SignupPage: React.FC = () => {
   const { t } = useTranslation();
   const lp = useLocalePath();
   const navigate = useNavigate();
-  const toast = useToast();
   const [params, setParams] = useSearchParams();
   const user = useCurrentUser();
   const step = params.get('step') ?? 'account';
   const go = (s: string) => setParams({ step: s });
 
-  // Step 1
-  const [v, setV] = useState({ fullName: '', email: '', code: '+994', phone: '', password: '', confirm: '', terms: false });
+  const [type, setType] = useState<ApplicantType>(() => authService.pendingSignup()?.type ?? 'INDIVIDUAL');
+  const [v, setV] = useState<AccountState>({ fullName: '', companyName: '', email: '', code: '+994', phone: '', voen: '', foreignTaxNumber: '', password: '', confirm: '', terms: false });
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const recaptchaRef = useRef<ReCAPTCHA>(null);
-  // Check-email step
-  const [sentTo, setSentTo] = useState(readPendingEmail);
   const [deliveryFailed, setDeliveryFailed] = useState(false);
-  // Step 2 / 3
-  const [role, setRole] = useState<CabinetRole | null>(null);
-  const [profile, setProfile] = useState({ region: '', plots: '', investorType: 'individual' as 'individual' | 'company', budget: 1, types: [] as string[] });
-
   useEffect(() => { document.title = `${t('auth.signup')} · AGROInvest`; }, [t]);
-  if (step === 'account' && user && user.roles.length) return <Navigate to={lp(cabinetHome(user))} replace />;
-  if (step === 'check-email' && !sentTo) return <Navigate to={lp('/signup')} replace />;
-  if (step !== 'account' && step !== 'check-email' && !user) return <Navigate to={lp('/signup')} replace />;
 
+  const pending = authService.pendingSignup();
+  // The last step works with the sign-up token from this browser, or for a signed-in applicant who has not finished.
+  const detailsType: ApplicantType | null = user?.needsOnboarding ? user.applicantType ?? null : !user ? pending?.type ?? null : null;
+  if (user && !(step === 'details' && user.needsOnboarding)) return <Navigate to={lp(cabinetHome(user))} replace />;
+  if (step === 'check-email' && !pending) return <Navigate to={lp('/signup')} replace />;
+  if (step === 'details' && !detailsType) return <Navigate to={lp(user ? cabinetHome(user) : '/login')} replace />;
+  if (step !== 'account' && step !== 'check-email' && step !== 'details') return <Navigate to={lp('/signup')} replace />;
+
+  const company = isCompany(type);
   const submitAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     const er: Record<string, string> = {};
-    if (v.fullName.trim().length < 3) er.fullName = t('form.minLength', { n: 3 });
+    if (company) {
+      if (v.companyName.trim().length < 2) er.companyName = t('auth.errors.company');
+      if (type === 'LEGAL_ENTITY' && !VOEN_RE.test(v.voen.trim())) er.voen = t('auth.errors.voen');
+      if (type === 'FOREIGN_ENTITY') {
+        if (!FOREIGN_TAX_RE.test(v.foreignTaxNumber.trim())) er.foreignTaxNumber = t('auth.errors.foreignTax');
+        if (v.voen.trim() && !VOEN_RE.test(v.voen.trim())) er.voen = t('auth.errors.voen');
+      }
+    } else if (v.fullName.trim().length < 3) er.fullName = t('form.minLength', { n: 3 });
     else if (v.fullName.trim().split(/\s+/).length < 2) er.fullName = t('auth.errors.fullName');
-    if (!EMAIL_RE.test(v.email)) er.email = t('form.email');
-    if (v.phone.replace(/\D/g, '').length < 7) er.phone = t('auth.errors.phone');
+    if (!EMAIL_RE.test(v.email.trim())) er.email = t('form.email');
+    if (type === 'INDIVIDUAL' && v.phone.replace(/\D/g, '').length < 7) er.phone = t('auth.errors.phone');
     if (v.password.length < 8) er.password = t('form.minLength', { n: 8 });
     if (v.confirm !== v.password) er.confirm = t('auth.errors.passwordMatch');
     if (!v.terms) er.terms = t('auth.errors.terms');
@@ -326,63 +604,63 @@ export const SignupPage: React.FC = () => {
     if (Object.keys(er).length) return;
     setBusy(true);
     try {
-      const r = await authService.signup({ fullName: v.fullName, email: v.email, phone: `${v.code} ${v.phone.trim()}`, password: v.password, recaptchaToken: recaptchaToken! });
-      const email = v.email.trim().toLowerCase();
-      savePendingEmail(email); setSentTo(email); setDeliveryFailed(r.emailDeliveryFailed);
+      const r = await authService.signup({
+        applicantType: type, email: v.email, password: v.password, confirmPassword: v.confirm, acceptTerms: v.terms, recaptchaToken: recaptchaToken!,
+        fullName: company ? undefined : v.fullName, phone: type === 'INDIVIDUAL' ? `${v.code} ${v.phone.trim()}` : undefined,
+        companyName: company ? v.companyName : undefined, voen: company ? v.voen : undefined,
+        foreignTaxNumber: type === 'FOREIGN_ENTITY' ? v.foreignTaxNumber : undefined,
+      });
+      setDeliveryFailed(r.emailDeliveryFailed);
       go('check-email');
     } catch (x) {
       const text = errorText(t, x);
-      const field = x instanceof ApiError && x.status === 409 ? 'email' : x instanceof ApiError && /telefon/i.test(x.detail) ? 'phone' : 'form';
+      const detail = x instanceof ApiError ? x.detail : '';
+      const field = x instanceof ApiError && x.status === 409 ? (/VÖEN/i.test(detail) ? 'voen' : 'email')
+        : /telefon/i.test(detail) ? 'phone' : /VÖEN/i.test(detail) ? 'voen' : 'form';
       setErr({ [field]: text });
     }
     finally { setBusy(false); setRecaptchaToken(null); recaptchaRef.current?.reset(); }
   };
-  const submitRole = async () => {
-    if (!role) { setErr({ role: t('auth.errors.role') }); return; }
-    setBusy(true);
-    await authService.addRole(role);
-    setBusy(false);
-    go(`profile-${role}`);
-  };
-  const ranges: [number, number][] = [[0, 50000], [50000, 200000], [200000, 500000], [500000, 2000000]];
-  const finish = async (skip: boolean) => {
-    const r: CabinetRole = step === 'profile-investor' ? 'investor' : 'landowner';
-    if (!skip) {
-      setBusy(true);
-      if (r === 'investor') {
-        await authService.updateProfile({ investorType: profile.investorType });
-        await authService.updatePreferences({ budgetMin: ranges[profile.budget][0], budgetMax: ranges[profile.budget][1], fieldTypes: profile.types });
-      } else {
-        await authService.updateProfile({ region: profile.region || undefined, plotsCount: profile.plots ? Number(profile.plots) : undefined });
-      }
-      setBusy(false);
-    }
-    navigate(lp(r === 'investor' ? '/investor' : '/owner'), { replace: true });
-  };
-
   const s = strength(v.password);
   const levels = t('auth.strengthLevels', { returnObjects: true }) as unknown as string[];
-  const bind = (k: 'fullName' | 'email' | 'phone') => ({ id: `su-${k}`, value: v[k], 'aria-invalid': !!err[k], onChange: (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: e.target.value }) });
+  const bind = (k: 'fullName' | 'companyName' | 'email' | 'phone' | 'voen' | 'foreignTaxNumber') =>
+    ({ id: `su-${k}`, value: v[k], 'aria-invalid': !!err[k], onChange: (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: e.target.value }) });
+  const changeType = (next: ApplicantType) => { setType(next); setErr({}); };
 
   return (
-    <AuthLayout image="/images/site/photo-07.jpg" quote={t('auth.quoteSignup')} wide={step === 'role' || step.startsWith('profile')}>
+    <AuthLayout image="/images/site/photo-07.jpg" quote={t('auth.quoteSignup')} wide={step === 'details'}>
       {step === 'account' && (
         <>
           <StepHeader n={1} />
           <h1 className="font-display text-4xl text-brand">{t('auth.signupTitle')}</h1>
-          <p className="text-muted mt-2 mb-8">{t('auth.signupSubtitle')}</p>
+          <p className="text-muted mt-2 mb-6">{t('auth.signupSubtitle')}</p>
+          <ApplicantTypePicker value={type} onChange={changeType} />
           {err.form && <div className="mb-5"><Alert>{err.form}</Alert></div>}
           <form onSubmit={submitAccount} noValidate className="grid gap-5">
-            <Field label={t('auth.fullName')} htmlFor="su-fullName" error={err.fullName}><input className="field" autoComplete="name" {...bind('fullName')} /></Field>
-            <Field label={t('auth.email')} htmlFor="su-email" error={err.email}><input className="field" type="email" autoComplete="email" {...bind('email')} /></Field>
-            <Field label={t('auth.phone')} htmlFor="su-phone" error={err.phone}>
-              <div className="flex gap-2">
-                <select aria-label={t('auth.countryCode')} className="field !w-32 shrink-0" value={v.code} onChange={e => setV({ ...v, code: e.target.value })}>
-                  {COUNTRY_CODES.map(([c, l]) => <option key={c} value={c}>{l}</option>)}
-                </select>
-                <input className="field" type="tel" autoComplete="tel-national" placeholder="50 123 45 67" {...bind('phone')} />
-              </div>
-            </Field>
+            {company ? (
+              <Field label={type === 'FOREIGN_ENTITY' ? t('auth.companyFullName') : t('auth.companyName')} htmlFor="su-companyName" error={err.companyName}><input className="field" autoComplete="organization" {...bind('companyName')} /></Field>
+            ) : (
+              <Field label={t('auth.fullName')} htmlFor="su-fullName" error={err.fullName}><input className="field" autoComplete="name" {...bind('fullName')} /></Field>
+            )}
+            {type === 'FOREIGN_ENTITY' && (
+              <Field label={t('auth.foreignTax')} htmlFor="su-foreignTaxNumber" error={err.foreignTaxNumber}><input className="field" {...bind('foreignTaxNumber')} /></Field>
+            )}
+            {company && (
+              <Field label={type === 'FOREIGN_ENTITY' ? t('auth.voenAz') : t('auth.voen')} htmlFor="su-voen" error={err.voen} optional={type === 'FOREIGN_ENTITY'} hint={t('auth.voenHint')}>
+                <input className="field" inputMode="numeric" maxLength={10} {...bind('voen')} />
+              </Field>
+            )}
+            <Field label={company ? t('auth.companyEmail') : t('auth.email')} htmlFor="su-email" error={err.email}><input className="field" type="email" autoComplete="email" {...bind('email')} /></Field>
+            {type === 'INDIVIDUAL' && (
+              <Field label={t('auth.phone')} htmlFor="su-phone" error={err.phone}>
+                <div className="flex gap-2">
+                  <select aria-label={t('auth.countryCode')} className="field !w-32 shrink-0" value={v.code} onChange={e => setV({ ...v, code: e.target.value })}>
+                    {COUNTRY_CODES.map(([c, l]) => <option key={c} value={c}>{l}</option>)}
+                  </select>
+                  <input className="field" type="tel" autoComplete="tel-national" placeholder="50 123 45 67" {...bind('phone')} />
+                </div>
+              </Field>
+            )}
             <Field label={t('auth.password')} htmlFor="su-pw" error={err.password}>
               <PasswordInput id="su-pw" value={v.password} onChange={x => setV({ ...v, password: x })} invalid={!!err.password} autoComplete="new-password" describedBy="pw-strength" />
               <div className="flex gap-1 mt-2" aria-hidden="true">{[0, 1, 2, 3].map(i => <span key={i} className={`h-1.5 flex-1 rounded-full ${i < s ? (s <= 1 ? 'bg-danger' : s === 2 ? 'bg-warn' : 'bg-leaf') : 'bg-line'}`} />)}</div>
@@ -399,134 +677,23 @@ export const SignupPage: React.FC = () => {
               {err.terms && <p className="field-error" role="alert">{err.terms}</p>}
             </div>
             <RecaptchaField ref={recaptchaRef} onChange={setRecaptchaToken} />
-            <button type="submit" className="btn btn-primary w-full" disabled={busy}>{busy && <Loader2 className="w-4 h-4 animate-spin" />}{t('auth.create')}</button>
+            <button type="submit" className="btn btn-primary w-full" disabled={busy}>{busy && <Loader2 className="w-4 h-4 animate-spin" />}{t('form.continue')}</button>
           </form>
-          <OrDivider />
-          <GoogleButton />
+          {type !== 'FOREIGN_ENTITY' && (
+            <>
+              <OrDivider />
+              <EGovOptions methods={type === 'INDIVIDUAL' ? ['mygov', 'asan', 'sima'] : type === 'LEGAL_ENTITY' ? ['eqanun'] : ['visitor']} />
+            </>
+          )}
           <p className="text-center text-sm mt-8">{t('auth.haveAccount')} <Link to={lp('/login')} className="font-bold text-leaf-dark hover:underline">{t('auth.login')}</Link></p>
         </>
       )}
 
-      {step === 'check-email' && (
-        <div className="text-center" role="status">
-          <span className="w-16 h-16 rounded-full bg-sage text-brand grid place-items-center mx-auto mb-5"><Mail className="w-8 h-8" aria-hidden="true" /></span>
-          <h1 className="font-display text-4xl text-brand">{t('auth.verifyTitle')}</h1>
-          <p className="text-muted mt-3">{t('auth.verifyText', { email: sentTo })}</p>
-          <p className="text-sm text-muted mt-2">{t('auth.verifyNext')}</p>
-          {deliveryFailed && <div className="mt-5 text-left"><Alert tone="info">{t('auth.deliveryFailed')}</Alert></div>}
-          <MailpitHint />
-          <ResendLink email={sentTo} />
-          <Link to={lp('/login')} className="btn btn-primary mt-8">{t('auth.backLogin')}</Link>
-        </div>
+      {step === 'check-email' && pending && (
+        <ConfirmationStatus email={pending.email} deliveryFailed={deliveryFailed} onContinue={() => go('details')} />
       )}
 
-      {step === 'role' && (
-        <>
-          <StepHeader n={2} />
-          <h1 className="font-display text-4xl text-brand">{t('auth.roleTitle')}</h1>
-          <div role="radiogroup" aria-label={t('auth.roleTitle')} className="grid sm:grid-cols-2 gap-4 mt-8">
-            {([['landowner', MapIcon, t('auth.ownerCard'), t('auth.ownerCardText')], ['investor', TrendingUp, t('auth.investorCard'), t('auth.investorCardText')]] as const).map(([r, Icon, title, text]) => (
-              <button key={r} type="button" role="radio" aria-checked={role === r} onClick={() => { setRole(r); setErr({}); }}
-                className={`text-left rounded-[1.25rem] border-2 p-6 transition ${role === r ? 'border-brand bg-sage shadow-[var(--shadow-soft)]' : 'border-line bg-white hover:border-leaf'}`}>
-                <span className={`w-12 h-12 rounded-2xl grid place-items-center ${r === 'investor' ? 'bg-[#F4ECD6] text-gold-dark' : 'bg-sage text-brand'}`}><Icon className="w-6 h-6" aria-hidden="true" /></span>
-                <span className="block font-display text-2xl text-brand mt-4">{title}</span>
-                <span className="block text-muted mt-1">{text}</span>
-                {role === r && <CheckCircle2 className="w-6 h-6 text-brand mt-3" aria-hidden="true" />}
-              </button>
-            ))}
-          </div>
-          {err.role && <p className="field-error mt-3" role="alert">{err.role}</p>}
-          <p className="text-sm text-muted mt-5">{t('auth.roleNote')}</p>
-          <button type="button" className="btn btn-primary mt-8 px-10" onClick={submitRole} disabled={busy}>{t('form.continue')}</button>
-        </>
-      )}
-
-      {step.startsWith('profile') && (
-        <>
-          <StepHeader n={3} />
-          <h1 className="font-display text-4xl text-brand">{t('auth.profileTitle')}</h1>
-          <p className="text-muted mt-2 mb-8">{t('auth.profileSubtitle')}</p>
-          {step === 'profile-landowner' ? (
-            <div className="grid gap-5">
-              <div className="grid sm:grid-cols-2 gap-5">
-                <Field label={t('owner.add.region')} htmlFor="pf-region">
-                  <select id="pf-region" className="field" value={profile.region} onChange={e => setProfile({ ...profile, region: e.target.value })}>
-                    <option value="">{t('owner.add.choose')}</option>
-                    {REGIONS.map(r => <option key={r.key} value={r.key}>{t(`regions.${r.key}`)}</option>)}
-                  </select>
-                </Field>
-                <Field label={t('auth.plots')} htmlFor="pf-plots"><input id="pf-plots" className="field" type="number" min={0} value={profile.plots} onChange={e => setProfile({ ...profile, plots: e.target.value })} /></Field>
-              </div>
-              <Field label={t('auth.idUpload')} htmlFor="pf-id" hint={t('auth.idHint')}>
-                <label className="flex items-center gap-3 rounded-xl border border-dashed border-[#CFC8B6] bg-white p-4 cursor-pointer hover:border-leaf">
-                  <Upload className="w-5 h-5 text-leaf" aria-hidden="true" /><span className="text-sm font-semibold">{t('owner.add.dropOrClick')}</span>
-                  <input id="pf-id" type="file" accept=".jpg,.jpeg,.png,.pdf" className="sr-only" />
-                </label>
-              </Field>
-            </div>
-          ) : (
-            <div className="grid gap-6">
-              <fieldset>
-                <legend className="field-label">{t('auth.investorType')}</legend>
-                <div className="flex gap-3">
-                  {(['individual', 'company'] as const).map(x => (
-                    <label key={x} className={`flex-1 rounded-xl border-2 px-4 py-3 cursor-pointer font-semibold ${profile.investorType === x ? 'border-brand bg-sage' : 'border-line bg-white'}`}>
-                      <input type="radio" name="inv-type" className="sr-only" checked={profile.investorType === x} onChange={() => setProfile({ ...profile, investorType: x })} />{t(`auth.${x}`)}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <Field label={t('auth.budget')} htmlFor="pf-budget">
-                <select id="pf-budget" className="field" value={profile.budget} onChange={e => setProfile({ ...profile, budget: Number(e.target.value) })}>
-                  {(t('auth.budgetRanges', { returnObjects: true }) as unknown as string[]).map((r, i) => <option key={r} value={i}>{r}</option>)}
-                </select>
-              </Field>
-              <div>
-                <p className="field-label">{t('auth.preferredTypes')}</p>
-                <Chips label={t('auth.preferredTypes')} options={CATEGORIES.map(c => ({ value: c.key, label: t(`fieldTypes.${c.key}`) }))} selected={profile.types} onChange={types => setProfile({ ...profile, types })} limit={10} />
-              </div>
-            </div>
-          )}
-          <div className="flex items-center gap-5 mt-10">
-            <button type="button" className="btn btn-primary px-10" onClick={() => finish(false)} disabled={busy}>{t('auth.finish')}</button>
-            <button type="button" className="text-sm font-bold text-muted hover:text-ink underline" onClick={() => finish(true)}>{t('auth.skip')}</button>
-          </div>
-        </>
-      )}
-    </AuthLayout>
-  );
-};
-
-/* ---------- 1.3 Cabinet chooser ---------- */
-export const ChooseCabinetPage: React.FC = () => {
-  const { t } = useTranslation();
-  const lp = useLocalePath();
-  const navigate = useNavigate();
-  const user = useCurrentUser();
-  const [remember, setRemember] = useState(false);
-  if (!user) return <Navigate to={lp('/login')} replace />;
-  if (user.roles.length < 2) return <Navigate to={lp(cabinetHome(user))} replace />;
-  const open = (r: CabinetRole) => {
-    authService.rememberCabinet(remember ? r : null);
-    navigate(lp(r === 'landowner' ? '/owner' : '/investor'));
-  };
-  return (
-    <AuthLayout image="/images/site/photo-16.jpg" quote={t('auth.quoteLogin')} wide>
-      <h1 className="font-display text-4xl text-brand">{t('auth.chooserTitle')}</h1>
-      <p className="text-muted mt-2 mb-8">{t('auth.chooserSubtitle')}</p>
-      <div className="grid sm:grid-cols-2 gap-4">
-        <button type="button" onClick={() => open('landowner')} className="text-left rounded-[1.25rem] border-2 border-line bg-white p-6 hover:border-brand hover:shadow-[var(--shadow-lift)] transition">
-          <span className="w-12 h-12 rounded-2xl grid place-items-center bg-sage text-brand"><MapIcon className="w-6 h-6" aria-hidden="true" /></span>
-          <span className="block font-display text-2xl text-brand mt-4">{t('auth.ownerCabinet')}</span>
-          <span className="block text-muted mt-1">{t('auth.ownerCabinetText')}</span>
-        </button>
-        <button type="button" onClick={() => open('investor')} className="text-left rounded-[1.25rem] border-2 border-line bg-white p-6 hover:border-gold hover:shadow-[var(--shadow-lift)] transition">
-          <span className="w-12 h-12 rounded-2xl grid place-items-center bg-[#F4ECD6] text-gold-dark"><TrendingUp className="w-6 h-6" aria-hidden="true" /></span>
-          <span className="block font-display text-2xl text-brand mt-4">{t('auth.investorCabinet')}</span>
-          <span className="block text-muted mt-1">{t('auth.investorCabinetText')}</span>
-        </button>
-      </div>
-      <label className="flex items-center gap-2 mt-6 font-semibold text-sm cursor-pointer"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} className="w-4 h-4 accent-[#1F4D2E]" />{t('auth.rememberChoice')}</label>
+      {step === 'details' && detailsType && <DetailsStep type={detailsType} />}
     </AuthLayout>
   );
 };
@@ -560,7 +727,9 @@ export const ConfirmEmailPage: React.FC = () => {
           {state === 'ok' && <p className="text-muted">{t('auth.confirmed')}</p>}
           {state === 'error' && <Alert>{msg}</Alert>}
         </div>
-        {state === 'ok' && <Link to={lp('/login')} className="btn btn-primary mt-8">{t('auth.login')}</Link>}
+        {state === 'ok' && (authService.pendingSignup()
+          ? <Link to={lp('/signup?step=details')} className="btn btn-primary mt-8">{t('auth.continueSignup')}</Link>
+          : <Link to={lp('/login')} className="btn btn-primary mt-8">{t('auth.login')}</Link>)}
         {state === 'error' && (
           <>
             <p className="text-sm text-muted mt-6">{t('auth.newLinkText')}</p>
@@ -577,6 +746,8 @@ export const ConfirmEmailPage: React.FC = () => {
 export const ResetPasswordPage: React.FC = () => {
   const { t } = useTranslation();
   const lp = useLocalePath();
+  const navigate = useNavigate();
+  const toast = useToast();
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const [pw, setPw] = useState({ next: '', confirm: '' });
@@ -592,7 +763,12 @@ export const ResetPasswordPage: React.FC = () => {
     setErr(er);
     if (er.next || er.confirm) return;
     setBusy(true);
-    try { setDone(await authService.resetPassword(token, pw.next) || t('auth.resetDone')); }
+    try {
+      const message = await authService.resetPassword(token, pw.next) || t('auth.resetDone');
+      setDone(message);
+      toast(message);
+      navigate(lp('/login'), { replace: true });
+    }
     catch (x) { setErr({ form: errorText(t, x) }); }
     finally { setBusy(false); }
   };

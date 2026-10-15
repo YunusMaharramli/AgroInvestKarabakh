@@ -32,9 +32,7 @@ public static class OpportunityMapping
     /// For admin listings this is the ministry, or the user an admin assigned to answer investor inquiries.
     /// </summary>
     public static bool IsResponsibleParty(InvestmentOpportunity o, Land land, Viewer viewer) =>
-        viewer.UserId is not null && (o.Source == OpportunitySource.Owner
-            ? land.OwnerId == viewer.UserId
-            : viewer.IsAdmin || land.ResponsibleUserId == viewer.UserId);
+        viewer.UserId is not null && viewer.IsAdmin;
 
     public static OpportunityDto ToDto(
         InvestmentOpportunity o, Land land, Viewer viewer, int proposalCount, MyProposalSummary? myProposal,

@@ -89,7 +89,7 @@
     "reportSend": "Bildiriş göndər"
   },
   "footer": {
-    "brandText": "AGROInvest Azərbaycanın təsərrüfatlarını böyütmək üçün torpaq sahiblərini və investorları bir araya gətirir. <inv>İnvestisiya imkanlarına</inv> baxın və ya bir neçə dəqiqəyə <own>torpağınızı yerləşdirin</own>.",
+    "brandText": "Dərc edilmiş təsərrüfat sahələrini araşdırın, biznes planınızı təqdim edin və müraciətinizi izləyin.",
     "member": "Artıq üzvsünüz?",
     "login": "Daxil olun",
     "visit": "Ünvanımız",
@@ -130,18 +130,18 @@
   "home": {
     "slides": [
       {
-        "title": "Böyüməyə investisiya",
-        "text": "Azərbaycanın real təsərrüfatlarına dəstək olun və hər məhsuldan pay alın.",
+        "title": "Qarabağ üçün aqrar investisiya müsabiqələri",
+        "text": "Dərc edilmiş təsərrüfat sahələrini araşdırın, biznes planınızı təqdim edin və müraciətinizi izləyin.",
         "cta": "Ətraflı"
       },
       {
-        "title": "Sizin torpaq, bizim investorlar",
-        "text": "Sahələrinizi bir neçə dəqiqəyə yerləşdirin və torpağa inanan investorlarla tanış olun.",
+        "title": "Müsabiqəyə elektron müraciət",
+        "text": "Sahəni seçin, sahibkar və ya şirkət məlumatlarını və tələb olunan sənədləri təqdim edin.",
         "cta": "Ətraflı"
       },
       {
-        "title": "Birlikdə böyüyək",
-        "text": "Torpaq sahibləri və investorlar üçün etibarlı kənd təsərrüfatı torpaq bazarı.",
+        "title": "Şəffaf baxış prosesi",
+        "text": "Müraciətinizin qeydə alınmasından inzibati qərara qədər status tarixçəsini izləyin.",
         "cta": "Ətraflı"
       }
     ],
@@ -150,17 +150,17 @@
     "play": "Slaydları başlat",
     "whatEyebrow": "Platforma haqqında",
     "whatTitle": "AGROInvest nədir?",
-    "whatText": "AGROInvest rəqəmsal bazardır: təsərrüfat sahibləri kapitala ehtiyacı olan kənd təsərrüfatı torpaqlarını yerləşdirir, investorlar isə özlərinə uyğun layihələri tapır, müqayisə edir və maliyyələşdirir. Hər elan yoxlanılır, ilk müraciətdən son qərara qədər hər addım şəffafdır.",
+    "whatText": "Dərc edilmiş təsərrüfat sahələrini araşdırın, biznes planınızı təqdim edin və müraciətinizi izləyin.",
     "videoEyebrow": "Necə işləyir",
     "videoTitle": "AGROInvest-də ilk addımlar",
     "videoText": "Qısa bələdçi: necə qeydiyyatdan keçmək, daxil olmaq və saytda yol tapmaq.",
     "banner": "Torpaqdan uğura",
-    "ownersEyebrow": "Torpaq sahibləri üçün",
-    "ownersTitle": "Torpağınızı böyüyən biznesə çevirin",
-    "ownersText": "Əkin sahələrinizi, bağlarınızı və ya otlaqlarınızı pulsuz yerləşdirin, investisiya şərtlərini özünüz təyin edin və etibar etdiyiniz investoru seçin. Komandamız hər elanı yoxlayır ki, ciddi investorlar sizi inamla tapsın.",
+    "ownersEyebrow": "Müraciətlər",
+    "ownersTitle": "Müsabiqəyə elektron müraciət",
+    "ownersText": "Sahəni seçin, sahibkar və ya şirkət məlumatlarını və tələb olunan sənədləri təqdim edin.",
     "investorsEyebrow": "İnvestorlar üçün",
     "investorsTitle": "Görə və anlaya biləcəyiniz torpağa investisiya edin",
-    "investorsText": "Yoxlanılmış elanları büdcə, rayon və sahə növünə görə axtarın, hər birinin uyğunluq balını görün, iki torpağı yan-yana müqayisə edin və bir neçə kliklə müraciət göndərin.",
+    "investorsText": "Müraciətinizin qeydə alınmasından inzibati qərara qədər status tarixçəsini izləyin.",
     "learnMore": "Ətraflı"
   },
   "video": {
@@ -170,25 +170,25 @@
   },
   "about": {
     "title": "AGROInvest haqqında",
-    "intro": "İnanırıq ki, doğru insanlar birlikdə çalışanda Azərbaycan torpağı daha çox ailəni doyura və daha çox iş yeri yarada bilər. AGROInvest bu tərəfdaşlığı sadə, təhlükəsiz və şəffaf edir.",
+    "intro": "Dərc edilmiş təsərrüfat sahələrini araşdırın, biznes planınızı təqdim edin və müraciətinizi izləyin.",
     "storyEyebrow": "Hekayəmiz",
     "storyTitle": "Niyə başladıq",
     "facts": [
       {
-        "title": "Yaranma",
-        "text": "AGROInvest 2025-ci ildə Bakıda aqronomlar və proqramçılardan ibarət kiçik komanda tərəfindən yaradılıb."
+        "title": "Qarabağ üçün aqrar investisiya müsabiqələri",
+        "text": "Dərc edilmiş təsərrüfat sahələrini araşdırın, biznes planınızı təqdim edin və müraciətinizi izləyin."
       },
       {
-        "title": "Missiyamız",
-        "text": "Böyüməyə hazır kənd təsərrüfatı torpaqlarına — xüsusilə bərpa olunan bölgələrdə — kapital və bilik gətirmək."
+        "title": "Müsabiqəyə elektron müraciət",
+        "text": "Sahəni seçin, sahibkar və ya şirkət məlumatlarını və tələb olunan sənədləri təqdim edin."
       },
       {
-        "title": "Nə edirik",
-        "text": "Torpaqları yerləşdirir və yoxlayırıq, investorlarla uyğunlaşdırırıq, hər müraciəti və qərarı şəffaf saxlayırıq."
+        "title": "Şəffaf baxış prosesi",
+        "text": "Müraciətinizin qeydə alınmasından inzibati qərara qədər status tarixçəsini izləyin."
       },
       {
-        "title": "Kimə xidmət edirik",
-        "text": "İnvestisiyaya ehtiyacı olan təsərrüfat və torpaq sahiblərinə, real yerli layihə istəyən fərdi və korporativ investorlara."
+        "title": "EKTİS",
+        "text": "Gələcək inteqrasiya üçün strukturlaşdırılmış məlumat və sınaq API-si."
       }
     ],
     "stats": {
@@ -200,7 +200,7 @@
     "teamTitle": "Komanda",
     "team": "Təsisçilər: [Ad Soyad] (aqronomiya), [Ad Soyad] (maliyyə), [Ad Soyad] (texnologiya).",
     "videoEyebrow": "Ətraflı",
-    "videoText": "AGROInvest-in Zəngilandakı ailə bağını Bakıdan olan investorla necə birləşdirdiyinə baxın — ilk səfərdən ilk məhsula qədər.",
+    "videoText": "Sahəni seçin, sahibkar və ya şirkət məlumatlarını və tələb olunan sənədləri təqdim edin.",
     "videoCaption": "Çəkiliş: [Studiya adı], 2026"
   },
   "investments": {
@@ -424,9 +424,13 @@
     "paused": "Dayandırılıb"
   },
   "reqStatus": {
-    "pending": "Gözləyir",
-    "selected": "Seçildi",
-    "notSelected": "Seçilmədi"
+    "pending": "Qəbul edilib",
+    "underReview": "Baxılır",
+    "informationRequested": "Əlavə məlumat tələb olunur",
+    "selected": "Qərar verilib — seçilib",
+    "notSelected": "Qərar verilib — seçilməyib",
+    "rejected": "Qərar verilib — rədd edilib",
+    "cancelled": "Müsabiqə bağlanıb"
   },
   "risk": {
     "low": "Aşağı",
@@ -454,8 +458,6 @@
     "forgot": "Şifrəni unutmusunuz?",
     "login": "Daxil ol",
     "or": "və ya",
-    "google": "Google ilə davam et",
-    "googleSoon": "Google ilə giriş tezliklə olacaq.",
     "noAccount": "Hesabınız yoxdur?",
     "signup": "Qeydiyyatdan keçin",
     "devTitle": "Sınaq hesabları (yalnız tərtibat üçün)",
@@ -474,8 +476,8 @@
     "step": "Addım {{n}} / {{total}}",
     "steps": [
       "Hesab",
-      "Kabinet",
-      "Profil"
+      "Təsdiq",
+      "Məlumat"
     ],
     "fullName": "Ad və soyad",
     "email": "E-poçt",
@@ -541,7 +543,10 @@
       "linkInvalid": "Link etibarsızdır və ya vaxtı bitib.",
       "noToken": "Link natamamdır: təsdiq kodu yoxdur.",
       "fullName": "Ad və soyadınızı yazın.",
-      "recaptcha": "Robot yoxlamasını tamamlayın."
+      "recaptcha": "Robot yoxlamasını tamamlayın.",
+      "company": "Şirkətin adını yazın.",
+      "voen": "VÖEN 10 rəqəmdən ibarət olmalıdır.",
+      "foreignTax": "Xarici vergi nömrəsini düzgün yazın."
     },
     "verifyNext": "Link 24 saat etibarlıdır. Təsdiqdən sonra daxil olub kabinetinizi seçin.",
     "deliveryFailed": "Hesab yaradıldı, amma məktub göndərilə bilmədi. Bir neçə dəqiqə gözləyib linki yenidən göndərin.",
@@ -557,7 +562,91 @@
     "resetSave": "Yeni şifrəni saxla",
     "resetDone": "Şifrə yeniləndi. Yeni şifrənizlə daxil olun.",
     "captchaTitle": "Təhlükəsizlik yoxlaması",
-    "captchaHint": "Davam etmək üçün robot olmadığınızı təsdiqləyin."
+    "captchaHint": "Davam etmək üçün robot olmadığınızı təsdiqləyin.",
+    "companyName": "Şirkətin adı",
+    "companyFullName": "Şirkətin tam adı",
+    "companyEmail": "Şirkətin e-poçtu",
+    "voen": "VÖEN",
+    "voenAz": "Azərbaycanda VÖEN",
+    "voenHint": "10 rəqəmli vergi ödəyicisinin eyniləşdirmə nömrəsi.",
+    "foreignTax": "Xarici vergi nömrəsi",
+    "continueSignup": "Qeydiyyatı davam et",
+    "applicant": {
+      "title": "Kim kimi qeydiyyatdan keçirsiniz?",
+      "INDIVIDUAL": "Fiziki şəxs",
+      "LEGAL_ENTITY": "Hüquqi şəxs",
+      "FOREIGN": "Xarici şəxs",
+      "FOREIGN_INDIVIDUAL": "Xarici fiziki şəxs",
+      "FOREIGN_ENTITY": "Xarici hüquqi şəxs"
+    },
+    "egov": {
+      "title": "Dövlət xidmətləri ilə",
+      "mygov": "myGov ID ilə",
+      "asan": "Asan İmza ilə",
+      "sima": "SİMA İmza ilə",
+      "eqanun": "e-qanun.az ilə",
+      "visitor": "Xarici vətəndaşlar üçün ziyarətçi hesabı",
+      "soon": "Bu giriş üsulu tezliklə aktiv olacaq.",
+      "info": {
+        "mygov": "Vahid dövlət identifikasiya hesabı (myGov ID).",
+        "asan": "Mobil elektron imza: Asan İmza.",
+        "sima": "SİMA mobil tətbiqi ilə elektron imza.",
+        "eqanun": "Hüquqi şəxslər üçün e-qanun.az elektron imzası.",
+        "visitor": "Azərbaycan vətəndaşı olmayanlar üçün ziyarətçi hesabı."
+      }
+    },
+    "status": {
+      "pending": "Təsdiq gözlənilir…",
+      "confirmed": "E-poçt təsdiqləndi",
+      "check": "Yenidən yoxla",
+      "expired": "Qeydiyyat sessiyası tapılmadı və ya vaxtı bitib. E-poçtu təsdiqləyibsinizsə, daxil olub qeydiyyatı tamamlayın."
+    },
+    "details": {
+      "title": "Özünüz haqqında məlumat",
+      "companyTitle": "Şirkət haqqında məlumat",
+      "subtitle": "Bu məlumatlar investor profilinizdə saxlanılır. Müraciətçi növü:",
+      "maritalStatus": "Ailə vəziyyəti",
+      "single": "Subay",
+      "married": "Evli",
+      "income6": "Son 6 ay üzrə gəlir (AZN)",
+      "hasCredit": "Kredit mövcudluğu",
+      "hasCreditQ": "Mövcud kredit varmı?",
+      "creditPayment": "Mövcud kreditin aylıq ödənişi (AZN)",
+      "hasFixedIncome": "Sabit gəlirin mövcudluğu",
+      "fixedIncome": "Sabit gəlirin aylıq miqdarı (AZN)",
+      "minInitial": "İlkin ödəniş üçün minimum vəsait (AZN)",
+      "minProject": "Layihəyə qoyacağınız minimum vəsait (AZN)",
+      "minCompany": "Layihəyə ayrılacaq minimum şirkət vəsaiti (AZN)",
+      "residency": "Azərbaycanda yaşayış statusu",
+      "residencyOptions": {
+        "PERMANENT_RESIDENT": "Daimi yaşayış icazəsi",
+        "TEMPORARY_RESIDENT": "Müvəqqəti yaşayış icazəsi",
+        "NON_RESIDENT": "Azərbaycanda yaşamır"
+      },
+      "address": "Ünvan",
+      "incomeSource": "Gəlir mənbəyi",
+      "country": "Şirkətin ölkəsi",
+      "chooseCountry": "Ölkəni seçin",
+      "choose": "Seçin",
+      "activityStatus": "Fəaliyyət statusu",
+      "activityStatusOptions": {
+        "BRANCH": "Azərbaycanda filial",
+        "REPRESENTATIVE_OFFICE": "Nümayəndəlik",
+        "SUBSIDIARY": "Törəmə şirkət",
+        "NOT_REGISTERED": "Azərbaycanda qeydiyyatı yoxdur"
+      },
+      "mainActivity": "Əsas fəaliyyət sahəsi",
+      "activity": "Fəaliyyət sahəsi",
+      "startDate": "Fəaliyyətə başlama tarixi",
+      "ceo": "Şirkətin rəhbəri (CEO)",
+      "finish": "Qeydiyyatı tamamla",
+      "done": "Qeydiyyat tamamlandı. İnvestor kabinetinizə xoş gəlmisiniz!",
+      "errors": {
+        "choose": "Seçim edin.",
+        "amount": "Düzgün məbləğ yazın.",
+        "date": "Tarix gələcəkdə ola bilməz."
+      }
+    }
   },
   "cabinet": {
     "ownerBadge": "Torpaq sahibi kabineti",
@@ -755,15 +844,15 @@
       "overview": "Ümumi baxış",
       "search": "Torpaq axtar",
       "compare": "AgroMüqayisə",
-      "investments": "İnvestisiyalarım",
+      "investments": "Müraciətlər",
       "saved": "Yadda saxlananlar",
       "settings": "Profil və ayarlar"
     },
     "kpi": {
-      "invested": "Ümumi investisiya",
-      "active": "Aktiv investisiyalar",
+      "invested": "Təklif olunan investisiya",
+      "active": "Qərar verilib — seçilib",
       "pending": "Gözləyən müraciətlər",
-      "avgReturn": "Orta gözlənilən gəlir"
+      "avgReturn": "Müraciətlər"
     },
     "recommended": "Sizin üçün tövsiyələr",
     "recommendedText": "Saxladığınız seçimlərə ən uyğun torpaqlar.",
@@ -807,31 +896,31 @@
         "region": "Rayona uyğunluq"
       },
       "weight": "çəki {{w}}%",
-      "send": "İnvestisiya müraciəti göndər",
+      "send": "Təqdim et",
       "loginToInvest": "İnvestisiya üçün daxil olun",
       "notAccepting": "Bu elan artıq müraciət qəbul etmir.",
       "ownListing": "Bu sizin öz elanınızdır.",
       "alreadySent": "Bu torpaq üçün artıq müraciət göndərmisiniz.",
-      "modalTitle": "İnvestisiya müraciəti göndər",
+      "modalTitle": "Müraciətlər",
       "amount": "Məbləğ (AZN)",
-      "message": "Sahibə mesaj",
+      "message": "İnvestisiya və biznes planı",
       "sentToast": "Müraciət göndərildi! Onu “İnvestisiyalarım”da izləyə bilərsiniz.",
       "goal": "Hədəf: {{amount}}",
       "between": "{{min}} ilə {{max}} arasında"
     },
     "inv": {
-      "title": "İnvestisiyalarım",
+      "title": "Müraciətlər",
       "pending": "Gözləyir",
       "selected": "Seçildi",
       "notSelected": "Seçilmədi",
       "timeline": [
-        "Göndərildi",
-        "Baxıldı",
+        "Qəbul edilib",
+        "Baxılır",
         "Qərar"
       ],
       "empty": "Hələ heç nə yoxdur.",
       "emptyCta": "Torpaq tap",
-      "otherSelected": "Torpaq sahibi bu torpaq üçün başqa investoru seçdi."
+      "otherSelected": "Qərar verilib — seçilməyib"
     },
     "saved": {
       "title": "Yadda saxlananlar",
@@ -908,7 +997,11 @@
     "savedToast": "Dəyişikliklər yadda saxlanıldı.",
     "errors": {
       "currentPassword": "Hazırkı şifrə yanlışdır."
-    }
+    },
+    "investorProfile": "İnvestor profili",
+    "applicantType": "Müraciətçi növü",
+    "profileEmpty": "Əlavə məlumat hələ doldurulmayıb.",
+    "adminPassword": "Admin hesabının şifrəsi yalnız verilənlər bazasında idarə olunur və dəyişdirilə bilməz."
   },
   "common": {
     "azn": "{{value}} AZN",
@@ -1215,5 +1308,35 @@
       "soil_analysis": "Torpaq analizi (nəticə)",
       "water_analysis": "Su analizi (nəticə)"
     }
+  },
+  "competition": {
+    "applications": "Müraciətlər",
+    "competitions": "Aktiv müsabiqələr",
+    "proposedInvestment": "Təklif olunan investisiya",
+    "applicantType": "Müraciətçi növü",
+    "applicantName": "Sahibkarın / şirkətin adı",
+    "individual": "Fərdi sahibkar",
+    "company": "Şirkət",
+    "taxNumber": "VÖEN",
+    "documents": "Sənədlər (PDF, JPG, PNG; hər biri 10 MB)",
+    "deadline": "Son müraciət tarixi",
+    "supplement": "Əlavə məlumat",
+    "submit": "Təqdim et",
+    "confirm": "Təsdiqlə",
+    "comment": "Qeyd / qərarın səbəbi",
+    "commentRequired": "Səbəbi və ya tələb olunan məlumatı yazın.",
+    "review": "Baxış statusu",
+    "all": "Hamısı",
+    "status": {
+      "SUBMITTED": "Qəbul edilib",
+      "OPEN": "Qəbul edilib",
+      "UNDER_REVIEW": "Baxılır",
+      "INFORMATION_REQUESTED": "Əlavə məlumat tələb olunur",
+      "SELECTED": "Qərar verilib — seçilib",
+      "NOT_SELECTED": "Qərar verilib — seçilməyib",
+      "REJECTED": "Qərar verilib — rədd edilib",
+      "CANCELLED": "Müsabiqə bağlanıb"
+    },
+    "simulation": "Sınaq"
   }
 }

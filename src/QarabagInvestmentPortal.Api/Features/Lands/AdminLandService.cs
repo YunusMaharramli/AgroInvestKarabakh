@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using QarabagInvestmentPortal.Api.Features.Notifications;
 using QarabagInvestmentPortal.Api.Features.Opportunities;
+using QarabagInvestmentPortal.Api.Features.Proposals;
 using QarabagInvestmentPortal.Api.Infrastructure.Files;
 using QarabagInvestmentPortal.Api.Infrastructure.Http;
 using QarabagInvestmentPortal.Api.Infrastructure.Persistence;
@@ -27,8 +28,7 @@ public sealed record AdminLandResult(
 
 /// <summary>
 /// Ministry administrators create and manage land records and listings directly (draft → publish → unpublish / archive).
-/// Owner submissions and their review flow are untouched; these actions only apply to admin-managed land
-/// (entered by an admin, or older state land without an owner).
+/// Only admin-managed land can be published for a competition.
 /// </summary>
 public sealed class AdminLandService(
     AppDbContext db, PrivateFileStorage storage, NotificationService notifications, OpportunityQueries opportunities, TimeProvider clock)
@@ -350,6 +350,7 @@ public sealed class AdminLandService(
             o.ClosedAt = now;
             o.ClosureReason = "Sahə arxivləşdirildi: " + reason;
             o.UpdatedAt = now;
+            await CancelApplicationsAsync(o, o.ClosureReason, now, ct);
         }
         land.Status = LandStatus.Archived;
         land.ArchivedAt = now;
@@ -499,11 +500,32 @@ public sealed class AdminLandService(
         land.UpdatedAt = now;
         if (opportunity is { Status: OpportunityStatus.Active })
         {
-            opportunity.Status = OpportunityStatus.Draft;
+            opportunity.Status = OpportunityStatus.Closed;
+            opportunity.ClosedAt = now;
+            opportunity.ClosureReason = reason;
             opportunity.UpdatedAt = now;
+            await CancelApplicationsAsync(opportunity, reason, now, ct);
         }
         Audit(land.Id, adminId, "unpublished", reason);
-        await Task.CompletedTask;
+    }
+
+    private async Task CancelApplicationsAsync(InvestmentOpportunity opportunity, string reason, DateTimeOffset now, CancellationToken ct)
+    {
+        var pending = await db.Proposals.Where(p => p.OpportunityId == opportunity.Id &&
+            (p.Status == ProposalStatus.Open || p.Status == ProposalStatus.UnderReview || p.Status == ProposalStatus.InformationRequested)).ToListAsync(ct);
+        foreach (var proposal in pending)
+        {
+            proposal.Status = ProposalStatus.Cancelled;
+            proposal.DecidedAt = now;
+            proposal.UpdatedAt = now;
+            db.ProposalHistory.Add(new ProposalHistoryEntry
+            {
+                Id = Ids.New("hist"), ProposalId = proposal.Id, Status = "CANCELLED", ChangedBy = "İnzibatçı",
+                Comment = reason, CreatedAt = now,
+            });
+            notifications.Notify(proposal.InvestorId, "Müsabiqə bağlandı",
+                $"{proposal.ReferenceNumber} nömrəli müraciət üzrə müsabiqə bağlandı. Səbəb: {reason}");
+        }
     }
 
     private Task<InvestmentOpportunity?> LatestOpportunityAsync(string landId, CancellationToken ct) =>

@@ -28,6 +28,13 @@ public sealed class ProposalService(
         if (opportunityId.Length == 0) return Fail(400, "İnvestisiya elanı seçilməyib.");
         if (!decimal.TryParse(F("proposedInvestmentAmount").Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) || amount <= 0)
             return Fail(400, "Təklif etdiyiniz məbləği yazın.");
+        var applicantType = F("applicantType");
+        var applicantName = F("applicantName");
+        var taxNumber = F("taxNumber");
+        if (applicantType is not ("individual" or "company")) return Fail(400, "Müraciətçi növünü seçin.");
+        if (applicantName.Length is < 3 or > 200) return Fail(400, "Sahibkarın və ya şirkətin adını yazın (3–200 simvol).");
+        if ((applicantType == "company" || taxNumber.Length > 0) && (taxNumber.Length != 10 || taxNumber.Any(c => c < '0' || c > '9')))
+            return Fail(400, "VÖEN 10 rəqəmdən ibarət olmalıdır.");
         var summary = F("businessPlanSummary");
         if (summary.Length == 0) return Fail(400, "Layihənizi qısa təsvir edin.");
         if (summary.Length > 4000) return Fail(400, "Layihə təsviri çox uzundur (ən çox 4000 simvol).");
@@ -55,7 +62,7 @@ public sealed class ProposalService(
         await LockOpportunityAsync(opportunityId, ct);
 
         var opp = await db.Opportunities.Include(o => o.Land).FirstOrDefaultAsync(o => o.Id == opportunityId, ct);
-        if (opp is null || opp.Status == OpportunityStatus.Draft) return Fail(404, "İnvestisiya elanı tapılmadı.");
+        if (opp is null || opp.Source != OpportunitySource.Admin || opp.Status == OpportunityStatus.Draft) return Fail(404, "İnvestisiya elanı tapılmadı.");
         var now = clock.GetUtcNow();
         if (opp.Status != OpportunityStatus.Active) return Fail(400, "Bu elan bağlanıb, yeni təklif qəbul edilmir.");
         if (!opp.AcceptsProposals(now)) return Fail(400, "Bu elanın son təklif tarixi keçib.");
@@ -73,6 +80,9 @@ public sealed class ProposalService(
             ReferenceNumber = $"AGRO-{now.Year}-{sequence:0000}",
             OpportunityId = opportunityId,
             InvestorId = investorId,
+            ApplicantType = applicantType,
+            ApplicantName = applicantName,
+            TaxNumber = taxNumber.Length > 0 ? taxNumber : null,
             ProposedInvestmentAmount = amount,
             BusinessPlanSummary = summary,
             EstimatedImplementationPeriod = period,
@@ -146,7 +156,7 @@ public sealed class ProposalService(
         var proposal = await db.Proposals.Include(p => p.Opportunity).ThenInclude(o => o!.Land)
             .FirstOrDefaultAsync(p => p.Id == proposalId, ct);
         if (proposal is null) return Fail(404, "Təklif tapılmadı.");
-        if (proposal.Status != ProposalStatus.Open || proposal.Opportunity!.Status != OpportunityStatus.Active)
+        if (!IsPending(proposal.Status) || proposal.Opportunity!.Status != OpportunityStatus.Active)
             return Fail(409, "Yalnız aktiv elanın açıq təklifi rədd edilə bilər.");
 
         var now = clock.GetUtcNow();
@@ -184,7 +194,7 @@ public sealed class ProposalService(
         if (opp.Status != OpportunityStatus.Active) return Outcome<WinnerSelectedResponse>.Fail(400, "Yalnız aktiv elan üzrə qalib seçilə bilər.");
 
         var proposals = await db.Proposals.Include(p => p.Investor)
-            .Where(p => p.OpportunityId == opportunityId && p.Status == ProposalStatus.Open).ToListAsync(ct);
+            .Where(p => p.OpportunityId == opportunityId && (p.Status == ProposalStatus.Open || p.Status == ProposalStatus.UnderReview || p.Status == ProposalStatus.InformationRequested)).ToListAsync(ct);
         var winner = proposals.FirstOrDefault(p => p.Id == proposalId);
         if (winner is null) return Outcome<WinnerSelectedResponse>.Fail(404, "Seçilən təklif tapılmadı və ya artıq bağlanıb.");
 
@@ -245,7 +255,7 @@ public sealed class ProposalService(
         await LockOpportunityAsync(opportunityId, ct);
         var opp = await db.Opportunities.Include(o => o.Land).FirstOrDefaultAsync(o => o.Id == opportunityId, ct);
         if (opp is null) return Outcome<OpportunityDto>.Fail(404, "İnvestisiya elanı tapılmadı.");
-        if (!OpportunityMapping.IsResponsibleParty(opp, opp.Land!, viewer))
+        if (!viewer.IsAdmin)
             return Outcome<OpportunityDto>.Fail(403, "Bu elanı yalnız onun sahibi idarə edə bilər.");
         if (opp.Status != OpportunityStatus.Active || opp.WinnerProposalId is not null)
             return Outcome<OpportunityDto>.Fail(409, "Yalnız qalib seçilməmiş aktiv elan bağlana bilər.");
@@ -255,7 +265,7 @@ public sealed class ProposalService(
         opp.ClosedAt = now;
         opp.ClosureReason = reason;
         opp.UpdatedAt = now;
-        var openProposals = await db.Proposals.Where(p => p.OpportunityId == opportunityId && p.Status == ProposalStatus.Open).ToListAsync(ct);
+        var openProposals = await db.Proposals.Where(p => p.OpportunityId == opportunityId && (p.Status == ProposalStatus.Open || p.Status == ProposalStatus.UnderReview || p.Status == ProposalStatus.InformationRequested)).ToListAsync(ct);
         var actor = await DecidedByAsync(viewer, ct);
         foreach (var proposal in openProposals)
         {
@@ -278,20 +288,77 @@ public sealed class ProposalService(
         return Outcome<OpportunityDto>.Success((await opportunities.GetAsync(opportunityId, viewer, ct))!);
     }
 
+    public static bool IsPending(ProposalStatus status) => status is ProposalStatus.Open or ProposalStatus.UnderReview or ProposalStatus.InformationRequested;
+
+    public async Task<Outcome<ProposalDto>> ReviewAsync(string id, ReviewApplicationRequest request, Viewer viewer, CancellationToken ct)
+    {
+        if (!viewer.IsAdmin) return Fail(403, "İnzibatçı icazəsi tələb olunur.");
+        if (request.Status is not (ProposalStatus.UnderReview or ProposalStatus.InformationRequested))
+            return Fail(400, "Baxış statusu düzgün deyil.");
+        var comment = request.Comment?.Trim() ?? "";
+        if (comment.Length > 2000 || (request.Status == ProposalStatus.InformationRequested && comment.Length == 0))
+            return Fail(400, "Tələb olunan əlavə məlumatı yazın (ən çox 2000 simvol).");
+        var opportunityId = await db.Proposals.Where(p => p.Id == id).Select(p => p.OpportunityId).FirstOrDefaultAsync(ct);
+        if (opportunityId is null) return Fail(404, "Müraciət tapılmadı.");
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await LockOpportunityAsync(opportunityId, ct);
+        var proposal = await db.Proposals.Include(p => p.Opportunity).FirstAsync(p => p.Id == id, ct);
+        if (!IsPending(proposal.Status) || proposal.Opportunity!.Status != OpportunityStatus.Active)
+            return Fail(409, "Bu müraciət üzrə qərar artıq verilib.");
+        if (proposal.Status == request.Status) return Fail(409, "Müraciət artıq bu statusdadır.");
+        proposal.Status = request.Status;
+        proposal.UpdatedAt = clock.GetUtcNow();
+        var status = request.Status == ProposalStatus.UnderReview ? "UNDER_REVIEW" : "INFORMATION_REQUESTED";
+        db.ProposalHistory.Add(History(id, status, await DecidedByAsync(viewer, ct), comment, proposal.UpdatedAt));
+        notifications.Notify(proposal.InvestorId, request.Status == ProposalStatus.UnderReview ? "Müraciətə baxılır" : "Əlavə məlumat tələb olunur", comment);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return Outcome<ProposalDto>.Success((await GetAsync(id, viewer, ct))!);
+    }
+
+    public async Task<Outcome<ProposalDto>> SupplementAsync(string id, Viewer viewer, IFormCollection form, CancellationToken ct)
+    {
+        var message = form["message"].ToString().Trim();
+        if (message.Length is < 1 or > 4000) return Fail(400, "Əlavə məlumatı yazın (ən çox 4000 simvol).");
+        var (files, error) = await PrivateFileStorage.ValidateAsync(form.Files.GetFiles("documents"), FileRule.ProposalDocuments, ct);
+        if (error is not null) return Fail(400, error);
+        var opportunityId = await db.Proposals.Where(p => p.Id == id && p.InvestorId == viewer.UserId).Select(p => p.OpportunityId).FirstOrDefaultAsync(ct);
+        if (opportunityId is null) return Fail(404, "Müraciət tapılmadı.");
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await LockOpportunityAsync(opportunityId, ct);
+        var proposal = await db.Proposals.Include(p => p.Opportunity).FirstAsync(p => p.Id == id, ct);
+        if (proposal.Status != ProposalStatus.InformationRequested || proposal.Opportunity!.Status != OpportunityStatus.Active)
+            return Fail(409, "Yalnız əlavə məlumat tələb olunan müraciət yenilənə bilər.");
+        var saved = new List<string>();
+        try
+        {
+            foreach (var file in files)
+            {
+                var docId = Ids.New("pdoc");
+                var key = await storage.SaveAsync($"proposals/{id}", docId, file, ct);
+                saved.Add(key);
+                db.ProposalDocuments.Add(new ProposalDocument { Id = docId, ProposalId = id, FileName = Limit(Path.GetFileName(file.File.FileName), 255), ContentType = file.ContentType, SizeBytes = file.File.Length, StorageKey = key, UploadedAt = clock.GetUtcNow() });
+            }
+            proposal.Status = ProposalStatus.UnderReview;
+            proposal.UpdatedAt = clock.GetUtcNow();
+            db.ProposalHistory.Add(History(id, "UNDER_REVIEW", "Müraciətçi", message, proposal.UpdatedAt));
+            await notifications.NotifyAdminsAsync("Əlavə məlumat təqdim edildi", proposal.ReferenceNumber, ct);
+            notifications.Notify(proposal.InvestorId, "Əlavə məlumat qeydə alındı", proposal.ReferenceNumber);
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
+        catch { foreach (var key in saved) storage.TryDelete(key); throw; }
+        return Outcome<ProposalDto>.Success((await GetAsync(id, viewer, ct))!);
+    }
+
     // ---------------------------------------------------------------- read
 
     public async Task<List<ProposalDto>> SentAsync(Viewer viewer, CancellationToken ct) =>
         await ToDtosAsync(await BaseQuery().Where(p => p.InvestorId == viewer.UserId).OrderByDescending(p => p.SubmittedAt).ToListAsync(ct), viewer, ct);
 
-    /// <summary>Proposals for listings where the viewer is the responsible owner.</summary>
-    public async Task<List<ProposalDto>> ReceivedAsync(Viewer viewer, CancellationToken ct) =>
-        await ToDtosAsync(await BaseQuery()
-            .Where(p => p.Opportunity!.Source == OpportunitySource.Owner && p.Opportunity.Land!.OwnerId == viewer.UserId)
-            .OrderByDescending(p => p.SubmittedAt).ToListAsync(ct), viewer, ct);
-
     public async Task<List<ProposalDto>> AllAsync(Viewer viewer, string? status, string? region, string? search, CancellationToken ct)
     {
-        var query = BaseQuery();
+        var query = BaseQuery().Where(p => p.Opportunity!.Source == OpportunitySource.Admin);
         if (!string.IsNullOrWhiteSpace(status) && status != "all" && Enum.TryParse<ProposalStatus>(status.Replace("_", ""), true, out var s))
             query = query.Where(p => p.Status == s);
         if (!string.IsNullOrWhiteSpace(region) && region != "all") query = query.Where(p => p.Opportunity!.Land!.Region == region);
@@ -313,8 +380,7 @@ public sealed class ProposalService(
     }
 
     public static bool CanView(Proposal p, Viewer viewer) =>
-        viewer.UserId is not null && (viewer.IsAdmin || p.InvestorId == viewer.UserId
-            || OpportunityMapping.IsResponsibleParty(p.Opportunity!, p.Opportunity!.Land!, viewer));
+        viewer.UserId is not null && (viewer.IsAdmin || p.InvestorId == viewer.UserId);
 
     private IQueryable<Proposal> BaseQuery() => db.Proposals.AsNoTracking()
         .Include(p => p.Investor)
@@ -338,8 +404,9 @@ public sealed class ProposalService(
                 LandDto.From(o.Land!, o.Status == OpportunityStatus.Active),
                 p.Documents.OrderBy(d => d.UploadedAt).Select(ProposalDocumentDto.From).ToList(),
                 p.History.OrderBy(h => h.CreatedAt).Select(ProposalHistoryDto.From).ToList(),
-                CanSelectWinner: viewer.IsAdmin && p.Status == ProposalStatus.Open
-                    && o.WinnerProposalId is null && o.Status == OpportunityStatus.Active);
+                CanSelectWinner: viewer.IsAdmin && IsPending(p.Status)
+                    && o.WinnerProposalId is null && o.Status == OpportunityStatus.Active,
+                p.ApplicantType, p.ApplicantName, p.TaxNumber);
         }).ToList();
     }
 

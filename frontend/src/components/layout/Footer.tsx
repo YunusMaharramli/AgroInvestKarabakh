@@ -62,7 +62,7 @@ export const Footer: React.FC = () => {
           <p className="text-cream/85 text-lg leading-relaxed">
             <Trans i18nKey="footer.brandText" components={{
               inv: <Link to={lp('/investments')} className="underline decoration-gold underline-offset-4 hover:text-gold" />,
-              own: <Link to={lp('/owners')} className="underline decoration-gold underline-offset-4 hover:text-gold" />,
+              own: <Link to={lp('/investments')} className="underline decoration-gold underline-offset-4 hover:text-gold" />,
             }} />
           </p>
           <p className="text-sm text-cream/75">{t('footer.member')} <Link to={lp('/login')} className="font-bold text-gold hover:underline">{t('footer.login')}</Link></p>

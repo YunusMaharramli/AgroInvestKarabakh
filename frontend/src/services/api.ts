@@ -1,13 +1,10 @@
 import { useSyncExternalStore, useCallback, useRef } from 'react';
-import type { AppNotification, AppUser, CabinetRole, InvestmentRequest, Land, UserPreferences } from '../types/agro';
-import { db, delay, mutate, newId, subscribe } from './db';
-import { TEST_PASSWORD, SEED_USERS } from '../mocks/seed';
-import { backend, BackendError, TOKEN_KEY, type AuthResponse, type MessageResponse, type RegistrationResponse } from './backend';
+import type { AppNotification, AppUser, ApplicantType, CabinetRole, InvestmentRequest, InvestorProfile, Land, UserPreferences } from '../types/agro';
+import { db, mutate, subscribe } from './db';
+import { syncMinistryLands } from './ministryLands';
+import { backend, BackendError, TOKEN_KEY, type AuthResponse, type BackendUser, type MessageResponse, type RegistrationResponse, type SignupStatus } from './backend';
 
-/* ------------------------------------------------------------------ *
- * Mock API layer. Every function returns a Promise like a real HTTP
- * call would, so components do not change when the backend is wired.
- * ------------------------------------------------------------------ */
+/* Backend API adapter. The in-memory store only helps existing React views refresh. */
 
 const SESSION_KEY = 'agroinvest_session';
 const CHOICE_KEY = 'agroinvest_cabinet_choice';
@@ -32,7 +29,6 @@ function fromBackend(x: unknown, fallback = 'form.error'): ApiError {
   return new ApiError(fallback);
 }
 
-const SEED_EMAILS = new Set(SEED_USERS.map(u => u.email.toLowerCase()));
 
 /* ---------------- auth ---------------- */
 
@@ -51,21 +47,9 @@ export const authService = {
     return s ? db().users.find(u => u.id === s.userId) ?? null : null;
   },
 
-  /**
-   * Seed test accounts (both@ / owner@ / investor@agroinvest.az) log in against mock data.
-   * Every other account logs in against the real backend, which refuses accounts
-   * whose email is not confirmed yet (403).
-   */
+  /** Sign in using the API; user details are refreshed from the server on reload. */
   async login(identifier: string, password: string, remember: boolean, recaptchaToken: string): Promise<AppUser> {
     const id = identifier.trim().toLowerCase().replace(/\s/g, '');
-    if (SEED_EMAILS.has(id)) {
-      await delay(null, 400);
-      const user = db().users.find(u => u.email.toLowerCase() === id);
-      const pw = (user && localStorage.getItem(`agroinvest_pw_${user.id}`)) || TEST_PASSWORD;
-      if (!user || password !== pw) throw new ApiError('auth.errors.invalid');
-      startSession(user.id, remember, null);
-      return user;
-    }
     let res: AuthResponse;
     try {
       res = await backend<AuthResponse>('POST', '/auth/login', { email: id, password, recaptchaToken });
@@ -74,42 +58,49 @@ export const authService = {
       if (e.status === 403) throw new ApiError('auth.errors.notConfirmed', e.detail, 403);
       throw e;
     }
-    // The cabinets still run on mock data, so keep a local mirror of the backend user.
-    const b = res.user;
-    const isAdmin = String(b.role).toUpperCase() === 'ADMIN' || b.role === 1;
-    let user = db().users.find(u => u.id === b.id || u.email.toLowerCase() === b.email.toLowerCase());
-    if (!user) {
-      user = {
-        id: b.id, fullName: `${b.firstName} ${b.lastName}`.trim(), email: b.email, phone: b.phone ?? '', avatar: null, roles: [], verified: true, isAdmin,
-        preferences: { budgetMin: 50000, budgetMax: 500000, fieldTypes: [], regions: [], riskTolerance: 'medium' },
-      };
-      const created = user;
-      mutate(d => { d.users.push(created); });
-    } else if (!!user.isAdmin !== isAdmin) {
-      const id = user.id;
-      mutate(d => { const u = d.users.find(x => x.id === id); if (u) u.isAdmin = isAdmin; });
-      user = { ...user, isAdmin };
-    }
-    startSession(user.id, remember, res.token);
-    return user;
+    return adoptSession(res, remember);
   },
 
-  /** Creates the account on the backend; the backend emails a confirmation link (Mailpit in development). */
-  async signup(input: { fullName: string; email: string; phone: string; password: string; recaptchaToken: string }): Promise<RegistrationResponse> {
-    const parts = input.fullName.trim().split(/\s+/);
-    const firstName = parts.shift() ?? '';
-    const lastName = parts.join(' ');
+  /** Sign-up step 1 for any applicant type. The backend emails a confirmation link (Mailpit in development). */
+  async signup(input: SignupInput): Promise<RegistrationResponse> {
     try {
-      return await backend<RegistrationResponse>('POST', '/auth/register', {
-        firstName, lastName, email: input.email.trim().toLowerCase(), phone: input.phone,
-        password: input.password, confirmPassword: input.password,
-        recaptchaToken: input.recaptchaToken,
+      const r = await backend<RegistrationResponse>('POST', '/auth/register', {
+        applicantType: input.applicantType, fullName: input.fullName?.trim(), email: input.email.trim().toLowerCase(),
+        phone: input.phone, companyName: input.companyName?.trim(), taxIdentificationNumber: input.voen?.trim(),
+        foreignTaxNumber: input.foreignTaxNumber?.trim(), password: input.password, confirmPassword: input.confirmPassword,
+        acceptTerms: input.acceptTerms, recaptchaToken: input.recaptchaToken,
       });
+      if (r.signupToken) savePendingSignup({ token: r.signupToken, email: input.email.trim().toLowerCase(), type: input.applicantType });
+      return r;
     } catch (x) {
       const e = fromBackend(x);
       if (e.status === 409) throw new ApiError('auth.errors.emailTaken', e.detail, 409);
       throw e;
     }
+  },
+
+  /** The sign-up this browser started (kept until it is finished). */
+  pendingSignup(): PendingSignup | null { return readPendingSignup(); },
+  forgetPendingSignup() { try { localStorage.removeItem(PENDING_SIGNUP_KEY); } catch { /* ignore */ } },
+
+  /** Is the email of the pending sign-up confirmed yet? */
+  async signupStatus(token: string): Promise<SignupStatus> {
+    try { return await backend<SignupStatus>('POST', '/auth/signup/status', { signupToken: token }); }
+    catch (x) {
+      const e = fromBackend(x);
+      if (e.status === 404) authService.forgetPendingSignup();
+      throw e;
+    }
+  },
+
+  /** Last sign-up step: the additional information. Signs the applicant in and returns the user. */
+  async completeSignup(details: Record<string, unknown>): Promise<AppUser> {
+    const pending = readPendingSignup();
+    let res: AuthResponse;
+    try { res = await backend<AuthResponse>('POST', '/auth/signup/details', { ...details, signupToken: pending?.token }); }
+    catch (x) { throw fromBackend(x); }
+    authService.forgetPendingSignup();
+    return adoptSession(res, true);
   },
 
   /** Confirms the email with the token from the link in the confirmation email. */
@@ -137,18 +128,18 @@ export const authService = {
   async addRole(role: CabinetRole) {
     const me = authService.currentUser();
     if (!me) throw new ApiError('auth.errors.notSignedIn');
-    await delay(null, 400);
-    mutate(d => {
-      const u = d.users.find(x => x.id === me.id)!;
-      if (!u.roles.includes(role)) u.roles.push(role);
-    });
+    if (role !== 'investor') throw new ApiError('form.error');
+    mutate(d => { d.users.find(x => x.id === me.id)!.roles = ['investor']; });
   },
 
   async updateProfile(patch: Partial<AppUser>) {
     const me = authService.currentUser();
     if (!me) throw new ApiError('auth.errors.notSignedIn');
-    await delay(null, 400);
-    mutate(d => { Object.assign(d.users.find(x => x.id === me.id)!, patch); });
+    const parts = (patch.fullName ?? me.fullName).trim().split(/\s+/);
+    try {
+      await backend('PATCH', '/auth/profile', { firstName: parts.shift(), lastName: parts.join(' '), phone: patch.phone ?? me.phone, companyName: patch.companyName ?? me.companyName ?? '' });
+      mutate(d => { Object.assign(d.users.find(x => x.id === me.id)!, patch); });
+    } catch (x) { throw fromBackend(x); }
   },
 
   async updatePreferences(patch: Partial<UserPreferences>) {
@@ -170,22 +161,25 @@ export const authService = {
       authService.logout();
       return;
     }
-    await delay(null, 500);
-    const pw = localStorage.getItem(`agroinvest_pw_${me.id}`) || TEST_PASSWORD;
-    if (current !== pw) throw new ApiError('settings.errors.currentPassword');
-    localStorage.setItem(`agroinvest_pw_${me.id}`, next);
+    throw new ApiError('auth.errors.notSignedIn');
   },
 
   /** Re-reads the role from the server (an admin may have been promoted while signed in). */
   async refreshRole(): Promise<boolean> {
-    const me = authService.currentUser();
-    if (!me || !readSession()?.token) return false;
+    const session = readSession();
+    if (!session?.token) return false;
     try {
-      const b = (await backend<{ user: { role: string | number } }>('GET', '/auth/me')).user;
-      const isAdmin = String(b.role).toUpperCase() === 'ADMIN' || b.role === 1;
-      if (!!me.isAdmin !== isAdmin) mutate(d => { const u = d.users.find(x => x.id === me.id); if (u) u.isAdmin = isAdmin; });
-      return isAdmin;
-    } catch { return !!me.isAdmin; }
+      const me = await backend<{ user: BackendUser; profile: InvestorProfile | null }>('GET', '/auth/me');
+      const b = me.user;
+      if (readSession()?.userId !== b.id) return false;
+      const user = toAppUser(b, me.profile, db().users.find(u => u.id === b.id));
+      mutate(d => { d.users = [user]; });
+      notifyAuth();
+      return !!user.isAdmin;
+    } catch (x) {
+      if (x instanceof BackendError && x.status === 401) { authService.clearLocalSession(); return false; }
+      throw x;
+    }
   },
 
   /** True when signed in with a real backend session (needed for admin pages). */
@@ -193,10 +187,15 @@ export const authService = {
 
   logout() {
     if (readSession()?.token) void backend('POST', '/auth/logout').catch(() => undefined);
+    authService.clearLocalSession();
+  },
+
+  clearLocalSession() {
     try {
       localStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_KEY);
       localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY);
     } catch { /* ignore */ }
+    mutate(d => { d.users = []; d.requests = []; d.notifications = []; d.saved = {}; });
     notifyAuth();
   },
 
@@ -208,9 +207,49 @@ export const authService = {
   },
 };
 
+export interface SignupInput {
+  applicantType: ApplicantType; email: string; password: string; confirmPassword: string; acceptTerms: boolean; recaptchaToken: string;
+  fullName?: string; phone?: string; companyName?: string; voen?: string; foreignTaxNumber?: string;
+}
+export interface PendingSignup { token: string; email: string; type: ApplicantType }
+
+/* Kept in localStorage so the tab opened from the confirmation email can continue the sign-up too. */
+const PENDING_SIGNUP_KEY = 'agroinvest_pending_signup';
+function readPendingSignup(): PendingSignup | null {
+  try { const raw = localStorage.getItem(PENDING_SIGNUP_KEY); return raw ? JSON.parse(raw) as PendingSignup : null; } catch { return null; }
+}
+function savePendingSignup(p: PendingSignup) { try { localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify(p)); } catch { /* ignore */ } }
+
+/** View model for the cabinet components, built from the backend user. */
+function toAppUser(b: BackendUser, profile: InvestorProfile | null | undefined, old?: AppUser): AppUser {
+  const isAdmin = String(b.role).toUpperCase() === 'ADMIN' || b.role === 1;
+  const company = b.applicantType === 'LEGAL_ENTITY' || b.applicantType === 'FOREIGN_ENTITY';
+  return {
+    id: b.id, fullName: `${b.firstName} ${b.lastName}`.trim(), email: b.email, phone: b.phone ?? '',
+    avatar: old?.avatar ?? null, roles: ['investor'], verified: true, isAdmin,
+    applicantType: isAdmin ? null : b.applicantType ?? null, needsOnboarding: !isAdmin && !!b.needsOnboarding,
+    investorProfile: profile ?? null,
+    investorType: company ? 'company' : 'individual', companyName: profile?.companyName || old?.companyName,
+    preferences: old?.preferences ?? { budgetMin: 0, budgetMax: 1500000, fieldTypes: [], regions: [], riskTolerance: 'medium' },
+    notify: old?.notify,
+  };
+}
+
+/** Starts the local session from a login / sign-up response. */
+function adoptSession(res: AuthResponse, remember: boolean): AppUser {
+  const old = db().users.find(u => u.id === res.user.id || u.email.toLowerCase() === res.user.email.toLowerCase());
+  const user = toAppUser(res.user, res.profile, old);
+  mutate(d => { d.users = [user]; d.requests = []; d.notifications = []; d.saved = {}; });
+  startSession(user.id, remember, res.token);
+  void refreshPortal().catch(() => undefined);
+  return user;
+}
+
 function startSession(userId: string, remember: boolean, token: string | null) {
   const data = JSON.stringify({ userId, remember, token });
   try {
+    localStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY);
     const store = remember ? localStorage : sessionStorage;
     store.setItem(SESSION_KEY, data);
     if (token) store.setItem(TOKEN_KEY, token);
@@ -248,129 +287,77 @@ export function useDbValue<T>(read: () => T): T {
   });
 }
 
-/* ---------------- lands ---------------- */
-
+/* Server data is mirrored in memory so the existing components keep their layout. */
+export interface BackendApplication {
+  id: string; referenceNumber: string; userId: string; opportunityId: string;
+  proposedInvestmentAmount: number; businessPlanSummary: string; estimatedImplementationPeriod: string;
+  status: string; submittedAt: string; updatedAt: string; applicantType: string; applicantName: string; taxNumber: string | null;
+  land: { id: string } | null; statusHistory: NonNullable<InvestmentRequest['history']>;
+  documents: NonNullable<InvestmentRequest['documents']>;
+}
+const statusMap: Record<string, InvestmentRequest['status']> = { OPEN: 'pending', UNDER_REVIEW: 'underReview', INFORMATION_REQUESTED: 'informationRequested', SELECTED: 'selected', NOT_SELECTED: 'notSelected', REJECTED: 'rejected', CANCELLED: 'cancelled' };
+export function toRequest(b: BackendApplication): InvestmentRequest {
+  return { id: b.id, referenceNumber: b.referenceNumber, opportunityId: b.opportunityId, landId: b.land?.id ?? '', investorId: b.userId,
+    amount: b.proposedInvestmentAmount, message: b.businessPlanSummary, durationMonths: parseInt(b.estimatedImplementationPeriod) || 0,
+    investmentModel: 'lease', status: statusMap[b.status] ?? 'pending', viewedByOwner: b.status !== 'OPEN',
+    createdAt: b.submittedAt, updatedAt: b.updatedAt, applicantType: b.applicantType, applicantName: b.applicantName, taxNumber: b.taxNumber,
+    history: b.statusHistory, documents: b.documents };
+}
+export async function refreshPortal() {
+  await syncMinistryLands();
+  const me = authService.currentUser();
+  if (!me || !authService.hasBackendSession() || me.isAdmin) return;
+  const [applications, notifications, saved] = await Promise.all([
+    backend<BackendApplication[]>('GET', '/proposals/sent'),
+    backend<{ id: string; userId: string; title: string; message: string; isRead: boolean; createdAt: string }[]>('GET', '/notifications'),
+    backend<{ landId: string }[]>('GET', '/favorites'),
+  ]);
+  if (authService.currentUser()?.id !== me.id) return;
+  mutate(d => {
+    d.requests = applications.map(toRequest);
+    d.notifications = notifications.map(n => ({ id: n.id, userId: n.userId, title: n.title, message: n.message, textKey: '', type: 'system', read: n.isRead, createdAt: n.createdAt, link: '/investor/investments' }));
+    d.saved[me.id] = saved.map(f => f.landId);
+  });
+}
 export const landService = {
-  publicLands(): Land[] {
-    return db().lands.filter(l => l.status === 'active' || l.status === 'funded');
-  },
-  async list(): Promise<Land[]> { return delay(landService.publicLands()); },
+  publicLands(): Land[] { return db().lands.filter(l => l.status === 'active' || l.status === 'closed'); },
+  async list(): Promise<Land[]> { await syncMinistryLands(); return landService.publicLands(); },
   get(id: string): Land | undefined { return db().lands.find(l => l.id === id); },
-  byOwner(ownerId: string): Land[] { return db().lands.filter(l => l.ownerId === ownerId); },
-
-  async create(land: Omit<Land, 'id' | 'createdAt' | 'views' | 'raisedAmount' | 'ownerVerified' | 'priceVolatility'>, asDraft: boolean): Promise<Land> {
-    const me = authService.currentUser()!;
-    await delay(null, 700);
-    const full: Land = {
-      ...land, id: newId('L'), createdAt: new Date().toISOString(), views: 0, raisedAmount: 0,
-      ownerVerified: me.verified, priceVolatility: 0.4, status: asDraft ? 'draft' : 'underReview',
-    };
-    mutate(d => {
-      d.lands.unshift(full);
-      if (!asDraft) d.notifications.unshift({ id: newId('N'), userId: me.id, type: 'review', textKey: 'notifications.underReview', values: { land: full.id }, link: '/owner/properties', read: false, createdAt: full.createdAt });
-    });
-    return full;
-  },
-
-  async setStatus(id: string, status: Land['status']) {
-    await delay(null, 300);
-    mutate(d => { d.lands.find(l => l.id === id)!.status = status; });
-  },
-
-  async remove(id: string) {
-    await delay(null, 300);
-    mutate(d => {
-      d.lands = d.lands.filter(l => l.id !== id);
-      d.requests = d.requests.filter(r => r.landId !== id);
-    });
-  },
-
-  addView(id: string) {
-    mutate(d => { const l = d.lands.find(x => x.id === id); if (l) l.views += 1; });
-  },
-
+  addView(_id: string) {},
   savedIds(userId: string): string[] { return db().saved[userId] ?? []; },
-  toggleSaved(userId: string, landId: string) {
-    mutate(d => {
-      const list = d.saved[userId] ?? [];
-      d.saved[userId] = list.includes(landId) ? list.filter(x => x !== landId) : [...list, landId];
-    });
-  },
-};
-
-/* ---------------- investment requests ---------------- */
-
-export const requestService = {
-  forOwner(ownerId: string): InvestmentRequest[] {
-    const mine = new Set(landService.byOwner(ownerId).map(l => l.id));
-    return db().requests.filter(r => mine.has(r.landId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  },
-  forInvestor(investorId: string): InvestmentRequest[] {
-    return db().requests.filter(r => r.investorId === investorId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  },
-  forLand(landId: string) { return db().requests.filter(r => r.landId === landId); },
-
-  async create(input: { landId: string; amount: number; investmentModel: InvestmentRequest['investmentModel']; durationMonths: number; message: string }) {
+  async toggleSaved(_userId: string, landId: string) {
     const me = authService.currentUser();
     if (!me) throw new ApiError('auth.errors.notSignedIn');
-    await delay(null, 700);
+    try { await backend(landService.savedIds(me.id).includes(landId) ? 'DELETE' : 'POST', landService.savedIds(me.id).includes(landId) ? '/favorites/' + landId : '/favorites', { landId }); await refreshPortal(); }
+    catch(x) { throw fromBackend(x); }
+  },
+};
+export const requestService = {
+  forInvestor(id: string): InvestmentRequest[] { return db().requests.filter(r => r.investorId === id); },
+  forLand(id: string) { return db().requests.filter(r => r.landId === id); },
+  async create(input: { landId: string; amount: number; investmentModel: InvestmentRequest['investmentModel']; durationMonths: number; message: string; applicantType?: string; applicantName?: string; taxNumber?: string; contactPhone?: string; documents?: File[] }) {
+    const me = authService.currentUser();
+    if (!me) throw new ApiError('auth.errors.notSignedIn');
     const land = landService.get(input.landId);
-    if (!land || land.status !== 'active') throw new ApiError('requests.errors.closed');
-    if (land.ownerId === me.id) throw new ApiError('requests.errors.own');
-    if (db().requests.some(r => r.landId === land.id && r.investorId === me.id)) throw new ApiError('requests.errors.duplicate');
-    const now = new Date().toISOString();
-    const req: InvestmentRequest = { ...input, id: newId('R'), investorId: me.id, status: 'pending', viewedByOwner: false, createdAt: now, updatedAt: now };
-    mutate(d => {
-      d.requests.unshift(req);
-      d.notifications.unshift({ id: newId('N'), userId: land.ownerId, type: 'request', textKey: 'notifications.newRequest', values: { land: land.id }, link: '/owner/requests', read: false, createdAt: now });
-    });
-    return req;
+    if (!land?.opportunityId || !land.acceptingApplications) throw new ApiError('requests.errors.closed');
+    const form = new FormData();
+    form.set('opportunityId', land.opportunityId); form.set('proposedInvestmentAmount', String(input.amount));
+    form.set('businessPlanSummary', input.message); form.set('estimatedImplementationPeriod', input.durationMonths + ' ay');
+    form.set('applicantType', input.applicantType ?? 'individual'); form.set('applicantName', input.applicantName ?? me.fullName);
+    form.set('taxNumber', input.taxNumber ?? ''); form.set('contactPhone', input.contactPhone ?? me.phone);
+    input.documents?.forEach(file => form.append('documents', file));
+    try { const created = await backend<BackendApplication>('POST', '/proposals', form); await refreshPortal(); return toRequest(created); }
+    catch(x) { throw fromBackend(x); }
   },
-
-  markViewed(id: string) {
-    mutate(d => { const r = d.requests.find(x => x.id === id); if (r) r.viewedByOwner = true; });
-  },
-
-  /**
-   * One-winner rule: atomically select one request, close the listing,
-   * mark every other pending request on that land "notSelected" and notify everyone.
-   */
-  async selectWinner(requestId: string) {
-    await delay(null, 600);
-    mutate(d => {
-      const win = d.requests.find(r => r.id === requestId);
-      if (!win || win.status !== 'pending') throw new ApiError('requests.errors.decided');
-      const land = d.lands.find(l => l.id === win.landId)!;
-      if (land.status !== 'active') throw new ApiError('requests.errors.closed');
-      const now = new Date().toISOString();
-      for (const r of d.requests.filter(x => x.landId === land.id && x.status === 'pending')) {
-        r.status = r.id === win.id ? 'selected' : 'notSelected';
-        r.updatedAt = now;
-        d.notifications.unshift({
-          id: newId('N'), userId: r.investorId, type: 'decision',
-          textKey: r.id === win.id ? 'notifications.selected' : 'notifications.notSelected',
-          values: { land: land.id }, link: '/investor/investments', read: false, createdAt: now,
-        });
-      }
-      land.status = 'funded';
-      land.raisedAmount = Math.max(land.raisedAmount, win.amount);
-      land.winnerRequestId = win.id;
-    });
+  async supplement(id: string, message: string, files: File[]) {
+    const form = new FormData(); form.set('message', message); files.forEach(file => form.append('documents', file));
+    try { await backend('POST', '/proposals/' + id + '/supplements', form); await refreshPortal(); }
+    catch(x) { throw fromBackend(x); }
   },
 };
-
-/* ---------------- notifications ---------------- */
-
 export const notificationService = {
-  forUser(userId: string): AppNotification[] {
-    return db().notifications.filter(n => n.userId === userId).slice(0, 20);
-  },
-  markAllRead(userId: string) {
-    mutate(d => d.notifications.forEach(n => { if (n.userId === userId) n.read = true; }));
-  },
-  markRead(id: string) {
-    mutate(d => { const n = d.notifications.find(x => x.id === id); if (n) n.read = true; });
-  },
+  forUser(userId: string): AppNotification[] { return db().notifications.filter(n => n.userId === userId); },
+  async markAllRead(_userId: string) { await backend('POST', '/notifications/read-all'); await refreshPortal(); },
+  async markRead(id: string) { await backend('PATCH', '/notifications/' + id + '/read'); await refreshPortal(); },
 };
-
 export const userById = (id: string) => db().users.find(u => u.id === id);

@@ -18,7 +18,7 @@ public static class LandEndpoints
         api.MapGet("/lands", async (HttpRequest request, AppDbContext db, CancellationToken ct) =>
         {
             var q = request.Query;
-            var query = db.Lands.AsNoTracking().Where(l => l.Status == LandStatus.Approved);
+            var query = db.Lands.AsNoTracking().Where(l => l.Status == LandStatus.Approved && (l.OwnerId == null || l.EntrySource != LandEntrySource.Owner));
             if (q["region"].ToString() is { Length: > 0 } region && region != "all") query = query.Where(l => l.Region == region);
             if (q["agricultureType"].ToString() is { Length: > 0 } type && type != "all") query = query.Where(l => l.AgricultureType == type);
             if (q["landUse"].ToString() is { Length: > 0 } use && use != "all" && LandUseCatalog.Find(use) is { } lu)
@@ -46,28 +46,28 @@ public static class LandEndpoints
         {
             var viewer = new Viewer(user.UserId(), user.IsAdmin());
             var land = await db.Lands.AsNoTracking().Include(l => l.Photos).FirstOrDefaultAsync(l => l.Id == id, ct);
-            var isOwner = land?.OwnerId is not null && land.OwnerId == viewer.UserId;
-            if (land is null || (land.Status != LandStatus.Approved && !isOwner && !viewer.IsAdmin))
+            var isPublic = land is { Status: LandStatus.Approved } && land.EntrySource != LandEntrySource.Owner;
+            if (land is null || (!isPublic && !viewer.IsAdmin))
                 return ApiResults.NotFound("Torpaq sahəsi tapılmadı.");
 
             var opps = await db.Opportunities.AsNoTracking().Include(o => o.Land)
-                .Where(o => o.LandId == id && ((o.Status != OpportunityStatus.Draft
-                    && o.Status != OpportunityStatus.Rejected) || isOwner || viewer.IsAdmin))
+                .Where(o => o.LandId == id && (viewer.IsAdmin ||
+                    (o.Source == OpportunitySource.Admin && o.Status != OpportunityStatus.Draft && o.Status != OpportunityStatus.Rejected)))
                 .OrderByDescending(o => o.CreatedAt).ToListAsync(ct);
             var dtos = await opportunities.ToDtosAsync(opps, viewer, ct, includeLand: false);
             var active = dtos.FirstOrDefault(o => o.Status == OpportunityStatus.Active);
             return Results.Ok(new LandDetailDto(LandDto.From(land, active is not null), dtos, active));
         });
 
-        // Land photos: public once the land is approved; before that only the owner and admins.
+        // Land photos: public only for ministry-published land; other records remain admin-only.
         api.MapGet("/lands/{landId}/photos/{photoId}", async (string landId, string photoId, ClaimsPrincipal user, AppDbContext db, PrivateFileStorage storage, HttpResponse response, CancellationToken ct) =>
         {
             var row = await db.LandPhotos.AsNoTracking()
-                .Join(db.Lands, p => p.LandId, l => l.Id, (p, l) => new { Photo = p, l.OwnerId, l.Status })
+                .Join(db.Lands, p => p.LandId, l => l.Id, (p, l) => new { Photo = p, l.Status, l.EntrySource })
                 .FirstOrDefaultAsync(x => x.Photo.Id == photoId && x.Photo.LandId == landId, ct);
             if (row is null) return ApiResults.NotFound("Foto tapılmadı.");
-            var isPublic = row.Status == LandStatus.Approved;
-            if (!isPublic && !user.IsAdmin() && (row.OwnerId is null || row.OwnerId != user.UserId()))
+            var isPublic = row.Status == LandStatus.Approved && row.EntrySource != LandEntrySource.Owner;
+            if (!isPublic && !user.IsAdmin())
                 return ApiResults.NotFound("Foto tapılmadı.");
             var stream = storage.OpenRead(row.Photo.StorageKey);
             if (stream is null) return ApiResults.NotFound("Fayl serverdə tapılmadı.");
@@ -96,67 +96,6 @@ public static class LandEndpoints
             if (error is not null) return ApiResults.BadRequest(error);
             return Results.Ok(LandSuitability.Evaluate(profile!.Type, profile.ToFacts(Math.Max(0, photos ?? 0))));
         });
-
-        // Owner: my lands.
-        var mine = api.MapGroup("/my/lands").RequireAuthorization(Policies.SignedIn);
-
-        mine.MapGet("", async (ClaimsPrincipal user, LandSubmissionService service, CancellationToken ct) =>
-            Results.Ok(await service.ListMineAsync(user.RequiredUserId(), ct)));
-
-        mine.MapPost("", async (HttpRequest request, ClaimsPrincipal user, LandSubmissionService service, CancellationToken ct) =>
-        {
-            if (user.IsAdmin()) return ApiResults.Forbidden("İnzibatçı torpaq əlavə edə bilməz. Torpağı yalnız sahibi əlavə edir.");
-            if (!request.HasFormContentType) return ApiResults.BadRequest("Forma və sənədlər birlikdə göndərilməlidir.");
-            var form = await request.ReadFormAsync(ct);
-            return (await service.SubmitAsync(user.RequiredUserId(), form, ct))
-                .ToResult(r => Results.Json(r, statusCode: StatusCodes.Status201Created));
-        });
-
-        mine.MapPost("/{id}/documents", async (string id, HttpRequest request, ClaimsPrincipal user, LandSubmissionService service, CancellationToken ct) =>
-        {
-            if (!request.HasFormContentType) return ApiResults.BadRequest("Sənədləri yükləyin.");
-            var form = await request.ReadFormAsync(ct);
-            return (await service.AddDocumentsAsync(user.RequiredUserId(), id, form, ct)).ToResult(r => Results.Ok(r));
-        });
-
-        // Owner fills in / corrects the land data and may add photos (multipart form, same field names as submit).
-        mine.MapPost("/{id}/profile", async (string id, HttpRequest request, ClaimsPrincipal user, LandSubmissionService service, CancellationToken ct) =>
-        {
-            if (!request.HasFormContentType) return ApiResults.BadRequest("Məlumatları forma ilə göndərin.");
-            var form = await request.ReadFormAsync(ct);
-            return (await service.UpdateProfileAsync(user.RequiredUserId(), id, form, ct)).ToResult(r => Results.Ok(r));
-        });
-
-        mine.MapPost("/{id}/reopen", async (string id, ClaimsPrincipal user, LandSubmissionService service, CancellationToken ct) =>
-            (await service.ReopenAsync(user.RequiredUserId(), id, ct)).ToResult(r => Results.Ok(r)));
-
-        // Admin-entered land (drafts, publication, archive ...): see AdminLandEndpoints.
-
-        // Admin: review queue.
-        var review = api.MapGroup("/admin/land-reviews").RequireAuthorization(Policies.Admin);
-
-        review.MapGet("", async (string? status, ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
-            Results.Ok(await service.QueueAsync(status, user.RequiredUserId(), ct)));
-
-        review.MapGet("/{id}", async (string id, ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
-            await service.GetAsync(id, user.RequiredUserId(), ct) is { } dto ? Results.Ok(dto) : ApiResults.NotFound("Torpaq müraciəti tapılmadı."));
-
-        review.MapPost("/{id}/approve", async (string id, ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
-            (await service.ApproveAsync(id, user.RequiredUserId(), ct)).ToResult(r => Results.Ok(r)));
-
-        review.MapPost("/{id}/request-documents", async (string id, ReviewMessageRequest req, ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
-            (await service.RequestDocumentsAsync(id, user.RequiredUserId(), req.Message, ct)).ToResult(r => Results.Ok(r)));
-
-        review.MapPost("/{id}/reject", async (string id, ReviewMessageRequest req, ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
-            (await service.RejectAsync(id, user.RequiredUserId(), req.Message, ct)).ToResult(r => Results.Ok(r)));
-
-        var republish = api.MapGroup("/admin/republish-reviews").RequireAuthorization(Policies.Admin);
-        republish.MapGet("", async (ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
-            Results.Ok(await service.RepublishQueueAsync(user.RequiredUserId(), ct)));
-        republish.MapPost("/{id}/approve", async (string id, ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
-            (await service.ApproveRepublishAsync(id, user.RequiredUserId(), ct)).ToResult(r => Results.Ok(r)));
-        republish.MapPost("/{id}/reject", async (string id, ReviewMessageRequest req, ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
-            (await service.RejectRepublishAsync(id, user.RequiredUserId(), req.Message, ct)).ToResult(r => Results.Ok(r)));
 
         return api;
     }

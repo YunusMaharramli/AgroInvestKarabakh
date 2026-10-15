@@ -28,7 +28,7 @@ export const HomePage: React.FC = () => {
   const lp = useLocalePath();
   useEffect(() => { document.title = t('meta.title'); }, [i18n.language]);
   const slides = t('home.slides', { returnObjects: true }) as unknown as { title: string; text: string; cta: string }[];
-  const targets = ['/investments', '/owners', '/about'];
+  const targets = ['/investments', '/investments', '/about'];
   const images = [IMG('photo-08'), IMG('photo-18'), CAT('crops-11')];
   return (
     <>
@@ -37,7 +37,7 @@ export const HomePage: React.FC = () => {
       <VideoSection eyebrow={t('home.videoEyebrow')} title={t('home.videoTitle')} text={t('home.videoText')} poster={IMG('photo-21')} src={VIDEOS.howItWorks} />
       <ParallaxBanner image={IMG('photo-24')} text={t('home.banner')} />
       <SplitSection image={IMG('photo-11')} imageAlt="" eyebrow={t('home.ownersEyebrow')} title={t('home.ownersTitle')} text={t('home.ownersText')}
-        cta={{ label: t('home.learnMore'), to: lp('/owners') }} />
+        cta={{ label: t('home.learnMore'), to: lp('/investments') }} />
       <SplitSection image={IMG('photo-03')} imageAlt="" eyebrow={t('home.investorsEyebrow')} title={t('home.investorsTitle')} text={t('home.investorsText')}
         cta={{ label: t('home.learnMore'), to: lp('/investments') }} reverse tone="sage" />
     </>

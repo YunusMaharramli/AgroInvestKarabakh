@@ -91,7 +91,6 @@ export const Header: React.FC = () => {
     { to: lp('/'), label: t('nav.home'), end: true },
     { to: lp('/about'), label: t('nav.about') },
     { to: lp('/investments'), label: t('nav.investments') },
-    { to: lp('/owners'), label: t('nav.owners') },
     { to: lp('/guides'), label: t('nav.guides') },
   ];
   const contactItems: DropItem[] = [

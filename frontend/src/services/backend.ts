@@ -1,3 +1,5 @@
+import type { ApplicantType, InvestorProfile } from '../types/agro';
+
 /* ------------------------------------------------------------------ *
  * Real backend (ASP.NET, /api/...). Used for account actions that need
  * a real email: sign-up, email confirmation link, login, password reset.
@@ -17,7 +19,7 @@ export function backendToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
 
-export async function backend<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {
+export async function backend<T>(method: 'GET' | 'POST' | 'DELETE' | 'PATCH', path: string, body?: unknown): Promise<T> {
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
   const token = backendToken();
   let res: Response;
@@ -42,10 +44,14 @@ export async function backend<T>(method: 'GET' | 'POST' | 'DELETE', path: string
   return data as T;
 }
 
-export interface BackendUser { id: string; firstName: string; lastName: string; email: string; phone: string | null; role: string | number }
+export interface BackendUser {
+  id: string; firstName: string; lastName: string; email: string; phone: string | null; role: string | number;
+  applicantType?: ApplicantType | null; needsOnboarding?: boolean;
+}
 export interface MessageResponse { message: string }
-export interface RegistrationResponse { message: string; requiresEmailConfirmation: boolean; emailDeliveryFailed: boolean }
-export interface AuthResponse { message: string; token: string; user: BackendUser }
+export interface RegistrationResponse { message: string; requiresEmailConfirmation: boolean; emailDeliveryFailed: boolean; signupToken?: string | null }
+export interface AuthResponse { message: string; token: string; user: BackendUser; profile?: InvestorProfile | null }
+export interface SignupStatus { email: string; applicantType: ApplicantType | null; emailConfirmed: boolean; needsOnboarding: boolean }
 
 /** Address of the local mail catcher (Mailpit) that receives emails in development. */
 export const MAILPIT_URL = 'http://localhost:8025';

@@ -81,6 +81,7 @@ public static partial class AdminLandRules
         if (land.Latitude == 0 && land.Longitude == 0) Block("location", "location", "Sahənin yerini xəritədə işarələyin.");
         if (land.BoundaryGeoJson is null) Block("boundary", "boundary", "Sahənin sərhədini xəritədə çəkin.");
         if (land.WaterAccess is null) Block("water_access", "waterAccess", "Su təminatını seçin (o cümlədən “dəmyə” və ya “məlum su mənbəyi yoxdur”).");
+        if (deadline.Value is null) Block("deadline_required", "applicationDeadline", "Müsabiqə üçün son müraciət tarixini yazın.");
         if (deadline.Value is { } d && d < now) Block("deadline", "applicationDeadline", "Müraciət üçün son tarix keçmişdədir.");
 
         // Cadastral number: either the number, or "not available" + manual review (verification).

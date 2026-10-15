@@ -1,18 +1,31 @@
 namespace QarabagInvestmentPortal.Api.Features.Users;
 
+/// <summary>
+/// Role is the only authorization claim. ApplicantType is investor profile data (null for admins and older accounts);
+/// NeedsOnboarding is true until the applicant has sent the additional sign-up information.
+/// </summary>
 public sealed record UserDto(
     string Id, string FirstName, string LastName, string Email, string? Phone, UserRole Role,
-    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt)
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
+    ApplicantType? ApplicantType = null, bool NeedsOnboarding = false, bool EmailConfirmed = false)
 {
-    public static UserDto From(User u) => new(u.Id, u.FirstName, u.LastName, u.Email, u.Phone, u.Role, u.CreatedAt, u.UpdatedAt);
+    public static UserDto From(User u) => new(u.Id, u.FirstName, u.LastName, u.Email, u.Phone, u.Role, u.CreatedAt, u.UpdatedAt,
+        u.ApplicantType, u.NeedsOnboarding, u.EmailConfirmedAt is not null);
 }
 
 public sealed record ProfileDto(
     string Id, string UserId, string CompanyName, string TaxIdentificationNumber, string BusinessActivity,
-    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt)
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
+    string? ForeignTaxNumber = null, string? Country = null, string? ActivityStatus = null, DateOnly? ActivityStartDate = null,
+    string? CeoName = null, string? Address = null, MaritalStatus? MaritalStatus = null, decimal? IncomeLast6Months = null,
+    string? ResidencyStatus = null, string? IncomeSource = null, bool? HasCredit = null, decimal? MonthlyCreditPayment = null,
+    bool? HasFixedIncome = null, decimal? FixedMonthlyIncome = null, decimal? MinimumFunds = null)
 {
     public static ProfileDto? From(UserProfile? p) => p is null ? null
-        : new(p.Id, p.UserId, p.CompanyName, p.TaxIdentificationNumber, p.BusinessActivity, p.CreatedAt, p.UpdatedAt);
+        : new(p.Id, p.UserId, p.CompanyName, p.TaxIdentificationNumber, p.BusinessActivity, p.CreatedAt, p.UpdatedAt,
+            p.ForeignTaxNumber, p.Country, p.ActivityStatus, p.ActivityStartDate, p.CeoName, p.Address, p.MaritalStatus,
+            p.IncomeLast6Months, p.ResidencyStatus, p.IncomeSource, p.HasCredit, p.MonthlyCreditPayment, p.HasFixedIncome,
+            p.FixedMonthlyIncome, p.MinimumFunds);
 }
 
 /// <summary>Minimal public info about another person (e.g. an investor shown to the land owner).</summary>
@@ -21,11 +34,46 @@ public sealed record PersonDto(string Id, string FirstName, string LastName, str
     public static PersonDto From(User u) => new(u.Id, u.FirstName, u.LastName, u.Email);
 }
 
+/// <summary>
+/// Sign-up, step 1. ApplicantType picks the form: INDIVIDUAL (FullName or First/LastName, Phone), LEGAL_ENTITY
+/// (CompanyName, TaxIdentificationNumber = VÖEN), FOREIGN_INDIVIDUAL (FullName), FOREIGN_ENTITY (CompanyName,
+/// ForeignTaxNumber, optional VÖEN). Email, Password, ConfirmPassword and AcceptTerms are always needed.
+/// </summary>
 public sealed record RegisterRequest(
     string? FirstName, string? LastName, string? Email, string? Phone,
     string? Password, string? ConfirmPassword, string? CompanyName,
     string? TaxIdentificationNumber, string? BusinessActivity,
-    string? RecaptchaToken = null);
+    string? RecaptchaToken = null,
+    ApplicantType? ApplicantType = null,
+    string? FullName = null,
+    string? ForeignTaxNumber = null,
+    bool? AcceptTerms = null);
+
+/// <summary>Sign-up: where the browser that started it stands (polled while waiting for the email confirmation).</summary>
+public sealed record SignupStatusRequest(string? SignupToken);
+public sealed record SignupStatusResponse(string Email, ApplicantType? ApplicantType, bool EmailConfirmed, bool NeedsOnboarding);
+
+/// <summary>
+/// Sign-up, last step: additional information. Sent with the sign-up token from step 1, or while signed in
+/// (an applicant who left before finishing and logged in later). Only the fields of the applicant's type are read.
+/// </summary>
+public sealed record InvestorDetailsRequest(
+    string? SignupToken = null,
+    MaritalStatus? MaritalStatus = null,
+    decimal? IncomeLast6Months = null,
+    bool? HasCredit = null,
+    decimal? MonthlyCreditPayment = null,
+    bool? HasFixedIncome = null,
+    decimal? FixedMonthlyIncome = null,
+    decimal? MinimumFunds = null,
+    string? ResidencyStatus = null,
+    string? Address = null,
+    string? IncomeSource = null,
+    string? Country = null,
+    string? ActivityStatus = null,
+    string? MainActivity = null,
+    DateOnly? ActivityStartDate = null,
+    string? CeoName = null);
 
 public sealed record LoginRequest(
     string? Email, string? Password, string? RecaptchaToken = null);

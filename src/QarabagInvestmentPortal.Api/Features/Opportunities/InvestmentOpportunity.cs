@@ -54,5 +54,6 @@ public sealed class InvestmentOpportunity
     public DateTimeOffset UpdatedAt { get; set; }
 
     public bool AcceptsProposals(DateTimeOffset now) =>
-        Status == OpportunityStatus.Active && (ApplicationDeadline is null || ApplicationDeadline >= now);
+        Status == OpportunityStatus.Active && (OpeningDate is null || OpeningDate <= now)
+        && (ApplicationDeadline is null || ApplicationDeadline >= now);
 }

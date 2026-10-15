@@ -11,7 +11,7 @@ export interface BackendLand {
   latitude: number; longitude: number; intendedUse: string; estimatedInvestmentRequirement: number; imageUrl: string;
   ownerId: string | null; hasActiveOpportunity: boolean; createdAt: string;
   district: string | null; settlement: string | null; verification: 'ADMIN_ENTERED' | 'EVIDENCE_PENDING' | 'VERIFIED'; waterAccess: string | null;
-  landUse: string; core: { boundary: unknown | null; roadAccessType: string | null }; photos: { id: string; url: string }[];
+  landUse: string; core: { boundary: { type: 'Polygon'; coordinates: number[][][] } | null; roadAccessType: string | null }; photos: { id: string; url: string }[];
 }
 
 function regionKey(region: string): string {
@@ -47,7 +47,7 @@ export function toLand(b: BackendLand): Land {
     photos: b.photos?.length ? b.photos.map(p => p.url) : b.imageUrl ? [b.imageUrl] : [],
     documents: [], status: 'active', raisedAmount: 0, views: 0, ownerVerified: b.verification === 'VERIFIED',
     priceVolatility: 0.4, createdAt: b.createdAt,
-    source: 'ministry', verification: b.verification, hasBoundary: !!b.core?.boundary,
+    source: 'ministry', verification: b.verification, hasBoundary: !!b.core?.boundary, boundary: b.core?.boundary ?? null,
   };
 }
 

@@ -96,6 +96,7 @@ export interface Land {
   /** Backend verification status: entering data or uploading a file never makes a land "VERIFIED". */
   verification?: 'ADMIN_ENTERED' | 'EVIDENCE_PENDING' | 'VERIFIED';
   hasBoundary?: boolean;
+  boundary?: { type: 'Polygon'; coordinates: number[][][] } | null;
 }
 
 /**

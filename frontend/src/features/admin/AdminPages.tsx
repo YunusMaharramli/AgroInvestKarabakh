@@ -3,7 +3,7 @@ import { Link, Navigate, NavLink, Outlet, useNavigate, useParams } from 'react-r
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle, Archive, ArchiveRestore, CheckCircle2, ChevronRight, CircleSlash, ExternalLink, Eye, FileText, Globe, History, Landmark,
-  LayoutGrid, LogOut, Plus, Send, ShieldAlert, ShieldCheck, Trash2, Upload, UserCog, XCircle,
+  LayoutGrid, LogOut, Plus, Send, ShieldAlert, ShieldCheck, Trash2, Upload, UserCog, Users, BarChart3, XCircle,
 } from 'lucide-react';
 import { Logo } from '../../components/layout/Logo';
 import { LanguageSwitcher } from '../../components/layout/LanguageSwitcher';
@@ -14,7 +14,7 @@ import { EmptyState, Field, Photo, Tabs } from '../../components/ui/Bits';
 import { ConfirmDialog, Modal, useToast } from '../../components/ui/Overlay';
 import { PinPicker, polygonAreaHa, type BoundaryPath } from '../../components/map/LandsMap';
 import { CATEGORIES } from '../../data/categories';
-import { REGIONS, regionByKey } from '../../data/regions';
+import { INVESTMENT_REGIONS, regionByKey } from '../../data/regions';
 import { PageTitle, Avatar } from '../cabinet/CabinetShell';
 import { LandSearchBar } from '../shared/LandSearch';
 
@@ -65,6 +65,8 @@ export const AdminShell: React.FC = () => {
   const nav = [
     { to: lp('/admin'), label: t('admin.nav.lands'), icon: <LayoutGrid className="w-5 h-5" />, end: true },
     { to: lp('/admin/applications'), label: t('competition.applications'), icon: <FileText className="w-5 h-5" /> },
+    { to: lp('/admin/investors'), label: t('admin.panel.investors', { defaultValue: 'Investors' }), icon: <Users className="w-5 h-5" /> },
+    { to: lp('/admin/statistics'), label: t('admin.panel.statistics', { defaultValue: 'Statistics' }), icon: <BarChart3 className="w-5 h-5" /> },
     { to: lp('/admin/lands/new'), label: t('admin.nav.add'), icon: <Plus className="w-5 h-5" /> },
   ];
   return (
@@ -97,7 +99,7 @@ export const AdminShell: React.FC = () => {
           <Suspense fallback={<div className="skeleton h-40" />}><Outlet /></Suspense>
         </main>
       </div>
-      <nav aria-label={t('admin.badge')} className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-line grid grid-cols-3">
+      <nav aria-label={t('admin.badge')} className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-line grid grid-cols-5">
         {nav.map(n => (
           <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `flex flex-col items-center gap-0.5 py-2 text-xs font-bold ${isActive ? 'text-brand' : 'text-muted'}`}>
             <span aria-hidden="true">{n.icon}</span>{n.label}
@@ -117,6 +119,7 @@ export const AdminLandsPage: React.FC = () => {
   const [status, setStatus] = useState<'active' | 'draft' | 'approved' | 'archived'>('active');
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
+  const [region, setRegion] = useState('');
   const [rows, setRows] = useState<AdminLandListItem[] | null>(null);
   const [error, setError] = useState('');
 
@@ -124,13 +127,13 @@ export const AdminLandsPage: React.FC = () => {
     let alive = true;
     const serverStatus = status === 'active' ? '' : status;
     const id = setTimeout(() => {
-      adminLands.list(serverStatus, q).then(r => { if (alive) { setRows(r); setError(''); } })
+      adminLands.list(serverStatus, q, region, type).then(r => { if (alive) { setRows(r); setError(''); } })
         .catch((x: AdminError) => { if (alive) { setRows([]); setError(x.message || t('auth.errors.server')); } });
     }, 250);
     return () => { alive = false; clearTimeout(id); };
-  }, [status, q]);
+  }, [status, q, region, type]);
 
-  const shown = (rows ?? []).filter(r => !type || r.landUse === type);
+  const shown = rows ?? [];
   const place = (r: AdminLandListItem) => [t(`regions.${r.region}`, { defaultValue: r.region }), r.district, r.settlement].filter(Boolean).join(' · ');
 
   return (
@@ -138,6 +141,10 @@ export const AdminLandsPage: React.FC = () => {
       <PageTitle title={t('admin.lands.title')} subtitle={t('admin.lands.subtitle')}
         actions={<Link to={lp('/admin/lands/new')} className="btn btn-primary"><Plus className="w-4 h-4" />{t('admin.nav.add')}</Link>} />
       <LandSearchBar value={q} onChange={setQ} type={type} onTypeChange={setType} className="mb-4" />
+      <select className="field mb-4 sm:!w-auto" aria-label={t('admin.form.region')} value={region} onChange={e => setRegion(e.target.value)}>
+        <option value="">{t('admin.panel.allRegions', { defaultValue: 'All regions' })}</option>
+        {INVESTMENT_REGIONS.map(r => <option key={r.key} value={r.key}>{t(`regions.${r.key}`)}</option>)}
+      </select>
       <Tabs label={t('admin.lands.title')} value={status} onChange={setStatus} tabs={[
         { id: 'active', label: t('admin.lands.tabActive') }, { id: 'draft', label: t('admin.status.DRAFT') },
         { id: 'approved', label: t('admin.status.APPROVED') }, { id: 'archived', label: t('admin.status.ARCHIVED') },
@@ -158,6 +165,7 @@ export const AdminLandsPage: React.FC = () => {
                       <p className="text-sm text-muted truncate">{place(r)} · {t('land.ha', { n: Math.round(r.areaHectares * 100) / 100 })}{r.landUse ? ` · ${t(`fieldTypes.${r.landUse}`, { defaultValue: r.landUse })}` : ''}</p>
                     </div>
                     <div className="text-xs text-muted sm:text-right shrink-0">
+                      <p>{t('admin.form.createdBy')}: {r.createdBy ?? '—'}</p>
                       <p>{t('admin.lands.updated', { date: f.date(r.updatedAt), name: r.updatedBy ?? '—' })}</p>
                       <p>{r.cadastralNumber ?? (r.cadastralUnavailable ? t('admin.form.cadastralNone') : '—')}</p>
                     </div>
@@ -445,7 +453,7 @@ export const AdminLandEditor: React.FC = () => {
 
           {section(L('sLocation'), <>
             <div className="grid sm:grid-cols-3 gap-5">
-              <div id="af-region">{choice('region', REGIONS.map(r => r.key), 'regions', L('region'))}</div>
+              <div id="af-region">{choice('region', options?.investmentRegions ?? INVESTMENT_REGIONS.map(r => r.key), 'regions', L('region'))}</div>
               {text('district', L('district'), { optional: true, max: 100 })}
               {text('settlement', L('settlement'), { optional: true, max: 100 })}
             </div>

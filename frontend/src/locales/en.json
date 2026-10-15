@@ -1062,6 +1062,11 @@
     "notRegistry": "AGROInvest is not an official land registry; for official records contact the State Service on Property Issues."
   },
   "admin": {
+    "panel": {
+      "investors": "Investors", "investorsHint": "Registered applicants and their profile information", "statistics": "Statistics", "statisticsHint": "Applications and investment activity", "allRegions": "All regions", "noInvestors": "No investors found", "applicationsCount": "{{count}} applications", "registered": "Registered", "accountStatus": "Account status", "incomplete": "Profile incomplete", "confirmed": "Confirmed", "unconfirmed": "Email unconfirmed", "previous": "Previous", "next": "Next", "noData": "No data yet", "publishedLands": "Published lands", "byRegion": "Applications by region", "byActivity": "Applications by activity", "byStatus": "Applications by status", "byMonth": "Recent months",
+      "types": { "INDIVIDUAL": "Individual", "LEGAL_ENTITY": "Legal entity", "FOREIGN_INDIVIDUAL": "Foreign individual", "FOREIGN_ENTITY": "Foreign entity" },
+      "fields": { "companyName": "Company", "taxIdentificationNumber": "Tax number", "businessActivity": "Main activity", "foreignTaxNumber": "Foreign tax number", "country": "Country", "activityStatus": "Activity status", "activityStartDate": "Activity start date", "ceoName": "CEO", "address": "Address", "maritalStatus": "Marital status", "incomeLast6Months": "Income in last 6 months", "residencyStatus": "Residency status", "incomeSource": "Income source", "hasCredit": "Has credit", "monthlyCreditPayment": "Monthly credit payment", "hasFixedIncome": "Fixed income", "fixedMonthlyIncome": "Fixed monthly income", "minimumFunds": "Minimum funds" }
+    },
     "badge": "Ministry panel",
     "noAccess": "This page is for ministry administrators only",
     "noAccessText": "Your account does not have administrator access. If access was just granted, log out and log in again.",
@@ -1201,7 +1206,7 @@
       "howTitle": "How it works",
       "howSteps": [
         "Enter the information and save it as a draft.",
-        "Upload the legal documents.",
+        "Upload at least one photo; add documents if available.",
         "Fix the checks in the side panel.",
         "Check the documents and mark the land “Verified” if needed.",
         "Review the summary and publish."
@@ -1306,7 +1311,9 @@
       "environment": "Other environmental details",
       "crop_history": "Crop history",
       "soil_analysis": "Soil analysis (result)",
-      "water_analysis": "Water analysis (result)"
+      "water_analysis": "Water analysis (result)",
+      "last_income": "Last income from the land (AZN)",
+      "last_profit": "Last profit from the land (AZN)"
     }
   },
   "competition": {

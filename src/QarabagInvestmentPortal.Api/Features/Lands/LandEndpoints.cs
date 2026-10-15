@@ -56,7 +56,7 @@ public static class LandEndpoints
                 .OrderByDescending(o => o.CreatedAt).ToListAsync(ct);
             var dtos = await opportunities.ToDtosAsync(opps, viewer, ct, includeLand: false);
             var active = dtos.FirstOrDefault(o => o.Status == OpportunityStatus.Active);
-            return Results.Ok(new LandDetailDto(LandDto.From(land, active is not null), dtos, active));
+            return Results.Ok(new LandDetailDto(LandDto.From(land, active is not null, viewer.IsAdmin), dtos, active));
         });
 
         // Land photos: public only for ministry-published land; other records remain admin-only.

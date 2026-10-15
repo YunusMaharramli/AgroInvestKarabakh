@@ -19,6 +19,7 @@ public sealed record LandPublicationCheck(bool CanPublish, IReadOnlyList<LandIss
 public static partial class AdminLandRules
 {
     public const double HectaresPerSot = 0.01;
+    public static readonly string[] InvestmentRegions = ["aghdam", "fuzuli", "jabrayil", "zangilan", "gubadli", "lachin", "kalbajar", "khojavend", "shusha", "khankendi", "tartar"];
 
     /// <summary>Water availability (core field): includes "rain_fed" and "none_known" (no known water access).</summary>
     public static readonly string[] WaterAccessOptions = ["irrigation_canal", "well", "river", "reservoir", "spring", "mains", "rain_fed", "none_known"];
@@ -46,6 +47,8 @@ public static partial class AdminLandRules
         new("crop_history", "Əkin tarixçəsi", InputKind.Text),
         new("soil_analysis", "Torpaq analizi (nəticə)", InputKind.Text),
         new("water_analysis", "Su analizi (nəticə)", InputKind.Text),
+        new("last_income", "Torpaqdan son gəlir", InputKind.Number, "AZN", Min: 0),
+        new("last_profit", "Torpaqdan son mənfəət", InputKind.Number, "AZN"),
     ], []);
 
     /// <summary>Which legal documents fit the ownership form. Private land: ownership or lease. State/municipal: authorization, ownership or lease.</summary>
@@ -77,12 +80,12 @@ public static partial class AdminLandRules
         if (land.LegalCategory is null) Block("legal_category", "legalCategory", "Torpağın rəsmi kateqoriyasını (təyinatını) seçin.");
         if (land.OwnershipForm is null) Block("ownership_form", "ownershipForm", "Mülkiyyət növünü seçin (sənəd tələbi buna görə müəyyən olunur).");
         if (land.AreaHectares <= 0) Block("area", "area", "Sahənin ölçüsünü hektar və ya sot ilə yazın.");
-        if (string.IsNullOrWhiteSpace(land.Region)) Block("region", "region", "Rayonu seçin.");
+        if (!InvestmentRegions.Contains(land.Region)) Block("region", "region", "Qarabağ investisiya rayonlarından birini seçin.");
         if (land.Latitude == 0 && land.Longitude == 0) Block("location", "location", "Sahənin yerini xəritədə işarələyin.");
         if (land.BoundaryGeoJson is null) Block("boundary", "boundary", "Sahənin sərhədini xəritədə çəkin.");
         if (land.WaterAccess is null) Block("water_access", "waterAccess", "Su təminatını seçin (o cümlədən “dəmyə” və ya “məlum su mənbəyi yoxdur”).");
-        if (deadline.Value is null) Block("deadline_required", "applicationDeadline", "Müsabiqə üçün son müraciət tarixini yazın.");
         if (deadline.Value is { } d && d < now) Block("deadline", "applicationDeadline", "Müraciət üçün son tarix keçmişdədir.");
+        if (land.Photos.Count == 0) Block("photos", "photos", "Dərc etmək üçün ən azı bir foto yükləyin.");
 
         // Cadastral number: either the number, or "not available" + manual review (verification).
         if (string.IsNullOrWhiteSpace(land.CadastralNumber))
@@ -93,12 +96,6 @@ public static partial class AdminLandRules
                 Block("cadastral_manual_review", "cadastralNumber",
                     "Kadastr nömrəsi yoxdur: sənədləri əl ilə yoxlayıb sahəni “Təsdiqlənib” statusuna keçirdikdən sonra dərc etmək olar.");
         }
-
-        // Legal evidence that fits the ownership form.
-        var accepted = AcceptedLegalKinds(land.OwnershipForm);
-        if (!land.Documents.Any(doc => accepted.Contains(doc.Kind)))
-            Block("legal_documents", "documents",
-                $"Hüquqi sənəd yükləyin ({string.Join(", ", accepted.Select(KindLabel))}).");
 
         // Eligibility: the land-use deal-breakers.
         if (type is not null)

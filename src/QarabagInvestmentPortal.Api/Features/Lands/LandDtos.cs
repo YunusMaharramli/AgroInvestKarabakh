@@ -17,7 +17,7 @@ public sealed record LandDto(
     string? District, string? Settlement, LandVerificationStatus Verification, string? WaterAccess,
     string LandUse, LandCoreDto Core, JsonElement Attributes, IReadOnlyList<LandPhotoDto> Photos, SuitabilityResult Suitability)
 {
-    public static LandDto From(Land l, bool hasActiveOpportunity = false)
+    public static LandDto From(Land l, bool hasActiveOpportunity = false, bool includePrivateBoundary = false)
     {
         var photos = l.Photos.OrderBy(p => p.SortOrder).Select(p => LandPhotoDto.From(l.Id, p)).ToList();
         var image = string.IsNullOrWhiteSpace(l.ImageUrl) && photos.Count > 0 ? photos[0].Url : l.ImageUrl;
@@ -27,7 +27,7 @@ public sealed record LandDto(
             l.OwnerId, l.OwnerId is not null, hasActiveOpportunity, l.CreatedAt, l.UpdatedAt, l.OwnershipType,
             l.District, l.Settlement, l.Verification, l.WaterAccess,
             (LandUseCatalog.Find(l.LandUse) ?? LandUseCatalog.Find(l.AgricultureType))?.Key ?? l.LandUse,
-            LandCoreDto.From(l), ToJson(l.Attributes), photos, LandSuitability.Evaluate(l));
+            LandCoreDto.From(l, hasActiveOpportunity || includePrivateBoundary), ToJson(l.Attributes), photos, LandSuitability.Evaluate(l));
     }
 
     private static JsonElement ToJson(string? json)
@@ -51,10 +51,10 @@ public sealed record LandCoreDto(
     bool? HasEncumbrance, string? Encumbrances, JsonElement? Boundary, string? RoadAccessType,
     double? RoadDistanceKm, double? SettlementDistanceKm, string? CurrentUse)
 {
-    public static LandCoreDto From(Land l)
+    public static LandCoreDto From(Land l, bool includeBoundary)
     {
         JsonElement? boundary = null;
-        if (!string.IsNullOrWhiteSpace(l.BoundaryGeoJson))
+        if (includeBoundary && !string.IsNullOrWhiteSpace(l.BoundaryGeoJson))
         {
             try
             {

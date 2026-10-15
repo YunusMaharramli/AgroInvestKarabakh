@@ -59,6 +59,7 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<OpportunityQueries>();
 builder.Services.AddScoped<AdminLandService>();
 builder.Services.AddScoped<EktisIntegrationService>();
+builder.Services.AddScoped<InvestorDirectoryService>();
 builder.Services.AddScoped<ProposalService>();
 builder.Services.AddScoped<LegacyJsonImporter>();
 builder.Services.AddScoped<LoginAttemptService>();

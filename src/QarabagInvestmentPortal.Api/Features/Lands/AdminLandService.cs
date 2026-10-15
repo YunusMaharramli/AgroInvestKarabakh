@@ -42,13 +42,15 @@ public sealed class AdminLandService(
 
     // ------------------------------------------------------------------ queries
 
-    public async Task<List<AdminLandListItemDto>> ListAsync(string? status, string? search, CancellationToken ct)
+    public async Task<List<AdminLandListItemDto>> ListAsync(string? status, string? search, string? region, string? landUse, CancellationToken ct)
     {
         var query = Managed().AsNoTracking();
         if (!string.IsNullOrWhiteSpace(status) && status != "all" && Enum.TryParse<LandStatus>(status.Replace("_", ""), true, out var s))
             query = query.Where(l => l.Status == s);
         else if (status != "all")
             query = query.Where(l => l.Status != LandStatus.Archived);
+        if (!string.IsNullOrWhiteSpace(region)) query = query.Where(l => l.Region == region);
+        if (!string.IsNullOrWhiteSpace(landUse)) query = query.Where(l => l.LandUse == landUse);
         if (search?.Trim() is { Length: > 0 } q)
         {
             var pattern = $"%{q.Replace("%", "").Replace("_", "")}%";
@@ -260,6 +262,8 @@ public sealed class AdminLandService(
         if (land.Status == LandStatus.Archived) return AdminLandResult.Fail(400, "Arxivdəki sahədə dəyişiklik etmək olmaz.");
         var photo = land.Photos.FirstOrDefault(p => p.Id == photoId);
         if (photo is null) return AdminLandResult.Fail(404, "Foto tapılmadı.");
+        if (land.Status == LandStatus.Approved && land.Photos.Count == 1)
+            return AdminLandResult.Fail(409, "Dərc edilmiş sahənin son fotosunu silmək olmaz. Əvvəlcə yeni foto əlavə edin və ya elanı dərcdən çıxarın.");
         db.LandPhotos.Remove(photo);
         land.UpdatedById = adminId;
         land.UpdatedAt = clock.GetUtcNow();
@@ -641,7 +645,7 @@ public sealed class AdminLandService(
             : (await opportunities.ToDtosAsync([opportunity], new Viewer(adminId, true), ct, includeLand: false)).FirstOrDefault();
 
         return new AdminLandDetailDto(
-            LandDto.From(land, opportunity?.Status == OpportunityStatus.Active),
+            LandDto.From(land, opportunity?.Status == OpportunityStatus.Active, includePrivateBoundary: true),
             new AdminLandFieldsDto(
                 land.Title, land.Description, land.Region, land.District, land.Settlement, land.AreaHectares, land.Latitude, land.Longitude,
                 ParseJson(land.BoundaryGeoJson), land.LandUse, land.IntendedUse, land.LegalCategory, land.CategoryConvertible, land.OwnershipForm,
@@ -751,7 +755,12 @@ internal sealed class AdminLandForm(IFormCollection form, bool creating)
             else land.Title = title;
         }
         if (Sent("description")) land.Description = Text("description", 4000) ?? string.Empty;
-        if (Sent("region")) land.Region = Text("region", 100) ?? string.Empty;
+        if (Sent("region"))
+        {
+            var region = Text("region", 100) ?? string.Empty;
+            if (region.Length > 0 && !AdminLandRules.InvestmentRegions.Contains(region)) Errors["region"] = "Qarabağ investisiya rayonlarından birini seçin.";
+            else land.Region = region;
+        }
         if (Sent("district")) land.District = Text("district", 100);
         if (Sent("settlement")) land.Settlement = Text("settlement", 100);
 

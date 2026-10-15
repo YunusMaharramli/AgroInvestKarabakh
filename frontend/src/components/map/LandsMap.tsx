@@ -101,6 +101,8 @@ export const LandsMap: React.FC<{ lands: Land[]; height?: string; detailHref?: (
           <APIProvider apiKey={MAPS_KEY}>
             <Map defaultCenter={AZ_CENTER} defaultZoom={7} styles={MAP_STYLE} scrollwheel={wheel} gestureHandling={wheel ? 'greedy' : 'cooperative'}
               zoomControl streetViewControl={false} mapTypeControl={false} fullscreenControl={false} clickableIcons={false}>
+              {visible.filter(l => l.status === 'active' && l.boundary?.coordinates?.[0]).map(l =>
+                <BoundaryShape key={l.id} path={l.boundary!.coordinates[0] as BoundaryPath} showVertices={false} />)}
               <LandMarkers lands={visible} title={name} onSelect={setActive} />
               {active && (
                 <InfoWindow position={{ lat: active.lat, lng: active.lng }} onCloseClick={() => setActive(null)} pixelOffset={[0, -38]}>
@@ -151,7 +153,7 @@ const VERTEX_ICON = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"><circle cx="7" cy="7" r="5" fill="#ffffff" stroke="#1F4D2E" stroke-width="2.5"/></svg>');
 
 /** Draws the boundary polygon. Not clickable, so map clicks keep adding corners. */
-const BoundaryShape: React.FC<{ path: BoundaryPath }> = ({ path }) => {
+const BoundaryShape: React.FC<{ path: BoundaryPath; showVertices?: boolean }> = ({ path, showVertices = true }) => {
   const map = useMap();
   const loaded = useApiIsLoaded();
   const shape = useRef<google.maps.Polygon | null>(null);
@@ -163,7 +165,7 @@ const BoundaryShape: React.FC<{ path: BoundaryPath }> = ({ path }) => {
   }, [map, loaded]);
   useEffect(() => { shape.current?.setPath(path.map(([lng, lat]) => ({ lat, lng }))); }, [path, map, loaded]);
   if (!loaded) return null;
-  return <>{path.map(([lng, lat], i) => <Marker key={i} position={{ lat, lng }} clickable={false} icon={{ url: VERTEX_ICON, anchor: new google.maps.Point(7, 7) }} />)}</>;
+  return showVertices ? <>{path.map(([lng, lat], i) => <Marker key={i} position={{ lat, lng }} clickable={false} icon={{ url: VERTEX_ICON, anchor: new google.maps.Point(7, 7) }} />)}</> : null;
 };
 
 interface PinPickerProps {
@@ -231,8 +233,8 @@ export const PinPicker: React.FC<PinPickerProps> = ({ value, onChange, center, e
       <p className="field-hint mb-2">{mode === 'draw' ? t('map.drawHint') : t('map.pinHint')}</p>
       <div className={`h-80 rounded-2xl overflow-hidden border ${error ? 'border-danger' : 'border-line'} ${mode === 'draw' ? 'cursor-crosshair' : ''}`} onClick={() => setWheel(true)}>
         <APIProvider apiKey={MAPS_KEY}>
-          <Map key={center ? `${center.lat},${center.lng}` : 'az'} defaultCenter={value ?? center ?? AZ_CENTER} defaultZoom={value ? 14 : center ? 10 : 7} styles={MAP_STYLE}
-            scrollwheel={wheel} streetViewControl={false} mapTypeControl={false} fullscreenControl={false} clickableIcons={false}
+          <Map key={center ? `${center.lat},${center.lng}` : 'az'} defaultCenter={value ?? center ?? AZ_CENTER} defaultZoom={value ? 14 : center ? 10 : 7} mapTypeId="hybrid"
+            scrollwheel={wheel} streetViewControl={false} mapTypeControl fullscreenControl={false} clickableIcons={false}
             draggableCursor={mode === 'draw' ? 'crosshair' : undefined} disableDoubleClickZoom={mode === 'draw'} onClick={onMapClick}>
             {boundary.length > 0 && <BoundaryShape path={boundary} />}
             {value && <Marker position={value} icon={markerIcon('#1F4D2E')} clickable={false} />}
@@ -270,6 +272,7 @@ export const SingleLandMap: React.FC<{ land: Land }> = ({ land }) => {
     <div className="h-72 rounded-2xl overflow-hidden border border-line">
       <APIProvider apiKey={MAPS_KEY}>
         <Map defaultCenter={{ lat: land.lat, lng: land.lng }} defaultZoom={11} styles={MAP_STYLE} gestureHandling="cooperative" streetViewControl={false} mapTypeControl={false}>
+          {land.status === 'active' && land.boundary?.coordinates?.[0] && <BoundaryShape path={land.boundary.coordinates[0] as BoundaryPath} showVertices={false} />}
           <Marker position={{ lat: land.lat, lng: land.lng }} icon={markerIcon(groupColor(land.fieldType), land.isSpecial)} />
         </Map>
       </APIProvider>

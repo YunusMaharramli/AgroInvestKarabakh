@@ -1062,6 +1062,11 @@
     "notRegistry": "AGROInvest rəsmi torpaq reyestri deyil; rəsmi məlumat üçün Əmlak Məsələləri Dövlət Xidmətinə müraciət edin."
   },
   "admin": {
+    "panel": {
+      "investors": "İnvestorlar", "investorsHint": "Qeydiyyatdan keçmiş müraciətçilər və profil məlumatları", "statistics": "Statistika", "statisticsHint": "Müraciətlər və investisiya fəaliyyəti", "allRegions": "Bütün rayonlar", "noInvestors": "İnvestor tapılmadı", "applicationsCount": "{{count}} müraciət", "registered": "Qeydiyyat tarixi", "accountStatus": "Hesab statusu", "incomplete": "Profil tamamlanmayıb", "confirmed": "Təsdiqlənib", "unconfirmed": "E-poçt təsdiqlənməyib", "previous": "Əvvəlki", "next": "Növbəti", "noData": "Hələ məlumat yoxdur", "publishedLands": "Dərc olunmuş sahələr", "byRegion": "Rayonlar üzrə müraciətlər", "byActivity": "Fəaliyyət üzrə müraciətlər", "byStatus": "Status üzrə müraciətlər", "byMonth": "Son aylar",
+      "types": { "INDIVIDUAL": "Fiziki şəxs", "LEGAL_ENTITY": "Hüquqi şəxs", "FOREIGN_INDIVIDUAL": "Xarici fiziki şəxs", "FOREIGN_ENTITY": "Xarici hüquqi şəxs" },
+      "fields": { "companyName": "Şirkət", "taxIdentificationNumber": "VÖEN", "businessActivity": "Əsas fəaliyyət", "foreignTaxNumber": "Xarici vergi nömrəsi", "country": "Ölkə", "activityStatus": "Fəaliyyət statusu", "activityStartDate": "Fəaliyyətə başlama tarixi", "ceoName": "Rəhbər", "address": "Ünvan", "maritalStatus": "Ailə vəziyyəti", "incomeLast6Months": "Son 6 ayın gəliri", "residencyStatus": "Yaşayış statusu", "incomeSource": "Gəlir mənbəyi", "hasCredit": "Krediti var", "monthlyCreditPayment": "Aylıq kredit ödənişi", "hasFixedIncome": "Sabit gəliri var", "fixedMonthlyIncome": "Aylıq sabit gəlir", "minimumFunds": "Minimum vəsait" }
+    },
     "badge": "Nazirlik paneli",
     "noAccess": "Bu səhifə yalnız nazirlik inzibatçıları üçündür",
     "noAccessText": "Hesabınızın inzibatçı icazəsi yoxdur. İcazə verilibsə, çıxıb yenidən daxil olun.",
@@ -1201,7 +1206,7 @@
       "howTitle": "Necə işləyir",
       "howSteps": [
         "Məlumatı daxil edin və qaralama kimi saxlayın.",
-        "Hüquqi sənədləri yükləyin.",
+        "Ən azı bir foto yükləyin; sənədləri varsa əlavə edin.",
         "Sağ paneldəki yoxlamaları düzəldin.",
         "Sənədləri yoxlayın və lazım olsa “Təsdiqlənib” edin.",
         "Xülasəni nəzərdən keçirib dərc edin."
@@ -1306,7 +1311,9 @@
       "environment": "Digər ekoloji məlumatlar",
       "crop_history": "Əkin tarixçəsi",
       "soil_analysis": "Torpaq analizi (nəticə)",
-      "water_analysis": "Su analizi (nəticə)"
+      "water_analysis": "Su analizi (nəticə)",
+      "last_income": "Torpaqdan son gəlir (AZN)",
+      "last_profit": "Torpaqdan son mənfəət (AZN)"
     }
   },
   "competition": {

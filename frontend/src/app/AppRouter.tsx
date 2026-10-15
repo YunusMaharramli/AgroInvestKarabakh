@@ -24,6 +24,8 @@ const AdminShell = lazy(() => import('../features/admin/AdminPages').then(m => (
 const AdminLandsPage = lazy(() => import('../features/admin/AdminPages').then(m => ({ default: m.AdminLandsPage })));
 const AdminApplicationsPage = lazy(() => import('../features/admin/AdminApplicationsPage'));
 const AdminLandEditor = lazy(() => import('../features/admin/AdminPages').then(m => ({ default: m.AdminLandEditor })));
+const AdminInvestorsPage = lazy(() => import('../features/admin/AdminPanelPages').then(m => ({ default: m.AdminInvestorsPage })));
+const AdminStatisticsPage = lazy(() => import('../features/admin/AdminPanelPages').then(m => ({ default: m.AdminStatisticsPage })));
 
 import { CompareProvider } from '../features/compare/CompareContext';
 import { authService, refreshPortal } from '../services/api';
@@ -122,6 +124,8 @@ export const AppRouter: React.FC = () => {
               <Route path="admin" element={<React.Suspense fallback={null}><AdminShell /></React.Suspense>}>
                 <Route index element={<AdminLandsPage />} />
                 <Route path="applications" element={<AdminApplicationsPage />} />
+                <Route path="investors" element={<AdminInvestorsPage />} />
+                <Route path="statistics" element={<AdminStatisticsPage />} />
                 <Route path="lands/new" element={<AdminLandEditor />} />
                 <Route path="lands/:id" element={<AdminLandEditor />} />
               </Route>

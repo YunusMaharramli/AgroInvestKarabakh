@@ -37,6 +37,9 @@ public static class AdminEndpoints
     {
         var admin = api.MapGroup("/admin").RequireAuthorization(Policies.Admin);
 
+        admin.MapGet("/investors", async (string? search, int? page, InvestorDirectoryService service, CancellationToken ct) =>
+            Results.Ok(await service.ListAsync(search, page ?? 1, ct)));
+
         admin.MapGet("/analytics", async (AppDbContext db, CancellationToken ct) =>
         {
             var proposals = await db.Proposals.AsNoTracking()

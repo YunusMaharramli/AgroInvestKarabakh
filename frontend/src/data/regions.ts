@@ -28,4 +28,9 @@ export const REGIONS: Region[] = [
   { key: 'sabirabad', lat: 40.01, lng: 48.47, climateRisk: 0.7 },
 ];
 
+/** Areas offered for admin-entered Qarabağ investment listings. */
+export const INVESTMENT_REGIONS = REGIONS.filter(r => [
+  'aghdam', 'fuzuli', 'jabrayil', 'zangilan', 'gubadli', 'lachin', 'kalbajar', 'khojavend', 'shusha', 'khankendi', 'tartar',
+].includes(r.key));
+
 export const regionByKey = (key: string) => REGIONS.find(r => r.key === key);

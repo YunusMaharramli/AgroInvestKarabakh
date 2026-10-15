@@ -18,6 +18,7 @@ public static class AdminLandEndpoints
         lands.MapGet("/options", () => Results.Ok(new
         {
             AdminLandRules.WaterAccessOptions,
+            AdminLandRules.InvestmentRegions,
             AdminLandRules.DocumentKinds,
             LandUseCatalog.LegalCategories,
             LandUseCatalog.OwnershipForms,
@@ -26,8 +27,8 @@ public static class AdminLandEndpoints
             AdminLandRules.HectaresPerSot,
         }));
 
-        lands.MapGet("", async (string? status, string? search, AdminLandService service, CancellationToken ct) =>
-            Results.Ok(await service.ListAsync(status, search, ct)));
+        lands.MapGet("", async (string? status, string? search, string? region, string? landUse, AdminLandService service, CancellationToken ct) =>
+            Results.Ok(await service.ListAsync(status, search, region, landUse, ct)));
 
         lands.MapGet("/{id}", async (string id, ClaimsPrincipal user, AdminLandService service, CancellationToken ct) =>
             await service.GetAsync(id, user.RequiredUserId(), ct) is { } dto ? Results.Ok(dto) : ApiResults.NotFound("Torpaq sahəsi tapılmadı."));

@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>QarabagInvestmentPortal.Api</RootNamespace>
+    <UserSecretsId>11f32add-78f9-4f2f-a971-6c0fae5d8046</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
@@ -12,6 +13,8 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+	<PackageReference Include="MailKit" Version="4.18.1" />
+	<PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="QarabagInvestmentPortal.UnitTests" />

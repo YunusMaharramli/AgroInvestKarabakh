@@ -21,6 +21,7 @@ public sealed class User
 
     public UserRole Role { get; set; } = UserRole.User;
     public string PasswordHash { get; set; } = string.Empty;
+    public DateTimeOffset? EmailConfirmedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 

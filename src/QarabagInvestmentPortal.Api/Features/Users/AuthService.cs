@@ -6,9 +6,17 @@ using QarabagInvestmentPortal.Api.Infrastructure.Validation;
 
 namespace QarabagInvestmentPortal.Api.Features.Users;
 
-public sealed class AuthService(AppDbContext db, SessionStore sessions, TimeProvider clock)
+public sealed class AuthService(
+    AppDbContext db,
+    SessionStore sessions,
+    TimeProvider clock,
+    LoginAttemptService loginAttempts,
+    EmailConfirmationService emailConfirmation,
+    ILogger<AuthService> logger)
 {
-    public async Task<Outcome<AuthResponse>> RegisterAsync(RegisterRequest req, HttpResponse response, CancellationToken ct)
+    public async Task<Outcome<RegistrationResponse>> RegisterAsync(
+        RegisterRequest req,
+        CancellationToken ct)
     {
         var firstName = req.FirstName?.Trim() ?? string.Empty;
         var lastName = req.LastName?.Trim() ?? string.Empty;
@@ -16,15 +24,15 @@ public sealed class AuthService(AppDbContext db, SessionStore sessions, TimeProv
         var password = req.Password ?? string.Empty;
 
         if (firstName.Length == 0 || lastName.Length == 0 || email.Length == 0 || string.IsNullOrWhiteSpace(req.Phone) || password.Length == 0)
-            return Outcome<AuthResponse>.Fail(400, "Bütün məcburi sahələr doldurulmalıdır.");
+            return Outcome<RegistrationResponse>.Fail(400, "Bütün məcburi sahələr doldurulmalıdır.");
         if (password != req.ConfirmPassword)
-            return Outcome<AuthResponse>.Fail(400, "Daxil edilən şifrələr bir-biri ilə uyğun gəlmir.");
+            return Outcome<RegistrationResponse>.Fail(400, "Daxil edilən şifrələr bir-biri ilə uyğun gəlmir.");
         if (password.Length < 6)
-            return Outcome<AuthResponse>.Fail(400, "Şifrə ən azı 6 simvoldan ibarət olmalıdır.");
+            return Outcome<RegistrationResponse>.Fail(400, "Şifrə ən azı 6 simvoldan ibarət olmalıdır.");
         if (!AzerbaijaniPhone.TryNormalize(req.Phone, out var phone))
-            return Outcome<AuthResponse>.Fail(400, AzerbaijaniPhone.InvalidMessage);
+            return Outcome<RegistrationResponse>.Fail(400, AzerbaijaniPhone.InvalidMessage);
         if (await db.Users.AnyAsync(u => u.Email == email, ct))
-            return Outcome<AuthResponse>.Fail(409, "Bu elektron poçt ünvanı artıq sistemdə qeydiyyatdan keçib.");
+            return Outcome<RegistrationResponse>.Fail(409, "Bu elektron poçt ünvanı artıq sistemdə qeydiyyatdan keçib.");
 
         var now = clock.GetUtcNow();
         var userId = Ids.New("usr");
@@ -54,28 +62,106 @@ public sealed class AuthService(AppDbContext db, SessionStore sessions, TimeProv
         db.Users.Add(user);
         await db.SaveChangesAsync(ct);
 
-        var token = sessions.Create(user, response);
-        return Outcome<AuthResponse>.Success(new AuthResponse("Qeydiyyat uğurla tamamlandı.", token, UserDto.From(user), ProfileDto.From(profile)));
+        try
+        {
+            await emailConfirmation.SendAsync(user, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex,
+                "Confirmation email could not be sent for user {UserId}", user.Id);
+
+            return Outcome<RegistrationResponse>.Success(
+                new RegistrationResponse(
+                    "Hesab yaradıldı, amma təsdiq məktubu göndərilə bilmədi. Bir neçə dəqiqədən sonra yenidən göndərməyi yoxlayın.",
+                    true,
+                    true));
+        }
+
+        return Outcome<RegistrationResponse>.Success(
+            new RegistrationResponse(
+                "Hesab yaradıldı. E-poçtunuza göndərilən linklə ünvanınızı təsdiqləyin.",
+                true,
+                false));
     }
 
-    public async Task<Outcome<AuthResponse>> LoginAsync(LoginRequest req, HttpResponse response, CancellationToken ct)
+    public async Task<Outcome<AuthResponse>> LoginAsync(
+    LoginRequest req,
+    string ipAddress,
+    HttpResponse response,
+    CancellationToken ct)
     {
         var email = req.Email?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (email.Length == 0 || string.IsNullOrEmpty(req.Password))
+        var password = req.Password ?? string.Empty;
+
+        if (email.Length == 0 || email.Length > 256 || password.Length == 0)
             return Outcome<AuthResponse>.Fail(400, "E-poçt və şifrə daxil edilməlidir.");
 
-        var user = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Email == email, ct);
-        if (user is null || !BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash))
-            return Outcome<AuthResponse>.Fail(401, "E-poçt və ya şifrə yanlışdır.");
+        var result = await loginAttempts.AuthenticateAsync(
+            email, password, ipAddress, ct);
+
+        if (!result.Ok)
+            return Outcome<AuthResponse>.Fail(result.Status, result.Error!);
+
+        var user = result.Value!;
+
+        if (user.EmailConfirmedAt is null)
+            return Outcome<AuthResponse>.Fail(
+                403, "Giriş üçün əvvəlcə e-poçt ünvanınızı təsdiqləyin.");
 
         var token = sessions.Create(user, response);
-        return Outcome<AuthResponse>.Success(new AuthResponse("Uğurla daxil oldunuz.", token, UserDto.From(user), ProfileDto.From(user.Profile)));
+
+        return Outcome<AuthResponse>.Success(
+            new AuthResponse(
+                "Uğurla daxil oldunuz.",
+                token,
+                UserDto.From(user),
+                ProfileDto.From(user.Profile)));
     }
 
     public async Task<MeResponse?> MeAsync(string userId, CancellationToken ct)
     {
         var user = await db.Users.AsNoTracking().Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == userId, ct);
         return user is null ? null : new MeResponse(UserDto.From(user), ProfileDto.From(user.Profile));
+    }
+
+    public async Task<Outcome<MessageResponse>> ChangePasswordAsync(
+    string userId,
+    ChangePasswordRequest req,
+    HttpResponse response,
+    CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(req.CurrentPassword) ||
+            string.IsNullOrEmpty(req.NewPassword) ||
+            string.IsNullOrEmpty(req.ConfirmNewPassword))
+            return Outcome<MessageResponse>.Fail(400, "Bütün şifrə sahələri doldurulmalıdır.");
+
+        if (req.NewPassword != req.ConfirmNewPassword)
+            return Outcome<MessageResponse>.Fail(400, "Yeni şifrələr uyğun gəlmir.");
+
+        // Hələlik qeydiyyatdakı mövcud qayda ilə eynidir.
+        if (req.NewPassword.Length < 6)
+            return Outcome<MessageResponse>.Fail(400, "Şifrə ən azı 6 simvol olmalıdır.");
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null)
+            return Outcome<MessageResponse>.Fail(401, "Giriş tələb olunur.");
+
+        if (!BCrypt.Net.BCrypt.Verify(req.CurrentPassword, user.PasswordHash))
+            return Outcome<MessageResponse>.Fail(400, "Hazırkı şifrə yanlışdır.");
+
+        if (BCrypt.Net.BCrypt.Verify(req.NewPassword, user.PasswordHash))
+            return Outcome<MessageResponse>.Fail(400, "Yeni şifrə əvvəlki şifrədən fərqli olmalıdır.");
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        user.UpdatedAt = clock.GetUtcNow();
+        await db.SaveChangesAsync(ct);
+
+        sessions.RemoveAllForUser(userId);
+        response.Cookies.Delete(SessionStore.CookieName);
+
+        return Outcome<MessageResponse>.Success(
+            new MessageResponse("Şifrə dəyişdirildi. Yenidən daxil olun."));
     }
 
     public async Task<Outcome<ProfileUpdatedResponse>> UpdateProfileAsync(string userId, UpdateProfileRequest req, CancellationToken ct)

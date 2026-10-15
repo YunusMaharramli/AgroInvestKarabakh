@@ -61,6 +61,7 @@ public sealed class LegacyJsonImporter(AppDbContext db, PrivateFileStorage stora
                 Phone = AzerbaijaniPhone.TryNormalize(rawPhone, out var phone) ? phone : (rawPhone.Length > 0 ? rawPhone : null),
                 Role = S(u, "role") == "ADMIN" ? UserRole.Admin : UserRole.User,
                 PasswordHash = S(u, "passwordHash"),
+                EmailConfirmedAt = now,
                 CreatedAt = D(u, "createdAt") ?? now,
                 UpdatedAt = D(u, "updatedAt") ?? now,
             };

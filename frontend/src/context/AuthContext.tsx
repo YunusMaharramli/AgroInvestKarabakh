@@ -6,8 +6,9 @@ interface AuthContextType {
   profile: EntrepreneurProfile | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: string }>;
-  register: (data: any) => Promise<{ success: boolean; error?: string; role?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: string; needsEmailConfirmation?: boolean }>;
+  register: (data: any) => Promise<{ success: boolean; error?: string; role?: string; needsEmailConfirmation?: boolean; message?: string; emailDeliveryFailed?: boolean }>;
+  resendConfirmation: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (data: any) => Promise<{ success: boolean; error?: string }>;
@@ -60,7 +61,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       const data = await res.json();
       if (!res.ok) {
-        return { success: false, error: data.error || 'Giriş uğursuz oldu.' };
+        return {
+          success: false,
+          error: data.error || 'Giriş uğursuz oldu.',
+          needsEmailConfirmation: res.status === 403,
+        };
       }
       setUser(data.user);
       setProfile(data.profile);
@@ -83,6 +88,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!res.ok) {
         return { success: false, error: data.error || 'Qeydiyyat uğursuz oldu.' };
       }
+      if (data.requiresEmailConfirmation === true) {
+        return {
+          success: true,
+          needsEmailConfirmation: true,
+          message: data.message,
+          emailDeliveryFailed: data.emailDeliveryFailed === true,
+        };
+      }
       setUser(data.user);
       setProfile(data.profile);
       setToken(data.token);
@@ -90,6 +103,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true, role: data.user?.role };
     } catch (err: any) {
       return { success: false, error: 'Şəbəkə xətası baş verdi.' };
+    }
+  };
+
+  const resendConfirmation = async (email: string) => {
+    try {
+      const res = await fetch('/api/auth/resend-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Məktub yenidən göndərilə bilmədi.' };
+      }
+
+      return { success: true, message: data.message };
+    } catch {
+      return { success: false, error: 'Şəbəkə xətası baş verdi. Yenidən cəhd edin.' };
     }
   };
 
@@ -144,6 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         register,
+        resendConfirmation,
         logout,
         refreshUser,
         updateProfile,

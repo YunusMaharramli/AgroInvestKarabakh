@@ -41,6 +41,15 @@ public sealed class SessionStore
 
     public void Remove(string token) => _sessions.TryRemove(token, out _);
 
+    public void RemoveAllForUser(string userId)
+    {
+        foreach (var session in _sessions)
+        {
+            if (session.Value.UserId == userId)
+                _sessions.TryRemove(session.Key, out _);
+        }
+    }
+
     public static string? ReadToken(HttpRequest request)
     {
         var header = request.Headers.Authorization.ToString();

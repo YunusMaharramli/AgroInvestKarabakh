@@ -18,6 +18,9 @@ import { InteractiveMapPage } from './pages/InteractiveMapPage.js';
 import { ComparePage } from './pages/ComparePage.js';
 import { AgroMatchPage } from './pages/AgroMatchPage.js';
 import { AuthPage } from './pages/AuthPage.js';
+import { ConfirmEmailPage } from './pages/ConfirmEmailPage.js';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage.js';
+import { ResetPasswordPage } from './pages/ResetPasswordPage.js';
 import { EntrepreneurDashboardPage } from './pages/EntrepreneurDashboardPage.js';
 import { AdminDashboardPage } from './pages/AdminDashboardPage.js';
 import { ApplicationWizardPage } from './pages/ApplicationWizardPage.js';
@@ -69,6 +72,18 @@ export default function App() {
 
     if (currentPath === '/agromatch') {
       return <AgroMatchPage navigate={navigate} />;
+    }
+
+    if (currentPath === '/confirm-email') {
+      return <ConfirmEmailPage navigate={navigate} />;
+    }
+
+    if (currentPath === '/forgot-password') {
+      return <ForgotPasswordPage navigate={navigate} />;
+    }
+
+    if (currentPath === '/reset-password') {
+      return <ResetPasswordPage navigate={navigate} />;
     }
 
     if (currentPath === '/login') {

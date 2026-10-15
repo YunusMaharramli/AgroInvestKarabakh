@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Features;
 using QarabagInvestmentPortal.Api.Features.Admin;
 using QarabagInvestmentPortal.Api.Features.Assistant;
@@ -12,10 +10,13 @@ using QarabagInvestmentPortal.Api.Features.Proposals;
 using QarabagInvestmentPortal.Api.Features.Recommendations;
 using QarabagInvestmentPortal.Api.Features.Users;
 using QarabagInvestmentPortal.Api.Infrastructure.Auth;
+using QarabagInvestmentPortal.Api.Infrastructure.Email;
 using QarabagInvestmentPortal.Api.Infrastructure.Files;
 using QarabagInvestmentPortal.Api.Infrastructure.Frontend;
 using QarabagInvestmentPortal.Api.Infrastructure.Import;
 using QarabagInvestmentPortal.Api.Infrastructure.Persistence;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +35,15 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddPortalDatabase(builder.Configuration, builder.Environment.ContentRootPath);
 builder.Services.AddPortalAuth();
+builder.Services.Configure<SmtpEmailOptions>(
+    builder.Configuration.GetSection(SmtpEmailOptions.SectionName));
+builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();
+builder.Services.Configure<AuthLinkOptions>(
+    builder.Configuration.GetSection(AuthLinkOptions.SectionName));
+builder.Services.AddScoped<AuthActionTokenService>();
+builder.Services.AddScoped<AuthLinkBuilder>();
+builder.Services.AddScoped<EmailConfirmationService>();
+builder.Services.AddScoped<PasswordResetService>();
 builder.Services.AddSingleton<PrivateFileStorage>();
 
 builder.Services.AddScoped<AuthService>();
@@ -43,6 +53,8 @@ builder.Services.AddScoped<LandSubmissionService>();
 builder.Services.AddScoped<LandReviewService>();
 builder.Services.AddScoped<ProposalService>();
 builder.Services.AddScoped<LegacyJsonImporter>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<LoginAttemptService>();
 
 var app = builder.Build();
 

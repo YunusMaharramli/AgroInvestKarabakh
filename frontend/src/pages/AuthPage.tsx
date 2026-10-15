@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.js';
-import { Eye, EyeOff, LogIn, UserPlus, AlertCircle, Phone } from 'lucide-react';
+import { Eye, EyeOff, LogIn, UserPlus, AlertCircle, Phone, MailCheck } from 'lucide-react';
 import { HELP_LINE } from '../components/Header.js';
 import { PHOTOS } from '../lib/landImages.js';
 
@@ -68,14 +68,26 @@ const PasswordInput: React.FC<{
 };
 
 export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navigate }) => {
-  const { login, register } = useAuth();
+  const { login, register, resendConfirmation } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [registrationNotice, setRegistrationNotice] = useState(false);
+  const [registrationMessage, setRegistrationMessage] = useState('');
+  const [emailDeliveryFailed, setEmailDeliveryFailed] = useState(false);
+  const [loginNeedsConfirmation, setLoginNeedsConfirmation] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
   const next = readNext();
 
   // The header links switch between /login and /register without remounting this page
-  useEffect(() => { setMode(initialMode); setErrorMessage(''); }, [initialMode]);
+  useEffect(() => {
+    setMode(initialMode);
+    setErrorMessage('');
+    setRegistrationNotice(false);
+    setLoginNeedsConfirmation(false);
+    setResendMessage('');
+  }, [initialMode]);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -92,6 +104,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
   const switchMode = (m: 'login' | 'register') => {
     setMode(m);
     setErrorMessage('');
+    setRegistrationNotice(false);
+    setLoginNeedsConfirmation(false);
+    setResendMessage('');
     navigate(`/${m}${next ? `?next=${encodeURIComponent(next)}` : ''}`);
   };
 
@@ -104,16 +119,23 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+    setLoginNeedsConfirmation(false);
+    setResendMessage('');
     setLoading(true);
     const res = await login(loginEmail.trim(), loginPassword);
     setLoading(false);
     if (res.success) afterLogin(res.role);
-    else setErrorMessage(res.error || 'Daxil olmaq alınmadı. E-poçtu və şifrəni yoxlayın.');
+    else {
+      setErrorMessage(res.error || 'Daxil olmaq alınmadı. E-poçtu və şifrəni yoxlayın.');
+      setLoginNeedsConfirmation(res.needsEmailConfirmation === true);
+    }
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+    setRegistrationNotice(false);
+    setResendMessage('');
     if (regPassword.length < 8) {
       setErrorMessage('Şifrə ən azı 8 simvoldan ibarət olmalıdır.');
       return;
@@ -135,8 +157,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
       businessActivity: '',
     });
     setLoading(false);
-    if (res.success) afterLogin(res.role);
+    if (res.success && res.needsEmailConfirmation) {
+      setRegistrationNotice(true);
+      setRegistrationMessage(res.message || 'Qeydiyyatı tamamlamaq üçün e-poçtunuzu yoxlayın.');
+      setEmailDeliveryFailed(res.emailDeliveryFailed === true);
+    }
+    else if (res.success) afterLogin(res.role);
     else setErrorMessage(res.error || 'Qeydiyyat alınmadı. Məlumatları yoxlayıb yenidən cəhd edin.');
+  };
+
+  const handleResendConfirmation = async () => {
+    if (resendLoading) return;
+
+    const email = registrationNotice ? regEmail.trim() : loginEmail.trim();
+    if (!email) return;
+
+    setResendLoading(true);
+    setResendMessage('');
+    const result = await resendConfirmation(email);
+    setResendLoading(false);
+    setResendMessage(result.success
+      ? result.message || 'Sorğunuz qəbul edildi. E-poçtunuzu yoxlayın.'
+      : result.error || 'Sorğu göndərilə bilmədi.');
   };
 
   const fillDemo = (email: string, password: string) => {
@@ -210,8 +252,37 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
                 <span>{errorMessage}</span>
               </div>
             )}
+            {loginNeedsConfirmation && (
+              <div className="mb-6 p-4 rounded-xl border border-line bg-cream text-base">
+                <p className="text-[#3E4F45]">Təsdiq məktubu çatmayıbsa, 5 dəqiqə sonra yenidən göndərilməsini istəyə bilərsiniz.</p>
+                <button type="button" onClick={handleResendConfirmation} disabled={resendLoading} className="mt-3 font-bold text-brand-900 underline underline-offset-4 disabled:opacity-60">
+                  {resendLoading ? 'Göndərilir…' : 'Təsdiq məktubunu yenidən göndər'}
+                </button>
+                {resendMessage && <p role="status" className="mt-3 text-[#3E4F45]">{resendMessage}</p>}
+              </div>
+            )}
 
-            {mode === 'login' ? (
+            {registrationNotice ? (
+              <div role="status" className="flex flex-col items-center text-center gap-5 py-5">
+                {emailDeliveryFailed
+                  ? <AlertCircle className="w-14 h-14 text-[#C0392B]" aria-hidden="true" />
+                  : <MailCheck className="w-14 h-14 text-brand-700" aria-hidden="true" />}
+                <h2 className="font-display font-extrabold text-2xl text-brand-900">
+                  {emailDeliveryFailed ? 'Məktub göndərilmədi' : 'E-poçtunuzu yoxlayın'}
+                </h2>
+                <p className="text-lg text-[#3E4F45]">
+                  {registrationMessage}
+                </p>
+                <p className="text-base text-[#3E4F45]">Yenidən göndərmə 5 dəqiqə sonra mümkündür.</p>
+                <button type="button" onClick={handleResendConfirmation} disabled={resendLoading} className="font-bold text-brand-900 underline underline-offset-4 disabled:opacity-60">
+                  {resendLoading ? 'Göndərilir…' : 'Təsdiq məktubunu yenidən göndər'}
+                </button>
+                {resendMessage && <p role="status" className="text-base text-[#3E4F45]">{resendMessage}</p>}
+                <button type="button" onClick={() => switchMode('login')} className="min-h-14 px-8 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-display font-extrabold text-lg">
+                  Girişə keç
+                </button>
+              </div>
+            ) : mode === 'login' ? (
               <form onSubmit={handleLoginSubmit} className="flex flex-col gap-5">
                 <Field id="l-email" label="E-poçt ünvanı">
                   <input
@@ -228,6 +299,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
                 <Field id="l-pass" label="Şifrə">
                   <PasswordInput id="l-pass" value={loginPassword} onChange={setLoginPassword} autoComplete="current-password" />
                 </Field>
+                <button
+                  type="button"
+                  onClick={() => navigate('/forgot-password')}
+                  className="self-end text-sm font-bold text-brand-800 hover:underline"
+                >
+                  Şifrənizi unutmusunuz?
+                </button>
                 <button
                   type="submit"
                   disabled={loading}

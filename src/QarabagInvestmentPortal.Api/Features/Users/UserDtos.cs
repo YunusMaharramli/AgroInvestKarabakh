@@ -34,3 +34,7 @@ public sealed record AuthResponse(string Message, string Token, UserDto User, Pr
 public sealed record MeResponse(UserDto User, ProfileDto? Profile);
 public sealed record ProfileUpdatedResponse(string Message, UserDto User, ProfileDto? Profile);
 public sealed record MessageResponse(string Message);
+public sealed record ChangePasswordRequest(
+    string? CurrentPassword,
+    string? NewPassword,
+    string? ConfirmNewPassword);

@@ -490,6 +490,100 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("proposal_history", "portal");
                 });
 
+            modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Users.AuthActionToken", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "Purpose");
+
+                    b.ToTable("auth_action_tokens", "portal");
+                });
+
+            modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Users.ConfirmationResendState", b =>
+                {
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset?>("BlockedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SentInWindow")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("WindowStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("IpAddress", "Email");
+
+                    b.ToTable("confirmation_resend_states", "portal");
+                });
+
+            modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Users.LoginAttemptState", b =>
+                {
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset?>("BlockedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CompletedBlocks")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("IpAddress", "Email");
+
+                    b.ToTable("login_attempt_states", "portal");
+                });
+
             modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Users.User", b =>
                 {
                     b.Property<string>("Id")
@@ -503,6 +597,9 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset?>("EmailConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -695,6 +792,15 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                     b.HasOne("QarabagInvestmentPortal.Api.Features.Proposals.Proposal", null)
                         .WithMany("History")
                         .HasForeignKey("ProposalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Users.AuthActionToken", b =>
+                {
+                    b.HasOne("QarabagInvestmentPortal.Api.Features.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -17,6 +17,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public const string ProposalReferenceSequence = "proposal_reference_seq";
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<AuthActionToken> AuthActionTokens => Set<AuthActionToken>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<Land> Lands => Set<Land>();
     public DbSet<LandDocument> LandDocuments => Set<LandDocument>();
@@ -28,6 +29,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<IntegrationLog> IntegrationLogs => Set<IntegrationLog>();
     public DbSet<ImportRun> ImportRuns => Set<ImportRun>();
+    public DbSet<LoginAttemptState> LoginAttemptStates => Set<LoginAttemptState>();
+    public DbSet<ConfirmationResendState> ConfirmationResendStates
+    => Set<ConfirmationResendState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,6 +52,38 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.PasswordHash).HasMaxLength(200).IsRequired();
             e.Ignore(x => x.FullName);
             e.HasOne(x => x.Profile).WithOne().HasForeignKey<UserProfile>(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<LoginAttemptState>(e =>
+        {
+            e.ToTable("login_attempt_states");
+            e.HasKey(x => new { x.IpAddress, x.Email });
+            e.Property(x => x.IpAddress).HasMaxLength(45);
+            e.Property(x => x.Email).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<ConfirmationResendState>(e =>
+        {
+            e.ToTable("confirmation_resend_states");
+            e.HasKey(x => new { x.IpAddress, x.Email });
+            e.Property(x => x.IpAddress).HasMaxLength(45).IsRequired();
+            e.Property(x => x.Email).HasMaxLength(256).IsRequired();
+        });
+
+        modelBuilder.Entity<AuthActionToken>(e =>
+        {
+            e.ToTable("auth_action_tokens");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.UserId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Purpose).HasConversion<string>().HasMaxLength(32);
+            e.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
+
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => new { x.UserId, x.Purpose });
+            e.HasOne<User>().WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<UserProfile>(e =>

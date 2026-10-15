@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import type ReCAPTCHA from 'react-google-recaptcha';
 import { AlertCircle, CheckCircle2, MailCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
+import { RecaptchaField } from '../components/RecaptchaField.js';
 
 interface ConfirmEmailPageProps {
   navigate: (route: string) => void;
@@ -15,15 +17,23 @@ export const ConfirmEmailPage: React.FC<ConfirmEmailPageProps> = ({ navigate }) 
   const [email, setEmail] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   const requestNewLink = async (event: React.FormEvent) => {
     event.preventDefault();
     if (resendLoading) return;
+    if (!recaptchaToken) {
+      setResendMessage('Robot yoxlamasını tamamlayın.');
+      return;
+    }
 
     setResendLoading(true);
     setResendMessage('');
-    const result = await resendConfirmation(email.trim());
+    const result = await resendConfirmation(email.trim(), recaptchaToken);
     setResendLoading(false);
+    setRecaptchaToken(null);
+    recaptchaRef.current?.reset();
     setResendMessage(result.success
       ? result.message || 'Sorğunuz qəbul edildi. E-poçtunuzu yoxlayın.'
       : result.error || 'Sorğu göndərilə bilmədi.');
@@ -114,6 +124,7 @@ export const ConfirmEmailPage: React.FC<ConfirmEmailPageProps> = ({ navigate }) 
                 autoComplete="email"
                 className="w-full min-h-[3.25rem] px-4 rounded-xl border-2 border-[#9AA89E] bg-white text-ink text-lg focus:border-brand-700"
               />
+              <div className="mt-4"><RecaptchaField ref={recaptchaRef} onChange={setRecaptchaToken} /></div>
               <button type="submit" disabled={resendLoading} className="mt-4 min-h-14 px-8 rounded-xl bg-brand-700 hover:bg-brand-800 disabled:opacity-60 text-white font-display font-extrabold text-lg">
                 {resendLoading ? 'Göndərilir…' : 'Yeni link istə'}
               </button>

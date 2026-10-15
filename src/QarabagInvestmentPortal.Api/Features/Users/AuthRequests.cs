@@ -1,8 +1,11 @@
 ﻿namespace QarabagInvestmentPortal.Api.Features.Users;
 
 public sealed record ConfirmEmailRequest(string? Token);
-public sealed record ResendConfirmationRequest(string? Email);
-public sealed record ForgotPasswordRequest(string? Email);
+public sealed record ResendConfirmationRequest(
+    string? Email, string? RecaptchaToken = null);
+
+public sealed record ForgotPasswordRequest(
+    string? Email, string? RecaptchaToken = null);
 public sealed record ResetPasswordRequest(
     string? Token,
     string? NewPassword,

@@ -56,7 +56,7 @@ export const authService = {
    * Every other account logs in against the real backend, which refuses accounts
    * whose email is not confirmed yet (403).
    */
-  async login(identifier: string, password: string, remember: boolean): Promise<AppUser> {
+  async login(identifier: string, password: string, remember: boolean, recaptchaToken: string): Promise<AppUser> {
     const id = identifier.trim().toLowerCase().replace(/\s/g, '');
     if (SEED_EMAILS.has(id)) {
       await delay(null, 400);
@@ -68,7 +68,7 @@ export const authService = {
     }
     let res: AuthResponse;
     try {
-      res = await backend<AuthResponse>('POST', '/auth/login', { email: id, password });
+      res = await backend<AuthResponse>('POST', '/auth/login', { email: id, password, recaptchaToken });
     } catch (x) {
       const e = fromBackend(x, 'auth.errors.invalid');
       if (e.status === 403) throw new ApiError('auth.errors.notConfirmed', e.detail, 403);
@@ -90,7 +90,7 @@ export const authService = {
   },
 
   /** Creates the account on the backend; the backend emails a confirmation link (Mailpit in development). */
-  async signup(input: { fullName: string; email: string; phone: string; password: string }): Promise<RegistrationResponse> {
+  async signup(input: { fullName: string; email: string; phone: string; password: string; recaptchaToken: string }): Promise<RegistrationResponse> {
     const parts = input.fullName.trim().split(/\s+/);
     const firstName = parts.shift() ?? '';
     const lastName = parts.join(' ');
@@ -98,6 +98,7 @@ export const authService = {
       return await backend<RegistrationResponse>('POST', '/auth/register', {
         firstName, lastName, email: input.email.trim().toLowerCase(), phone: input.phone,
         password: input.password, confirmPassword: input.password,
+        recaptchaToken: input.recaptchaToken,
       });
     } catch (x) {
       const e = fromBackend(x);
@@ -113,13 +114,13 @@ export const authService = {
   },
 
   /** Sends a new confirmation link (the server limits how often). Always answers with a generic message. */
-  async resendConfirmation(email: string): Promise<string> {
-    try { return (await backend<MessageResponse>('POST', '/auth/resend-confirmation', { email: email.trim().toLowerCase() })).message; }
+  async resendConfirmation(email: string, recaptchaToken: string): Promise<string> {
+    try { return (await backend<MessageResponse>('POST', '/auth/resend-confirmation', { email: email.trim().toLowerCase(), recaptchaToken })).message; }
     catch (x) { throw fromBackend(x); }
   },
 
-  async sendResetLink(email: string): Promise<string> {
-    try { return (await backend<MessageResponse>('POST', '/auth/forgot-password', { email: email.trim().toLowerCase() })).message; }
+  async sendResetLink(email: string, recaptchaToken: string): Promise<string> {
+    try { return (await backend<MessageResponse>('POST', '/auth/forgot-password', { email: email.trim().toLowerCase(), recaptchaToken })).message; }
     catch (x) { throw fromBackend(x); }
   },
 

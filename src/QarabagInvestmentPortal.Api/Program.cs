@@ -35,6 +35,8 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddPortalDatabase(builder.Configuration, builder.Environment.ContentRootPath);
 builder.Services.AddPortalAuth();
+builder.Services.AddHttpClient<RecaptchaVerifier>(
+    client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.Configure<SmtpEmailOptions>(
     builder.Configuration.GetSection(SmtpEmailOptions.SectionName));
 builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();

@@ -531,7 +531,8 @@
       "notConfirmed": "Confirm your email before logging in.",
       "linkInvalid": "This link is invalid or has expired.",
       "noToken": "The link is incomplete: the token is missing.",
-      "fullName": "Enter your first and last name."
+      "fullName": "Enter your first and last name.",
+      "recaptcha": "Please complete the robot check."
     },
     "verifyNext": "The link is valid for 24 hours. After confirming, log in to choose your cabinet.",
     "deliveryFailed": "Your account was created, but the email could not be sent. Wait a few minutes and send the link again.",

@@ -6,9 +6,9 @@ interface AuthContextType {
   profile: EntrepreneurProfile | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: string; needsEmailConfirmation?: boolean }>;
+  login: (email: string, password: string, recaptchaToken: string) => Promise<{ success: boolean; error?: string; role?: string; needsEmailConfirmation?: boolean }>;
   register: (data: any) => Promise<{ success: boolean; error?: string; role?: string; needsEmailConfirmation?: boolean; message?: string; emailDeliveryFailed?: boolean }>;
-  resendConfirmation: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  resendConfirmation: (email: string, recaptchaToken: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (data: any) => Promise<{ success: boolean; error?: string }>;
@@ -52,12 +52,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchCurrentUser(token);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, recaptchaToken: string) => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, recaptchaToken }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -106,12 +106,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const resendConfirmation = async (email: string) => {
+  const resendConfirmation = async (email: string, recaptchaToken: string) => {
     try {
       const res = await fetch('/api/auth/resend-confirmation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, recaptchaToken }),
       });
       const data = await res.json();
 

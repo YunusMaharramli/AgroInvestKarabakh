@@ -11,23 +11,37 @@ public static class AuthEndpoints
         var auth = api.MapGroup("/auth");
 
         auth.MapPost("/register",
-            async (RegisterRequest req, AuthService service, CancellationToken ct) =>
-                (await service.RegisterAsync(req, ct))
-                    .ToResult(r => Results.Json(
-                        r, statusCode: StatusCodes.Status201Created)));
+            async (RegisterRequest req, RecaptchaVerifier captcha,
+                   AuthService service, CancellationToken ct) =>
+    {
+        if (!await captcha.VerifyAsync(req.RecaptchaToken, ct))
+            return ApiResults.BadRequest("Robot yoxlaması uğursuz oldu. Yenidən cəhd edin.");
+
+        return (await service.RegisterAsync(req, ct))
+            .ToResult(r => Results.Json(
+                r, statusCode: StatusCodes.Status201Created));
+    });
 
         auth.MapPost("/confirm-email",
             async (ConfirmEmailRequest req,
                    EmailConfirmationService service,
                    CancellationToken ct) =>
-                (await service.ConfirmAsync(req.Token, ct))
+                (
+                await service.ConfirmAsync(req.Token, ct))
                     .ToResult(r => Results.Ok(r)));
         auth.MapPost("/forgot-password",
-        async (ForgotPasswordRequest req,
-               PasswordResetService service,
-               CancellationToken ct) =>
-        (await service.RequestAsync(req.Email, ct))
-            .ToResult(r => Results.Ok(r)));
+            async (ForgotPasswordRequest req,
+                   RecaptchaVerifier captcha,
+                   PasswordResetService service,
+                   CancellationToken ct) =>
+    {
+        if (!await captcha.VerifyAsync(req.RecaptchaToken, ct))
+            return ApiResults.BadRequest(
+                "Robot yoxlaması uğursuz oldu. Yenidən cəhd edin.");
+
+        return (await service.RequestAsync(req.Email, ct))
+            .ToResult(r => Results.Ok(r));
+    });
 
         auth.MapPost("/reset-password",
             async (ResetPasswordRequest req,
@@ -39,11 +53,16 @@ public static class AuthEndpoints
 
 
         auth.MapPost("/resend-confirmation",
-            async (ResendConfirmationRequest req,
-                   EmailConfirmationService service,
-                   HttpContext context,
-                   CancellationToken ct) =>
+    async (ResendConfirmationRequest req,
+           RecaptchaVerifier captcha,
+           EmailConfirmationService service,
+           HttpContext context,
+           CancellationToken ct) =>
     {
+        if (!await captcha.VerifyAsync(req.RecaptchaToken, ct))
+            return ApiResults.BadRequest(
+                "Robot yoxlaması uğursuz oldu. Yenidən cəhd edin.");
+
         var remoteIp = context.Connection.RemoteIpAddress;
         var ipAddress = remoteIp is null
             ? "unknown"
@@ -56,23 +75,28 @@ public static class AuthEndpoints
     });
 
         auth.MapPost("/login",
-            async (
-                LoginRequest req,
-                AuthService service,
-                HttpContext context,
-                CancellationToken ct) =>
-        {
-            var remoteIp = context.Connection.RemoteIpAddress;
-            var ipAddress = remoteIp is null
-                ? "unknown"
-                : remoteIp.IsIPv4MappedToIPv6
-                    ? remoteIp.MapToIPv4().ToString()
-                    : remoteIp.ToString();
+    async (
+        LoginRequest req,
+        RecaptchaVerifier captcha,
+        AuthService service,
+        HttpContext context,
+        CancellationToken ct) =>
+    {
+        if (!await captcha.VerifyAsync(req.RecaptchaToken, ct))
+            return ApiResults.BadRequest(
+                "Robot yoxlaması uğursuz oldu. Yenidən cəhd edin.");
 
-            return (await service.LoginAsync(
-                req, ipAddress, context.Response, ct))
-                .ToResult(r => Results.Ok(r));
-        });
+        var remoteIp = context.Connection.RemoteIpAddress;
+        var ipAddress = remoteIp is null
+            ? "unknown"
+            : remoteIp.IsIPv4MappedToIPv6
+                ? remoteIp.MapToIPv4().ToString()
+                : remoteIp.ToString();
+
+        return (await service.LoginAsync(
+            req, ipAddress, context.Response, ct))
+            .ToResult(r => Results.Ok(r));
+    });
 
         auth.MapPost("/change-password",
             async (ChangePasswordRequest req,

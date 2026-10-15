@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import type ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../context/AuthContext.js';
+import { RecaptchaField } from '../components/RecaptchaField.js';
 import { Eye, EyeOff, LogIn, UserPlus, AlertCircle, Phone, MailCheck } from 'lucide-react';
 import { HELP_LINE } from '../components/Header.js';
 import { PHOTOS } from '../lib/landImages.js';
@@ -78,6 +80,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
   const [loginNeedsConfirmation, setLoginNeedsConfirmation] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
+  const [formCaptchaToken, setFormCaptchaToken] = useState<string | null>(null);
+  const [resendCaptchaToken, setResendCaptchaToken] = useState<string | null>(null);
+  const formCaptchaRef = useRef<ReCAPTCHA>(null);
+  const resendCaptchaRef = useRef<ReCAPTCHA>(null);
   const next = readNext();
 
   // The header links switch between /login and /register without remounting this page
@@ -87,6 +93,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
     setRegistrationNotice(false);
     setLoginNeedsConfirmation(false);
     setResendMessage('');
+    setFormCaptchaToken(null);
+    setResendCaptchaToken(null);
+    formCaptchaRef.current?.reset();
+    resendCaptchaRef.current?.reset();
   }, [initialMode]);
 
   const [loginEmail, setLoginEmail] = useState('');
@@ -107,6 +117,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
     setRegistrationNotice(false);
     setLoginNeedsConfirmation(false);
     setResendMessage('');
+    setFormCaptchaToken(null);
+    setResendCaptchaToken(null);
+    formCaptchaRef.current?.reset();
+    resendCaptchaRef.current?.reset();
     navigate(`/${m}${next ? `?next=${encodeURIComponent(next)}` : ''}`);
   };
 
@@ -121,9 +135,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
     setErrorMessage('');
     setLoginNeedsConfirmation(false);
     setResendMessage('');
+    if (!formCaptchaToken) {
+      setErrorMessage('Robot yoxlamasını tamamlayın.');
+      return;
+    }
     setLoading(true);
-    const res = await login(loginEmail.trim(), loginPassword);
+    const res = await login(loginEmail.trim(), loginPassword, formCaptchaToken);
     setLoading(false);
+    setFormCaptchaToken(null);
+    formCaptchaRef.current?.reset();
     if (res.success) afterLogin(res.role);
     else {
       setErrorMessage(res.error || 'Daxil olmaq alınmadı. E-poçtu və şifrəni yoxlayın.');
@@ -144,6 +164,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
       setErrorMessage('İki şifrə eyni deyil. Zəhmət olmasa yenidən yazın.');
       return;
     }
+    if (!formCaptchaToken) {
+      setErrorMessage('Robot yoxlamasını tamamlayın.');
+      return;
+    }
     setLoading(true);
     const res = await register({
       firstName: regFirstName.trim(),
@@ -155,8 +179,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
       companyName: regCompanyName.trim(),
       taxIdentificationNumber: regTaxNumber.trim(),
       businessActivity: '',
+      recaptchaToken: formCaptchaToken,
     });
     setLoading(false);
+    setFormCaptchaToken(null);
+    formCaptchaRef.current?.reset();
     if (res.success && res.needsEmailConfirmation) {
       setRegistrationNotice(true);
       setRegistrationMessage(res.message || 'Qeydiyyatı tamamlamaq üçün e-poçtunuzu yoxlayın.');
@@ -171,11 +198,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
 
     const email = registrationNotice ? regEmail.trim() : loginEmail.trim();
     if (!email) return;
+    if (!resendCaptchaToken) {
+      setResendMessage('Robot yoxlamasını tamamlayın.');
+      return;
+    }
 
     setResendLoading(true);
     setResendMessage('');
-    const result = await resendConfirmation(email);
+    const result = await resendConfirmation(email, resendCaptchaToken);
     setResendLoading(false);
+    setResendCaptchaToken(null);
+    resendCaptchaRef.current?.reset();
     setResendMessage(result.success
       ? result.message || 'Sorğunuz qəbul edildi. E-poçtunuzu yoxlayın.'
       : result.error || 'Sorğu göndərilə bilmədi.');
@@ -255,6 +288,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
             {loginNeedsConfirmation && (
               <div className="mb-6 p-4 rounded-xl border border-line bg-cream text-base">
                 <p className="text-[#3E4F45]">Təsdiq məktubu çatmayıbsa, 5 dəqiqə sonra yenidən göndərilməsini istəyə bilərsiniz.</p>
+                <div className="mt-3"><RecaptchaField ref={resendCaptchaRef} onChange={setResendCaptchaToken} /></div>
                 <button type="button" onClick={handleResendConfirmation} disabled={resendLoading} className="mt-3 font-bold text-brand-900 underline underline-offset-4 disabled:opacity-60">
                   {resendLoading ? 'Göndərilir…' : 'Təsdiq məktubunu yenidən göndər'}
                 </button>
@@ -274,6 +308,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
                   {registrationMessage}
                 </p>
                 <p className="text-base text-[#3E4F45]">Yenidən göndərmə 5 dəqiqə sonra mümkündür.</p>
+                <RecaptchaField ref={resendCaptchaRef} onChange={setResendCaptchaToken} />
                 <button type="button" onClick={handleResendConfirmation} disabled={resendLoading} className="font-bold text-brand-900 underline underline-offset-4 disabled:opacity-60">
                   {resendLoading ? 'Göndərilir…' : 'Təsdiq məktubunu yenidən göndər'}
                 </button>
@@ -306,6 +341,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
                 >
                   Şifrənizi unutmusunuz?
                 </button>
+                <RecaptchaField ref={formCaptchaRef} onChange={setFormCaptchaToken} />
                 <button
                   type="submit"
                   disabled={loading}
@@ -361,6 +397,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', navig
                   </Field>
                 </fieldset>
 
+                <RecaptchaField ref={formCaptchaRef} onChange={setFormCaptchaToken} />
                 <button
                   type="submit"
                   disabled={loading}

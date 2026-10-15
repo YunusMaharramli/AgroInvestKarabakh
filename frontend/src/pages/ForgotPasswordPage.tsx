@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import type ReCAPTCHA from 'react-google-recaptcha';
 import { AlertCircle, Mail } from 'lucide-react';
+import { RecaptchaField } from '../components/RecaptchaField.js';
 
 interface ForgotPasswordPageProps {
   navigate: (route: string) => void;
@@ -10,10 +12,16 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ navigate
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   const requestReset = async (event: React.FormEvent) => {
     event.preventDefault();
     if (loading) return;
+    if (!recaptchaToken) {
+      setErrorMessage('Robot yoxlamasını tamamlayın.');
+      return;
+    }
 
     setLoading(true);
     setMessage('');
@@ -23,7 +31,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ navigate
       const response = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.trim(), recaptchaToken }),
       });
       const data = await response.json();
 
@@ -37,6 +45,8 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ navigate
       setErrorMessage('Şəbəkə xətası baş verdi. Yenidən cəhd edin.');
     } finally {
       setLoading(false);
+      setRecaptchaToken(null);
+      recaptchaRef.current?.reset();
     }
   };
 
@@ -78,6 +88,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ navigate
                 className="w-full min-h-[3.25rem] px-4 rounded-xl border-2 border-[#9AA89E] bg-white text-ink text-lg focus:border-brand-700"
               />
             </div>
+            <RecaptchaField ref={recaptchaRef} onChange={setRecaptchaToken} />
             <button type="submit" disabled={loading} className="min-h-14 rounded-xl bg-brand-700 hover:bg-brand-800 disabled:opacity-60 text-white font-display font-extrabold text-lg">
               {loading ? 'Göndərilir…' : 'Sıfırlama linki göndər'}
             </button>

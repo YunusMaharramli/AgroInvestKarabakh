@@ -22,10 +22,13 @@ public sealed record PersonDto(string Id, string FirstName, string LastName, str
 }
 
 public sealed record RegisterRequest(
-    string? FirstName, string? LastName, string? Email, string? Phone, string? Password, string? ConfirmPassword,
-    string? CompanyName, string? TaxIdentificationNumber, string? BusinessActivity);
+    string? FirstName, string? LastName, string? Email, string? Phone,
+    string? Password, string? ConfirmPassword, string? CompanyName,
+    string? TaxIdentificationNumber, string? BusinessActivity,
+    string? RecaptchaToken = null);
 
-public sealed record LoginRequest(string? Email, string? Password);
+public sealed record LoginRequest(
+    string? Email, string? Password, string? RecaptchaToken = null);
 
 public sealed record UpdateProfileRequest(
     string? FirstName, string? LastName, string? Phone, string? CompanyName, string? TaxIdentificationNumber, string? BusinessActivity);

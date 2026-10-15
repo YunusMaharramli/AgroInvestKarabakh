@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+import type ReCAPTCHA from 'react-google-recaptcha';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { AlertCircle, Eye, EyeOff, Loader2, Mail, Map as MapIcon, TrendingUp, CheckCircle2, Upload } from 'lucide-react';
 import { Logo } from '../../components/layout/Logo';
 import { LanguageSwitcher } from '../../components/layout/LanguageSwitcher';
+import { RecaptchaField } from '../../components/RecaptchaField';
 import { useLocalePath } from '../../app/i18n';
 import { authService, useCurrentUser, ApiError, errorText } from '../../services/api';
 import { MAILPIT_URL, isLocalDev } from '../../services/backend';
@@ -105,20 +107,24 @@ const ResendLink: React.FC<{ email: string; askEmail?: boolean }> = ({ email: in
   const [email, setEmail] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
   useEffect(() => { setEmail(initial); }, [initial]);
   const send = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!EMAIL_RE.test(email.trim())) { setMsg({ tone: 'error', text: t('form.email') }); return; }
+    if (!recaptchaToken) { setMsg({ tone: 'error', text: t('auth.errors.recaptcha') }); return; }
     setBusy(true); setMsg(null);
-    try { const m = await authService.resendConfirmation(email); setMsg({ tone: 'ok', text: m || t('auth.resent') }); }
+    try { const m = await authService.resendConfirmation(email, recaptchaToken); setMsg({ tone: 'ok', text: m || t('auth.resent') }); }
     catch (x) { setMsg({ tone: 'error', text: errorText(t, x) }); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setRecaptchaToken(null); recaptchaRef.current?.reset(); }
   };
   return (
     <form onSubmit={send} noValidate className="grid gap-3 mt-6 text-left">
       {askEmail && (
         <Field label={t('auth.email')} htmlFor="resend-email"><input id="resend-email" type="email" className="field" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></Field>
       )}
+      <RecaptchaField ref={recaptchaRef} onChange={setRecaptchaToken} />
       <button type="submit" className={askEmail ? 'btn btn-primary w-full' : 'text-sm font-bold text-leaf-dark hover:underline justify-self-start'} disabled={busy}>
         {busy && <Loader2 className="w-4 h-4 animate-spin inline mr-1" aria-hidden="true" />}{t('auth.resend')}
       </button>
@@ -139,6 +145,8 @@ export const LoginPage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<{ id?: string; pw?: string; form?: string }>({});
   const [unconfirmed, setUnconfirmed] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
   useEffect(() => { document.title = `${t('auth.login')} · AGROInvest`; }, [t]);
   if (user && !busy) return <Navigate to={lp(cabinetHome(user))} replace />;
 
@@ -147,16 +155,19 @@ export const LoginPage: React.FC = () => {
     const er: typeof err = {};
     if (!id.trim()) er.id = t('form.required');
     if (!pw) er.pw = t('form.required');
+    if (!recaptchaToken) er.form = t('auth.errors.recaptcha');
     setErr(er);
-    if (er.id || er.pw) return;
+    if (er.id || er.pw || er.form) return;
     setBusy(true); setUnconfirmed(false);
     try {
-      const u = await authService.login(id, pw, remember);
+      const u = await authService.login(id, pw, remember, recaptchaToken!);
       navigate(lp(cabinetHome(u)), { replace: true });
     } catch (x) {
       setErr({ form: errorText(t, x) });
       setUnconfirmed(x instanceof ApiError && x.status === 403);
       setBusy(false);
+      setRecaptchaToken(null);
+      recaptchaRef.current?.reset();
     }
   };
   const fill = (email: string) => { setId(email); setPw(TEST_PASSWORD); };
@@ -172,6 +183,7 @@ export const LoginPage: React.FC = () => {
         <Field label={t('auth.password')} htmlFor="login-pw" error={err.pw}>
           <PasswordInput id="login-pw" value={pw} onChange={setPw} invalid={!!err.pw} autoComplete="current-password" />
         </Field>
+        <RecaptchaField ref={recaptchaRef} onChange={setRecaptchaToken} />
         <div className="flex items-center justify-between gap-3 text-sm">
           <label className="flex items-center gap-2 font-semibold cursor-pointer"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} className="w-4 h-4 accent-[#1F4D2E]" />{t('auth.remember')}</label>
           <Link to={lp('/forgot-password')} className="font-bold text-leaf-dark hover:underline">{t('auth.forgot')}</Link>
@@ -204,14 +216,17 @@ export const ForgotPage: React.FC = () => {
   const [err, setErr] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
   useEffect(() => { document.title = `${t('auth.forgotTitle')} · AGROInvest`; }, [t]);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!EMAIL_RE.test(email.trim())) { setErr(t('form.email')); return; }
+    if (!recaptchaToken) { setErr(t('auth.errors.recaptcha')); return; }
     setErr(''); setBusy(true);
-    try { await authService.sendResetLink(email); setSent(true); }
+    try { await authService.sendResetLink(email, recaptchaToken); setSent(true); }
     catch (x) { setErr(errorText(t, x)); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setRecaptchaToken(null); recaptchaRef.current?.reset(); }
   };
   return (
     <AuthLayout image="/images/site/photo-12.jpg" quote={t('auth.quoteLogin')}>
@@ -229,6 +244,7 @@ export const ForgotPage: React.FC = () => {
           <p className="text-muted mt-2 mb-8">{t('auth.forgotSubtitle')}</p>
           <form onSubmit={submit} noValidate className="grid gap-5">
             <Field label={t('auth.email')} htmlFor="fp-email" error={err}><input id="fp-email" type="email" className="field" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" aria-invalid={!!err} /></Field>
+            <RecaptchaField ref={recaptchaRef} onChange={setRecaptchaToken} />
             <button type="submit" className="btn btn-primary w-full" disabled={busy}>{busy && <Loader2 className="w-4 h-4 animate-spin" />}{t('auth.sendLink')}</button>
           </form>
           <p className="text-center text-sm mt-8"><Link to={lp('/login')} className="font-bold text-leaf-dark hover:underline">{t('auth.backLogin')}</Link></p>
@@ -281,6 +297,8 @@ export const SignupPage: React.FC = () => {
   const [v, setV] = useState({ fullName: '', email: '', code: '+994', phone: '', password: '', confirm: '', terms: false });
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
   // Check-email step
   const [sentTo, setSentTo] = useState(readPendingEmail);
   const [deliveryFailed, setDeliveryFailed] = useState(false);
@@ -303,11 +321,12 @@ export const SignupPage: React.FC = () => {
     if (v.password.length < 8) er.password = t('form.minLength', { n: 8 });
     if (v.confirm !== v.password) er.confirm = t('auth.errors.passwordMatch');
     if (!v.terms) er.terms = t('auth.errors.terms');
+    if (!recaptchaToken) er.form = t('auth.errors.recaptcha');
     setErr(er);
     if (Object.keys(er).length) return;
     setBusy(true);
     try {
-      const r = await authService.signup({ fullName: v.fullName, email: v.email, phone: `${v.code} ${v.phone.trim()}`, password: v.password });
+      const r = await authService.signup({ fullName: v.fullName, email: v.email, phone: `${v.code} ${v.phone.trim()}`, password: v.password, recaptchaToken: recaptchaToken! });
       const email = v.email.trim().toLowerCase();
       savePendingEmail(email); setSentTo(email); setDeliveryFailed(r.emailDeliveryFailed);
       go('check-email');
@@ -316,7 +335,7 @@ export const SignupPage: React.FC = () => {
       const field = x instanceof ApiError && x.status === 409 ? 'email' : x instanceof ApiError && /telefon/i.test(x.detail) ? 'phone' : 'form';
       setErr({ [field]: text });
     }
-    finally { setBusy(false); }
+    finally { setBusy(false); setRecaptchaToken(null); recaptchaRef.current?.reset(); }
   };
   const submitRole = async () => {
     if (!role) { setErr({ role: t('auth.errors.role') }); return; }
@@ -379,6 +398,7 @@ export const SignupPage: React.FC = () => {
               </label>
               {err.terms && <p className="field-error" role="alert">{err.terms}</p>}
             </div>
+            <RecaptchaField ref={recaptchaRef} onChange={setRecaptchaToken} />
             <button type="submit" className="btn btn-primary w-full" disabled={busy}>{busy && <Loader2 className="w-4 h-4 animate-spin" />}{t('auth.create')}</button>
           </form>
           <OrDivider />

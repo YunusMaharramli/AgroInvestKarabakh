@@ -531,7 +531,8 @@
       "notConfirmed": "Daxil olmaq üçün əvvəlcə e-poçtunuzu təsdiqləyin.",
       "linkInvalid": "Link etibarsızdır və ya vaxtı bitib.",
       "noToken": "Link natamamdır: təsdiq kodu yoxdur.",
-      "fullName": "Ad və soyadınızı yazın."
+      "fullName": "Ad və soyadınızı yazın.",
+      "recaptcha": "Robot yoxlamasını tamamlayın."
     },
     "verifyNext": "Link 24 saat etibarlıdır. Təsdiqdən sonra daxil olub kabinetinizi seçin.",
     "deliveryFailed": "Hesab yaradıldı, amma məktub göndərilə bilmədi. Bir neçə dəqiqə gözləyib linki yenidən göndərin.",

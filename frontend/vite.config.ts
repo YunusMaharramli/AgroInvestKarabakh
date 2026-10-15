@@ -5,6 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // GOOGLE_MAPS_API_KEY from frontend/.env is exposed to the app (the key is public by design; restrict it to your domain in Google Cloud)
+    envPrefix: ['VITE_', 'GOOGLE_MAPS_'],
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

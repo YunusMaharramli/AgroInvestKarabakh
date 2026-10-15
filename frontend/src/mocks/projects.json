@@ -1,0 +1,12 @@
+[
+  { "id": "P-01", "fieldType": "crops", "region": "aghdam", "image": "/images/categories/crops-11-sm.jpg", "amountRaised": 420000, "year": 2025, "link": "/investments" },
+  { "id": "P-02", "fieldType": "orchards", "region": "zangilan", "image": "/images/categories/orchards-8-sm.jpg", "amountRaised": 310000, "year": 2025, "link": "/investments" },
+  { "id": "P-03", "fieldType": "greenhouse", "region": "fuzuli", "image": "/images/categories/greenhouse-5-sm.jpg", "amountRaised": 560000, "year": 2024, "link": "/investments" },
+  { "id": "P-04", "fieldType": "livestock", "region": "kalbajar", "image": "/images/categories/livestock-3-sm.jpg", "amountRaised": 280000, "year": 2025, "link": "/investments" },
+  { "id": "P-05", "fieldType": "orchards", "region": "guba", "image": "/images/site/photo-09-sm.jpg", "amountRaised": 390000, "year": 2024, "link": "/investments" },
+  { "id": "P-06", "fieldType": "crops", "region": "barda", "image": "/images/site/photo-25-sm.jpg", "amountRaised": 610000, "year": 2025, "link": "/investments" },
+  { "id": "P-07", "fieldType": "nursery", "region": "aghdam", "image": "/images/site/photo-14-sm.jpg", "amountRaised": 120000, "year": 2025, "link": "/investments" },
+  { "id": "P-08", "fieldType": "pasture", "region": "lachin", "image": "/images/site/photo-04-sm.jpg", "amountRaised": 150000, "year": 2024, "link": "/investments" },
+  { "id": "P-09", "fieldType": "processing", "region": "ganja", "image": "/images/site/photo-06-sm.jpg", "amountRaised": 720000, "year": 2025, "link": "/investments" },
+  { "id": "P-10", "fieldType": "crops", "region": "sheki", "image": "/images/site/photo-17-sm.jpg", "amountRaised": 260000, "year": 2024, "link": "/investments" }
+]

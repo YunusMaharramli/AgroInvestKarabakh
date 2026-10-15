@@ -57,9 +57,20 @@ together. Endpoints stay thin; rules live in focused services.
 See `docs/local-database.md` for the database. Then:
 
 ```powershell
+docker compose up -d                      # PostgreSQL (5433) + Mailpit (1025 / 8025)
 cd frontend; npm install; npm run build; cd ..
 dotnet run --project src/QarabagInvestmentPortal.Api
 ```
+
+Open http://localhost:3000 — the API also serves the built frontend (it finds the
+`frontend` folder by itself; `Frontend:Path` overrides it).
+
+Sign-up sends a confirmation **link** (no code). In development every email goes to
+Mailpit: open http://localhost:8025, open the email and click the link
+(`http://localhost:3000/confirm-email?token=...`, valid 24 hours). Password reset works
+the same way (`/reset-password?token=...`). For frontend work with hot reload run
+`npm run dev` in `frontend` (http://localhost:5173, `/api` is proxied to port 3000),
+but open the email links on port 3000 or rebuild with `npm run build`.
 
 In Development the API applies EF Core migrations on start
 (`Database:MigrateOnStartup`). Configuration keys:
@@ -68,7 +79,7 @@ In Development the API applies EF Core migrations on start
 | --- | --- |
 | `ConnectionStrings:Portal` | Optional. Otherwise built from `POSTGRES_*` variables or the `.env` file |
 | `Storage:RootPath` | Private document folder (default `App_Data/files`) |
-| `Frontend:Path` | Folder with the built frontend (`frontend/dist`) |
+| `Frontend:Path` | Optional. Frontend folder whose `dist` is served (default: the repository's `frontend`) |
 | `Gemini:ApiKey`, `Gemini:Model` | Optional AI assistant. Never commit the key |
 
 ## Tests

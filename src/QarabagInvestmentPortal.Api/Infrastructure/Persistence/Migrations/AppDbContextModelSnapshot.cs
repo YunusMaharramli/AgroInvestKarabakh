@@ -58,6 +58,39 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("integration_logs", "portal");
                 });
 
+            modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Chat.ChatMessage", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProposalId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SenderId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SenderId");
+
+                    b.HasIndex("ProposalId", "CreatedAt", "Id");
+
+                    b.ToTable("chat_messages", "portal");
+                });
+
             modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Favorites.Favorite", b =>
                 {
                     b.Property<string>("Id")
@@ -136,6 +169,11 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                     b.Property<string>("OwnerNote")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("OwnershipType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.Property<string>("Region")
                         .IsRequired()
@@ -276,6 +314,10 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ClosedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ClosureReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<string>("ContactPhone")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -309,6 +351,17 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text[]");
 
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReviewedById")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -333,12 +386,17 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("LandId")
+                    b.HasIndex("Status");
+
+                    b.HasIndex(new[] { "LandId" }, "active_opportunity_per_land")
                         .IsUnique()
                         .HasDatabaseName("ux_opportunities_one_active_per_land")
                         .HasFilter("\"Status\" = 'Active'");
 
-                    b.HasIndex("Status");
+                    b.HasIndex(new[] { "LandId" }, "draft_opportunity_per_land")
+                        .IsUnique()
+                        .HasDatabaseName("ux_opportunities_one_draft_per_land")
+                        .HasFilter("\"Status\" = 'Draft'");
 
                     b.ToTable("investment_opportunities", "portal");
                 });
@@ -701,6 +759,21 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("import_runs", "portal");
+                });
+
+            modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Chat.ChatMessage", b =>
+                {
+                    b.HasOne("QarabagInvestmentPortal.Api.Features.Proposals.Proposal", null)
+                        .WithMany()
+                        .HasForeignKey("ProposalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("QarabagInvestmentPortal.Api.Features.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Favorites.Favorite", b =>

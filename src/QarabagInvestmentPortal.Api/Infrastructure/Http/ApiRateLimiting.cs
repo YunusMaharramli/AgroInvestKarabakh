@@ -42,11 +42,17 @@ public static class ApiRateLimiting
                         && isWrite
                         && !string.IsNullOrEmpty(userId);
 
-                    var key = protectedWrite
+                    var chatSend = protectedWrite && HttpMethods.IsPost(context.Request.Method)
+                        && context.Request.Path.StartsWithSegments("/api/chats", out var chatPath)
+                        && chatPath.Value?.EndsWith("/messages", StringComparison.OrdinalIgnoreCase) == true;
+
+                    var key = chatSend
+                        ? $"chat:{userId}"
+                        : protectedWrite
                         ? $"write:{userId}:{ipKey}"
                         : $"public:{ipKey}";
 
-                    var limit = protectedWrite ? 10 : 100;
+                    var limit = chatSend ? 30 : protectedWrite ? 10 : 100;
 
                     return RateLimitPartition.GetFixedWindowLimiter(
                         key,

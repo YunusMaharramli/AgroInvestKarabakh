@@ -66,6 +66,8 @@ public static class AdminEndpoints
                     new StatusStat("OPEN", "Açıq", proposals.Count(p => p.Status == ProposalStatus.Open)),
                     new StatusStat("SELECTED", "Qalib seçilib", proposals.Count(p => p.Status == ProposalStatus.Selected)),
                     new StatusStat("NOT_SELECTED", "Seçilməyib", proposals.Count(p => p.Status == ProposalStatus.NotSelected)),
+                    new StatusStat("REJECTED", "Rədd edilib", proposals.Count(p => p.Status == ProposalStatus.Rejected)),
+                    new StatusStat("CANCELLED", "Elan bağlanıb", proposals.Count(p => p.Status == ProposalStatus.Cancelled)),
                 ],
                 Timeline: timeline));
         });

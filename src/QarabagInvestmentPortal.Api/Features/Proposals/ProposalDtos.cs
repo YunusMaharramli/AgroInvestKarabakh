@@ -28,3 +28,4 @@ public sealed record ProposalHistoryDto(string Id, string NewStatus, string Chan
 }
 
 public sealed record WinnerSelectedResponse(string Message, OpportunityDto Opportunity, int NotSelectedCount);
+public sealed record RejectProposalRequest(string? Reason);

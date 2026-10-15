@@ -8,6 +8,8 @@ public enum ProposalStatus
     Open,
     Selected,
     NotSelected,
+    Rejected,
+    Cancelled,
 }
 
 /// <summary>An investor's offer for an investment opportunity.</summary>

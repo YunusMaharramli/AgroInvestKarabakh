@@ -44,7 +44,8 @@ public static class LandEndpoints
                 return ApiResults.NotFound("Torpaq sahəsi tapılmadı.");
 
             var opps = await db.Opportunities.AsNoTracking().Include(o => o.Land)
-                .Where(o => o.LandId == id && (o.Status != OpportunityStatus.Draft || isOwner || viewer.IsAdmin))
+                .Where(o => o.LandId == id && ((o.Status != OpportunityStatus.Draft
+                    && o.Status != OpportunityStatus.Rejected) || isOwner || viewer.IsAdmin))
                 .OrderByDescending(o => o.CreatedAt).ToListAsync(ct);
             var dtos = await opportunities.ToDtosAsync(opps, viewer, ct, includeLand: false);
             var active = dtos.FirstOrDefault(o => o.Status == OpportunityStatus.Active);
@@ -76,6 +77,15 @@ public static class LandEndpoints
         mine.MapPost("/{id}/reopen", async (string id, ClaimsPrincipal user, LandSubmissionService service, CancellationToken ct) =>
             (await service.ReopenAsync(user.RequiredUserId(), id, ct)).ToResult(r => Results.Ok(r)));
 
+        var stateLands = api.MapGroup("/admin/lands").RequireAuthorization(Policies.Admin);
+        stateLands.MapPost("", async (HttpRequest request, ClaimsPrincipal user, LandSubmissionService service, CancellationToken ct) =>
+        {
+            if (!request.HasFormContentType) return ApiResults.BadRequest("Forma və sənədlər birlikdə göndərilməlidir.");
+            var form = await request.ReadFormAsync(ct);
+            return (await service.SubmitAdminAsync(user.RequiredUserId(), form, ct))
+                .ToResult(r => Results.Json(r, statusCode: StatusCodes.Status201Created));
+        });
+
         // Admin: review queue.
         var review = api.MapGroup("/admin/land-reviews").RequireAuthorization(Policies.Admin);
 
@@ -93,6 +103,14 @@ public static class LandEndpoints
 
         review.MapPost("/{id}/reject", async (string id, ReviewMessageRequest req, ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
             (await service.RejectAsync(id, user.RequiredUserId(), req.Message, ct)).ToResult(r => Results.Ok(r)));
+
+        var republish = api.MapGroup("/admin/republish-reviews").RequireAuthorization(Policies.Admin);
+        republish.MapGet("", async (ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
+            Results.Ok(await service.RepublishQueueAsync(user.RequiredUserId(), ct)));
+        republish.MapPost("/{id}/approve", async (string id, ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
+            (await service.ApproveRepublishAsync(id, user.RequiredUserId(), ct)).ToResult(r => Results.Ok(r)));
+        republish.MapPost("/{id}/reject", async (string id, ReviewMessageRequest req, ClaimsPrincipal user, LandReviewService service, CancellationToken ct) =>
+            (await service.RejectRepublishAsync(id, user.RequiredUserId(), req.Message, ct)).ToResult(r => Results.Ok(r)));
 
         return api;
     }

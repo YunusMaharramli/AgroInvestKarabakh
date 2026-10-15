@@ -54,6 +54,25 @@ public sealed class ApiRateLimitingTests
     }
 
     [Fact]
+    public void Chat_messages_allow_30_per_minute_per_account_without_consuming_other_write_quota()
+    {
+        using var services = CreateServices();
+        using var limiter = GetLimiter(services);
+
+        for (var i = 0; i < 30; i++)
+        {
+            var ip = i % 2 == 0 ? "192.0.2.7" : "192.0.2.8";
+            using var lease = limiter.AttemptAcquire(Request("/api/chats/proposal-1/messages", "POST", ip, "user-a", protectedEndpoint: true));
+            Assert.True(lease.IsAcquired);
+        }
+
+        using var rejected = limiter.AttemptAcquire(Request("/api/chats/proposal-2/messages", "POST", "192.0.2.9", "user-a", protectedEndpoint: true));
+        Assert.False(rejected.IsAcquired);
+        using var otherWrite = limiter.AttemptAcquire(Request("/api/favorites", "POST", "192.0.2.7", "user-a", protectedEndpoint: true));
+        Assert.True(otherWrite.IsAcquired);
+    }
+
+    [Fact]
     public void Protected_get_and_non_api_requests_are_not_limited()
     {
         using var services = CreateServices();

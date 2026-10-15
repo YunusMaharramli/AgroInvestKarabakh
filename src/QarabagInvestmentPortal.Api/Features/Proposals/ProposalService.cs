@@ -107,8 +107,9 @@ public sealed class ProposalService(
             notifications.Notify(investorId, "Təklifiniz göndərildi",
                 $"“{opp.Title}” elanına {proposal.ReferenceNumber} nömrəli təklifiniz göndərildi.");
             var message = $"“{opp.Title}” elanına {investor.FullName} yeni təklif göndərdi ({proposal.ReferenceNumber}).";
-            if (opp.Source == OpportunitySource.Owner) notifications.Notify(opp.Land!.OwnerId!, "Yeni investisiya təklifi", message);
-            else await notifications.NotifyAdminsAsync("Yeni investisiya təklifi", message, ct);
+            if (opp.Source == OpportunitySource.Owner)
+                notifications.Notify(opp.Land!.OwnerId!, "Yeni investisiya təklifi", message);
+            await notifications.NotifyAdminsAsync("Yeni investisiya təklifi", message, ct);
 
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
@@ -129,8 +130,42 @@ public sealed class ProposalService(
 
     // ---------------------------------------------------------------- choose the winner
 
+    public async Task<Outcome<ProposalDto>> RejectAsync(string proposalId, string? reason, Viewer viewer, CancellationToken ct)
+    {
+        if (!viewer.IsAdmin) return Fail(403, "Təklifi yalnız nazirlik rədd edə bilər.");
+        reason = reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length > 2000)
+            return Fail(400, "Rədd etmə səbəbini yazın (ən çox 2000 simvol).");
+
+        var opportunityId = await db.Proposals.AsNoTracking()
+            .Where(p => p.Id == proposalId).Select(p => p.OpportunityId).FirstOrDefaultAsync(ct);
+        if (opportunityId is null) return Fail(404, "Təklif tapılmadı.");
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await LockOpportunityAsync(opportunityId, ct);
+        var proposal = await db.Proposals.Include(p => p.Opportunity).ThenInclude(o => o!.Land)
+            .FirstOrDefaultAsync(p => p.Id == proposalId, ct);
+        if (proposal is null) return Fail(404, "Təklif tapılmadı.");
+        if (proposal.Status != ProposalStatus.Open || proposal.Opportunity!.Status != OpportunityStatus.Active)
+            return Fail(409, "Yalnız aktiv elanın açıq təklifi rədd edilə bilər.");
+
+        var now = clock.GetUtcNow();
+        proposal.Status = ProposalStatus.Rejected;
+        proposal.DecidedAt = now;
+        proposal.UpdatedAt = now;
+        db.ProposalHistory.Add(History(proposal.Id, "REJECTED", await DecidedByAsync(viewer, ct), reason, now));
+        notifications.Notify(proposal.InvestorId, "Təklifiniz rədd edildi",
+            $"“{proposal.Opportunity.Title}” elanı üzrə {proposal.ReferenceNumber} nömrəli təklifiniz rədd edildi. Səbəb: {reason}");
+        if (proposal.Opportunity.Source == OpportunitySource.Owner && proposal.Opportunity.Land!.OwnerId is { } ownerId)
+            notifications.Notify(ownerId, "Elanınız üzrə təklif rədd edildi",
+                $"“{proposal.Opportunity.Title}” elanı üzrə {proposal.ReferenceNumber} nömrəli təklif nazirlik tərəfindən rədd edildi.");
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return Outcome<ProposalDto>.Success((await GetAsync(proposalId, viewer, ct))!);
+    }
+
     /// <summary>
-    /// The responsible party picks one winner. In one transaction (with the listing row locked): the winner becomes
+    /// An admin picks one winner. In one transaction (with the listing row locked): the winner becomes
     /// SELECTED, every other OPEN proposal becomes NOT_SELECTED and is notified, and the listing is CLOSED so no new
     /// proposals can arrive.
     /// </summary>
@@ -143,10 +178,10 @@ public sealed class ProposalService(
 
         var opp = await db.Opportunities.Include(o => o.Land).FirstOrDefaultAsync(o => o.Id == opportunityId, ct);
         if (opp is null) return Outcome<WinnerSelectedResponse>.Fail(404, "İnvestisiya elanı tapılmadı.");
-        if (!OpportunityMapping.IsResponsibleParty(opp, opp.Land!, viewer))
-            return Outcome<WinnerSelectedResponse>.Fail(403, "Qalibi yalnız elanın sahibi seçə bilər.");
+        if (!viewer.IsAdmin)
+            return Outcome<WinnerSelectedResponse>.Fail(403, "Qalibi yalnız nazirlik seçə bilər.");
         if (opp.WinnerProposalId is not null) return Outcome<WinnerSelectedResponse>.Fail(409, "Bu elan üçün qalib artıq seçilib.");
-        if (opp.Status == OpportunityStatus.Draft) return Outcome<WinnerSelectedResponse>.Fail(400, "Elan hələ dərc olunmayıb.");
+        if (opp.Status != OpportunityStatus.Active) return Outcome<WinnerSelectedResponse>.Fail(400, "Yalnız aktiv elan üzrə qalib seçilə bilər.");
 
         var proposals = await db.Proposals.Include(p => p.Investor)
             .Where(p => p.OpportunityId == opportunityId && p.Status == ProposalStatus.Open).ToListAsync(ct);
@@ -154,14 +189,17 @@ public sealed class ProposalService(
         if (winner is null) return Outcome<WinnerSelectedResponse>.Fail(404, "Seçilən təklif tapılmadı və ya artıq bağlanıb.");
 
         var now = clock.GetUtcNow();
-        var decidedBy = await DecidedByAsync(viewer, opp, ct);
+        var decidedBy = await DecidedByAsync(viewer, ct);
 
         winner.Status = ProposalStatus.Selected;
         winner.DecidedAt = now;
         winner.UpdatedAt = now;
         db.ProposalHistory.Add(History(winner.Id, "SELECTED", decidedBy, "Təklifiniz qalib seçildi.", now));
         notifications.Notify(winner.InvestorId, "Təklifiniz qalib seçildi",
-            $"Təbriklər! “{opp.Title}” elanı üzrə {winner.ReferenceNumber} nömrəli təklifiniz seçildi. Elan sahibi sizinlə əlaqə saxlayacaq.");
+            $"Təbriklər! “{opp.Title}” elanı üzrə {winner.ReferenceNumber} nömrəli təklifiniz nazirlik tərəfindən seçildi.");
+        if (opp.Source == OpportunitySource.Owner && opp.Land!.OwnerId is { } ownerId)
+            notifications.Notify(ownerId, "Elanınız üzrə qalib seçildi",
+                $"“{opp.Title}” elanı üzrə {winner.ReferenceNumber} nömrəli təklif nazirlik tərəfindən qalib seçildi.");
 
         var others = proposals.Where(p => p.Id != winner.Id).ToList();
         foreach (var p in others)
@@ -171,7 +209,7 @@ public sealed class ProposalService(
             p.UpdatedAt = now;
             db.ProposalHistory.Add(History(p.Id, "NOT_SELECTED", decidedBy, "Başqa təklif seçildi.", now));
             notifications.Notify(p.InvestorId, "Təklifiniz seçilmədi",
-                $"“{opp.Title}” elanı üzrə başqa təklif seçildi. {p.ReferenceNumber} nömrəli təklifiniz seçilmədi. Maraq göstərdiyiniz üçün təşəkkür edirik.");
+                $"“{opp.Title}” elanı üzrə qalib seçildi. {p.ReferenceNumber} nömrəli təklifiniz seçilmədi. Maraq göstərdiyiniz üçün təşəkkür edirik.");
         }
 
         opp.Status = OpportunityStatus.Closed;
@@ -194,27 +232,40 @@ public sealed class ProposalService(
             $"{winner.ReferenceNumber} qalib seçildi. Elan bağlandı.", dto!, others.Count));
     }
 
-    /// <summary>The responsible party may close a listing without a winner, or reopen it if nobody has won yet.</summary>
-    public async Task<Outcome<OpportunityDto>> SetStatusAsync(string opportunityId, OpportunityStatus? status, Viewer viewer, CancellationToken ct)
+    /// <summary>The owner may withdraw an active listing with a reason; republishing requires admin approval.</summary>
+    public async Task<Outcome<OpportunityDto>> SetStatusAsync(string opportunityId, OpportunityStatus? status, string? reason, Viewer viewer, CancellationToken ct)
     {
-        if (status is not (OpportunityStatus.Active or OpportunityStatus.Closed))
-            return Outcome<OpportunityDto>.Fail(400, "Status ACTIVE və ya CLOSED olmalıdır.");
+        if (status != OpportunityStatus.Closed)
+            return Outcome<OpportunityDto>.Fail(400, "Bu əməliyyat yalnız elanı bağlaya bilər. Yenidən dərc üçün müraciət göndərin.");
+        reason = reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length > 2000)
+            return Outcome<OpportunityDto>.Fail(400, "Bağlanma səbəbini yazın (ən çox 2000 simvol).");
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await LockOpportunityAsync(opportunityId, ct);
         var opp = await db.Opportunities.Include(o => o.Land).FirstOrDefaultAsync(o => o.Id == opportunityId, ct);
-        if (opp is null || opp.Status == OpportunityStatus.Draft) return Outcome<OpportunityDto>.Fail(404, "İnvestisiya elanı tapılmadı.");
+        if (opp is null) return Outcome<OpportunityDto>.Fail(404, "İnvestisiya elanı tapılmadı.");
         if (!OpportunityMapping.IsResponsibleParty(opp, opp.Land!, viewer))
             return Outcome<OpportunityDto>.Fail(403, "Bu elanı yalnız onun sahibi idarə edə bilər.");
-        if (status == OpportunityStatus.Active && opp.WinnerProposalId is not null)
-            return Outcome<OpportunityDto>.Fail(409, "Qalib seçilmiş elanı yenidən açmaq olmaz.");
-        if (status == OpportunityStatus.Active && opp.Land!.Status != LandStatus.Approved)
-            return Outcome<OpportunityDto>.Fail(400, "Torpaq təsdiq olunmayıb.");
+        if (opp.Status != OpportunityStatus.Active || opp.WinnerProposalId is not null)
+            return Outcome<OpportunityDto>.Fail(409, "Yalnız qalib seçilməmiş aktiv elan bağlana bilər.");
 
         var now = clock.GetUtcNow();
-        opp.Status = status.Value;
-        opp.ClosedAt = status == OpportunityStatus.Closed ? now : null;
+        opp.Status = OpportunityStatus.Closed;
+        opp.ClosedAt = now;
+        opp.ClosureReason = reason;
         opp.UpdatedAt = now;
+        var openProposals = await db.Proposals.Where(p => p.OpportunityId == opportunityId && p.Status == ProposalStatus.Open).ToListAsync(ct);
+        var actor = await DecidedByAsync(viewer, ct);
+        foreach (var proposal in openProposals)
+        {
+            proposal.Status = ProposalStatus.Cancelled;
+            proposal.DecidedAt = now;
+            proposal.UpdatedAt = now;
+            db.ProposalHistory.Add(History(proposal.Id, "CANCELLED", actor, reason, now));
+            notifications.Notify(proposal.InvestorId, "İnvestisiya elanı bağlandı",
+                $"“{opp.Title}” elanı qalib seçilmədən bağlandı. Səbəb: {reason}");
+        }
         try
         {
             await db.SaveChangesAsync(ct);
@@ -287,8 +338,8 @@ public sealed class ProposalService(
                 LandDto.From(o.Land!, o.Status == OpportunityStatus.Active),
                 p.Documents.OrderBy(d => d.UploadedAt).Select(ProposalDocumentDto.From).ToList(),
                 p.History.OrderBy(h => h.CreatedAt).Select(ProposalHistoryDto.From).ToList(),
-                CanSelectWinner: p.Status == ProposalStatus.Open && o.WinnerProposalId is null && o.Status != OpportunityStatus.Draft
-                    && OpportunityMapping.IsResponsibleParty(o, o.Land!, viewer));
+                CanSelectWinner: viewer.IsAdmin && p.Status == ProposalStatus.Open
+                    && o.WinnerProposalId is null && o.Status == OpportunityStatus.Active);
         }).ToList();
     }
 
@@ -301,11 +352,11 @@ public sealed class ProposalService(
     private const string LockOpportunitySql = "SELECT 1 FROM portal.investment_opportunities WHERE \"Id\" = {0} FOR UPDATE";
     private const string NextReferenceSql = "SELECT nextval('portal.proposal_reference_seq') AS \"Value\"";
 
-    private async Task<string> DecidedByAsync(Viewer viewer, InvestmentOpportunity opp, CancellationToken ct)
+    private async Task<string> DecidedByAsync(Viewer viewer, CancellationToken ct)
     {
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == viewer.UserId, ct);
         var name = user?.FullName ?? "—";
-        return opp.Source == OpportunitySource.Owner ? $"{name} (elan sahibi)" : $"{name} (inzibatçı)";
+        return viewer.IsAdmin ? $"{name} (nazirlik)" : $"{name} (elan sahibi)";
     }
 
     private static ProposalHistoryEntry History(string proposalId, string status, string by, string comment, DateTimeOffset at) => new()

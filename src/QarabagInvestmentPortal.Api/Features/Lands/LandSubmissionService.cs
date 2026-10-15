@@ -18,7 +18,10 @@ public sealed class LandSubmissionService(
     // Azerbaijan's bounding box, to catch obviously wrong map points.
     private const double MinLat = 38.3, MaxLat = 41.95, MinLng = 44.7, MaxLng = 50.4;
 
-    public async Task<Outcome<MyLandDto>> SubmitAsync(string ownerId, IFormCollection form, CancellationToken ct)
+    public Task<Outcome<MyLandDto>> SubmitAdminAsync(string adminId, IFormCollection form, CancellationToken ct) =>
+        SubmitAsync(adminId, form, ct, adminManaged: true);
+
+    public async Task<Outcome<MyLandDto>> SubmitAsync(string ownerId, IFormCollection form, CancellationToken ct, bool adminManaged = false)
     {
         string F(string key) => form[key].ToString().Trim();
         static bool Num(string raw, out double value) =>
@@ -63,7 +66,8 @@ public sealed class LandSubmissionService(
         var land = new Land
         {
             Id = Ids.New("land"),
-            OwnerId = ownerId,
+            OwnerId = adminManaged ? null : ownerId,
+            OwnershipType = adminManaged ? LandOwnershipType.State : LandOwnershipType.Private,
             Title = title,
             Region = region,
             AgricultureType = type,
@@ -76,25 +80,28 @@ public sealed class LandSubmissionService(
             SoilQuality = NullIfEmpty(Limit(F("soilQuality"), 500)),
             WaterSupply = NullIfEmpty(Limit(F("waterSupply"), 500)),
             ImageUrl = string.Empty,
-            Status = LandStatus.PendingReview,
+            Status = adminManaged ? LandStatus.Approved : LandStatus.PendingReview,
             SubmittedAt = now,
+            ReviewedAt = adminManaged ? now : null,
+            ReviewedById = adminManaged ? ownerId : null,
             CreatedAt = now,
             UpdatedAt = now,
         };
         db.Lands.Add(land);
 
-        // The listing is created now as DRAFT and becomes ACTIVE when an admin approves the land.
+        // Owner listings await ministry review; ministry-managed state land is published immediately.
         db.Opportunities.Add(new InvestmentOpportunity
         {
             Id = Ids.New("opp"),
             LandId = land.Id,
-            Source = OpportunitySource.Owner,
+            Source = adminManaged ? OpportunitySource.Admin : OpportunitySource.Owner,
             Title = title,
             Description = land.Description,
             EligibilityConditions = Lines(F("eligibilityConditions")),
             RequiredDocuments = Lines(F("requiredDocuments")),
             ApplicationDeadline = deadline,
-            Status = OpportunityStatus.Draft,
+            Status = adminManaged ? OpportunityStatus.Active : OpportunityStatus.Draft,
+            OpeningDate = adminManaged ? now : null,
             ContactPhone = contactPhone,
             CreatedById = ownerId,
             CreatedAt = now,
@@ -102,10 +109,13 @@ public sealed class LandSubmissionService(
         });
 
         var saved = await SaveDocumentsAsync(land, ownerId, validated, ct);
-        await notifications.NotifyAdminsAsync("Yeni torpaq yoxlanılmalıdır",
-            $"{owner.FullName} “{title}” ({region}) sahəsini yoxlamaya göndərdi.", ct);
-        notifications.Notify(ownerId, "Torpağınız yoxlamaya göndərildi",
-            $"“{title}” sahəniz qəbul edildi. İnzibatçı sənədləri yoxlayandan sonra sizə xəbər veriləcək.");
+        if (!adminManaged)
+        {
+            await notifications.NotifyAdminsAsync("Yeni torpaq yoxlanılmalıdır",
+                $"{owner.FullName} “{title}” ({region}) sahəsini yoxlamaya göndərdi.", ct);
+            notifications.Notify(ownerId, "Torpağınız yoxlamaya göndərildi",
+                $"“{title}” sahəniz qəbul edildi. Nazirlik sənədləri yoxlayandan sonra sizə xəbər veriləcək.");
+        }
 
         try
         {
@@ -117,7 +127,13 @@ public sealed class LandSubmissionService(
             throw;
         }
 
-        return Outcome<MyLandDto>.Success((await GetMineAsync(ownerId, land.Id, ct))!);
+        if (!adminManaged) return Outcome<MyLandDto>.Success((await GetMineAsync(ownerId, land.Id, ct))!);
+        var stateLand = await db.Lands.AsNoTracking().Include(l => l.Documents).FirstAsync(l => l.Id == land.Id, ct);
+        var listing = await db.Opportunities.AsNoTracking().Include(o => o.Land).FirstAsync(o => o.LandId == land.Id, ct);
+        var listingDto = await opportunities.GetAsync(listing.Id, new Viewer(ownerId, true), ct);
+        return Outcome<MyLandDto>.Success(new MyLandDto(
+            LandDto.From(stateLand, true), null, null, now, now,
+            stateLand.Documents.Select(LandDocumentDto.From).ToList(), listingDto));
     }
 
     /// <summary>Owner adds documents (usually after the admin asked for more). Sends the land back to review.</summary>
@@ -157,14 +173,15 @@ public sealed class LandSubmissionService(
         return Outcome<MyLandDto>.Success((await GetMineAsync(ownerId, land.Id, ct))!);
     }
 
-    /// <summary>After a winner was chosen (or the listing closed), the owner can publish a new listing for the same approved land.</summary>
+    /// <summary>Request a new publication; only an admin can approve and publish it.</summary>
     public async Task<Outcome<MyLandDto>> ReopenAsync(string ownerId, string landId, CancellationToken ct)
     {
         var land = await db.Lands.FirstOrDefaultAsync(l => l.Id == landId, ct);
         if (land is null || land.OwnerId != ownerId) return Fail(404, "Torpaq sahəsi tapılmadı.");
         if (land.Status != LandStatus.Approved) return Fail(400, "Sahə hələ təsdiq olunmayıb.");
-        if (await db.Opportunities.AnyAsync(o => o.LandId == landId && o.Status != OpportunityStatus.Closed, ct))
-            return Fail(409, "Bu sahə üçün artıq açıq elan var.");
+        if (await db.Opportunities.AnyAsync(o => o.LandId == landId &&
+            (o.Status == OpportunityStatus.Active || o.Status == OpportunityStatus.Draft), ct))
+            return Fail(409, "Bu sahə üçün aktiv elan və ya gözləyən dərc müraciəti var.");
 
         var last = await db.Opportunities.Where(o => o.LandId == landId).OrderByDescending(o => o.CreatedAt).FirstOrDefaultAsync(ct);
         var owner = await db.Users.FirstAsync(u => u.Id == ownerId, ct);
@@ -178,8 +195,7 @@ public sealed class LandSubmissionService(
             Description = land.Description,
             EligibilityConditions = last?.EligibilityConditions ?? [],
             RequiredDocuments = last?.RequiredDocuments ?? [],
-            Status = OpportunityStatus.Active,
-            OpeningDate = now,
+            Status = OpportunityStatus.Draft,
             ContactPhone = AzerbaijaniPhone.TryNormalize(owner.Phone, out var p) ? p : last?.ContactPhone ?? string.Empty,
             CreatedById = ownerId,
             CreatedAt = now,
@@ -187,11 +203,13 @@ public sealed class LandSubmissionService(
         });
         try
         {
+            await notifications.NotifyAdminsAsync("Yenidən dərc müraciəti",
+                $"{owner.FullName} “{land.Title}” sahəsinin yenidən dərcini istəyir.", ct);
             await db.SaveChangesAsync(ct);
         }
         catch (DbUpdateException)
         {
-            return Fail(409, "Bu sahə üçün artıq açıq elan var.");
+            return Fail(409, "Bu sahə üçün dərc müraciəti artıq var.");
         }
         return Outcome<MyLandDto>.Success((await GetMineAsync(ownerId, landId, ct))!);
     }

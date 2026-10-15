@@ -28,6 +28,63 @@ public sealed class LandReviewService(AppDbContext db, NotificationService notif
         return land is null ? null : (await ToDtosAsync([land], adminId, ct))[0];
     }
 
+    public async Task<List<LandReviewDto>> RepublishQueueAsync(string adminId, CancellationToken ct)
+    {
+        var lands = await db.Lands.AsNoTracking().Include(l => l.Documents).Include(l => l.Owner)
+            .Where(l => l.OwnerId != null && l.Status == LandStatus.Approved
+                && db.Opportunities.Any(o => o.LandId == l.Id && o.Source == OpportunitySource.Owner
+                    && o.Status == OpportunityStatus.Draft))
+            .OrderBy(l => l.CreatedAt).ToListAsync(ct);
+        return await ToDtosAsync(lands, adminId, ct);
+    }
+
+    public Task<Outcome<LandReviewDto>> ApproveRepublishAsync(string opportunityId, string adminId, CancellationToken ct) =>
+        DecideRepublishAsync(opportunityId, adminId, null, ct, approve: true);
+
+    public Task<Outcome<LandReviewDto>> RejectRepublishAsync(string opportunityId, string adminId, string? reason, CancellationToken ct) =>
+        DecideRepublishAsync(opportunityId, adminId, reason, ct, approve: false);
+
+    private async Task<Outcome<LandReviewDto>> DecideRepublishAsync(
+        string opportunityId, string adminId, string? reason, CancellationToken ct, bool approve)
+    {
+        reason = reason?.Trim();
+        if (!approve && (string.IsNullOrWhiteSpace(reason) || reason.Length > 2000))
+            return Outcome<LandReviewDto>.Fail(400, "Rədd etmə səbəbini yazın (ən çox 2000 simvol).");
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlRawAsync(
+            "SELECT 1 FROM portal.investment_opportunities WHERE \"Id\" = {0} FOR UPDATE", [opportunityId], ct);
+        var opportunity = await db.Opportunities.Include(o => o.Land)
+            .FirstOrDefaultAsync(o => o.Id == opportunityId, ct);
+        if (opportunity is null || opportunity.Source != OpportunitySource.Owner
+            || opportunity.Land?.OwnerId is null || opportunity.Land.Status != LandStatus.Approved)
+            return Outcome<LandReviewDto>.Fail(404, "Yenidən dərc müraciəti tapılmadı.");
+        if (opportunity.Status != OpportunityStatus.Draft)
+            return Outcome<LandReviewDto>.Fail(409, "Bu müraciət üzrə qərar artıq verilib.");
+
+        var now = clock.GetUtcNow();
+        opportunity.Status = approve ? OpportunityStatus.Active : OpportunityStatus.Rejected;
+        opportunity.OpeningDate = approve ? now : null;
+        opportunity.ReviewNote = approve ? null : reason;
+        opportunity.ReviewedById = adminId;
+        opportunity.ReviewedAt = now;
+        opportunity.UpdatedAt = now;
+        notifications.Notify(opportunity.Land.OwnerId, approve ? "Elanınız yenidən dərc edildi" : "Yenidən dərc müraciəti rədd edildi",
+            approve ? $"“{opportunity.Title}” elanı nazirlik tərəfindən yenidən dərc edildi."
+                : $"“{opportunity.Title}” elanının yenidən dərci rədd edildi. Səbəb: {reason}");
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            return Outcome<LandReviewDto>.Fail(409, "Bu sahə üçün artıq aktiv elan var.");
+        }
+        return Outcome<LandReviewDto>.Success((await GetAsync(opportunity.LandId, adminId, ct))!);
+    }
+
     /// <summary>Approve: the land profile becomes public and its listing is published (ACTIVE).</summary>
     public Task<Outcome<LandReviewDto>> ApproveAsync(string landId, string adminId, CancellationToken ct) =>
         DecideAsync(landId, adminId, null, ct, (land, draft, now) =>

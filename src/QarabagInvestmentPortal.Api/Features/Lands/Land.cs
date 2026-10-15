@@ -14,6 +14,12 @@ public enum LandStatus
     Rejected,
 }
 
+public enum LandOwnershipType
+{
+    Private,
+    State,
+}
+
 public sealed class Land
 {
     public string Id { get; set; } = string.Empty;
@@ -21,6 +27,7 @@ public sealed class Land
     /// <summary>Null for legacy admin-managed lands.</summary>
     public string? OwnerId { get; set; }
     public User? Owner { get; set; }
+    public LandOwnershipType OwnershipType { get; set; } = LandOwnershipType.Private;
 
     public string Title { get; set; } = string.Empty;
     public string Region { get; set; } = string.Empty;

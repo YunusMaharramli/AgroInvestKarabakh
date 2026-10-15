@@ -8,12 +8,13 @@ public sealed record LandDto(
     string Id, string Title, string Region, string Description, double AreaHectares, string AgricultureType,
     double Latitude, double Longitude, string IntendedUse, decimal EstimatedInvestmentRequirement, string ImageUrl,
     LandStatus Status, string? SoilQuality, string? WaterSupply, string? OwnerId, bool IsOwnerListing,
-    bool HasActiveOpportunity, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt)
+    bool HasActiveOpportunity, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
+    LandOwnershipType OwnershipType)
 {
     public static LandDto From(Land l, bool hasActiveOpportunity = false) => new(
         l.Id, l.Title, l.Region, l.Description, l.AreaHectares, l.AgricultureType, l.Latitude, l.Longitude,
         l.IntendedUse, l.EstimatedInvestmentRequirement, l.ImageUrl, l.Status, l.SoilQuality, l.WaterSupply,
-        l.OwnerId, l.OwnerId is not null, hasActiveOpportunity, l.CreatedAt, l.UpdatedAt);
+        l.OwnerId, l.OwnerId is not null, hasActiveOpportunity, l.CreatedAt, l.UpdatedAt, l.OwnershipType);
 }
 
 public sealed record LandDetailDto(LandDto Land, IReadOnlyList<OpportunityDto> Opportunities, OpportunityDto? ActiveOpportunity);

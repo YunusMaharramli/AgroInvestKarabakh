@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using QarabagInvestmentPortal.Api.Features.Admin;
+using QarabagInvestmentPortal.Api.Features.Chat;
 using QarabagInvestmentPortal.Api.Features.Favorites;
 using QarabagInvestmentPortal.Api.Features.Lands;
 using QarabagInvestmentPortal.Api.Features.Notifications;
@@ -25,6 +26,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Proposal> Proposals => Set<Proposal>();
     public DbSet<ProposalDocument> ProposalDocuments => Set<ProposalDocument>();
     public DbSet<ProposalHistoryEntry> ProposalHistory => Set<ProposalHistoryEntry>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<Favorite> Favorites => Set<Favorite>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<IntegrationLog> IntegrationLogs => Set<IntegrationLog>();
@@ -115,6 +117,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.WaterSupply).HasMaxLength(500);
             e.Property(x => x.EstimatedInvestmentRequirement).HasPrecision(18, 2);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+            e.Property(x => x.OwnershipType).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.ReviewNote).HasMaxLength(2000);
             e.Property(x => x.OwnerNote).HasMaxLength(2000);
             e.Property(x => x.ReviewedById).HasMaxLength(64);
@@ -148,14 +151,21 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Description).HasMaxLength(4000);
             e.Property(x => x.ContactPhone).HasMaxLength(32);
             e.Property(x => x.WinnerProposalId).HasMaxLength(64);
+            e.Property(x => x.ClosureReason).HasMaxLength(2000);
+            e.Property(x => x.ReviewNote).HasMaxLength(2000);
+            e.Property(x => x.ReviewedById).HasMaxLength(64);
             e.Property(x => x.CreatedById).HasMaxLength(64);
             e.HasIndex(x => x.Status);
 
             // One active (published) opportunity per land.
-            e.HasIndex(x => x.LandId)
+            e.HasIndex(x => x.LandId, "active_opportunity_per_land")
                 .IsUnique()
                 .HasFilter("\"Status\" = 'Active'")
                 .HasDatabaseName("ux_opportunities_one_active_per_land");
+            e.HasIndex(x => x.LandId, "draft_opportunity_per_land")
+                .IsUnique()
+                .HasFilter("\"Status\" = 'Draft'")
+                .HasDatabaseName("ux_opportunities_one_draft_per_land");
         });
 
         modelBuilder.Entity<Proposal>(e =>
@@ -207,6 +217,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Status).HasMaxLength(64);
             e.Property(x => x.ChangedBy).HasMaxLength(200);
             e.Property(x => x.Comment).HasMaxLength(4000);
+        });
+
+        modelBuilder.Entity<ChatMessage>(e =>
+        {
+            e.ToTable("chat_messages");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.ProposalId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.SenderId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Body).HasMaxLength(2000).IsRequired();
+            e.HasIndex(x => new { x.ProposalId, x.CreatedAt, x.Id });
+            e.HasOne<Proposal>().WithMany().HasForeignKey(x => x.ProposalId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Favorite>(e =>

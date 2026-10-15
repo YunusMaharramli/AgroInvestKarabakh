@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using QarabagInvestmentPortal.Api.Features.Lands;
 using QarabagInvestmentPortal.Api.Infrastructure.Persistence;
 
 namespace QarabagInvestmentPortal.Api.Features.Opportunities;
@@ -32,7 +33,9 @@ public sealed class OpportunityQueries(AppDbContext db, TimeProvider clock)
     public async Task<List<OpportunityDto>> ListAsync(Viewer viewer, string? status, string? region, CancellationToken ct)
     {
         var query = db.Opportunities.AsNoTracking().Include(o => o.Land).AsQueryable();
-        if (!viewer.IsAdmin) query = query.Where(o => o.Status != OpportunityStatus.Draft);
+        if (!viewer.IsAdmin)
+            query = query.Where(o => o.Land!.Status == LandStatus.Approved
+                && o.Status != OpportunityStatus.Draft && o.Status != OpportunityStatus.Rejected);
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<OpportunityStatus>(status.Replace("_", ""), true, out var s))
             query = query.Where(o => o.Status == s);
         if (!string.IsNullOrWhiteSpace(region) && region != "all")
@@ -45,7 +48,9 @@ public sealed class OpportunityQueries(AppDbContext db, TimeProvider clock)
     {
         var o = await db.Opportunities.AsNoTracking().Include(x => x.Land).FirstOrDefaultAsync(x => x.Id == id, ct);
         if (o is null) return null;
-        if (o.Status == OpportunityStatus.Draft && !viewer.IsAdmin && o.Land!.OwnerId != viewer.UserId) return null;
+        if ((o.Land!.Status != LandStatus.Approved
+                || o.Status is OpportunityStatus.Draft or OpportunityStatus.Rejected)
+            && !viewer.IsAdmin && o.Land.OwnerId != viewer.UserId) return null;
         return (await ToDtosAsync([o], viewer, ct))[0];
     }
 }

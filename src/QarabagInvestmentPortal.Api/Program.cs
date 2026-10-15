@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http.Features;
 using QarabagInvestmentPortal.Api.Features.Admin;
 using QarabagInvestmentPortal.Api.Features.Assistant;
 using QarabagInvestmentPortal.Api.Features.Documents;
+using QarabagInvestmentPortal.Api.Features.Chat;
 using QarabagInvestmentPortal.Api.Features.Favorites;
 using QarabagInvestmentPortal.Api.Features.Lands;
 using QarabagInvestmentPortal.Api.Features.Notifications;
@@ -56,6 +57,8 @@ builder.Services.AddScoped<OpportunityQueries>();
 builder.Services.AddScoped<LandSubmissionService>();
 builder.Services.AddScoped<LandReviewService>();
 builder.Services.AddScoped<ProposalService>();
+builder.Services.AddScoped<ChatService>();
+builder.Services.AddSignalR();
 builder.Services.AddScoped<LegacyJsonImporter>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<LoginAttemptService>();
@@ -81,12 +84,15 @@ var api = app.MapGroup("/api");
 api.MapAuthEndpoints()
     .MapLandEndpoints()
     .MapOpportunityAndProposalEndpoints()
+    .MapChatEndpoints()
     .MapDocumentEndpoints()
     .MapFavoriteEndpoints()
     .MapNotificationEndpoints()
     .MapAdminEndpoints()
     .MapRecommendationEndpoints()
     .MapAssistantEndpoints();
+
+app.MapHub<ChatHub>("/hubs/chat").RequireAuthorization(Policies.SignedIn);
 
 app.UseBuiltFrontend();
 

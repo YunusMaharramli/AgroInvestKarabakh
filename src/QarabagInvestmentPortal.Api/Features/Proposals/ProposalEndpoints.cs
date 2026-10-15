@@ -18,10 +18,10 @@ public static class ProposalEndpoints
 
         api.MapPost("/opportunities/{id}/select-winner", async (string id, SelectWinnerRequest req, ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
             (await service.SelectWinnerAsync(id, req.ProposalId, ViewerOf(user), ct)).ToResult(r => Results.Ok(r)))
-            .RequireAuthorization(Policies.SignedIn);
+            .RequireAuthorization(Policies.Admin);
 
         api.MapPatch("/opportunities/{id}/status", async (string id, CloseOpportunityRequest req, ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
-            (await service.SetStatusAsync(id, req.Status, ViewerOf(user), ct)).ToResult(r => Results.Ok(r)))
+            (await service.SetStatusAsync(id, req.Status, req.Reason, ViewerOf(user), ct)).ToResult(r => Results.Ok(r)))
             .RequireAuthorization(Policies.SignedIn);
 
         // ------------------------------------------------ proposals (was "applications")
@@ -46,6 +46,10 @@ public static class ProposalEndpoints
         // ------------------------------------------------ admin: every proposal
         api.MapGet("/admin/proposals", async (string? status, string? region, string? search, ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
             Results.Ok(await service.AllAsync(ViewerOf(user), status, region, search, ct)))
+            .RequireAuthorization(Policies.Admin);
+
+        api.MapPost("/admin/proposals/{id}/reject", async (string id, RejectProposalRequest req, ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
+            (await service.RejectAsync(id, req.Reason, ViewerOf(user), ct)).ToResult(r => Results.Ok(r)))
             .RequireAuthorization(Policies.Admin);
 
         return api;

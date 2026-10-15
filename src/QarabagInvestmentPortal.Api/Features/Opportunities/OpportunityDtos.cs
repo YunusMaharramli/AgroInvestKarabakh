@@ -14,7 +14,8 @@ public sealed record OpportunityDto(
     OpportunityStatus Status, OpportunitySource Source, bool AcceptingProposals, bool ProposalDocumentsRequired,
     int ProposalCount, string? WinnerProposalId, DateTimeOffset? ClosedAt,
     string? ContactPhone, bool IsResponsibleParty, MyProposalSummary? MyProposal,
-    LandDto? Land, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+    LandDto? Land, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
+    string? ClosureReason, string? ReviewNote);
 
 public sealed record MyProposalSummary(string Id, string ReferenceNumber, ProposalStatus Status);
 
@@ -26,7 +27,7 @@ public sealed record Viewer(string? UserId, bool IsAdmin)
 
 public static class OpportunityMapping
 {
-    /// <summary>The owner (owner listings) or admins (admin listings) decide who wins.</summary>
+    /// <summary>The party managing the listing; ministry approval and winner selection are separate admin-only actions.</summary>
     public static bool IsResponsibleParty(InvestmentOpportunity o, Land land, Viewer viewer) =>
         viewer.UserId is not null && (o.Source == OpportunitySource.Owner
             ? land.OwnerId == viewer.UserId
@@ -44,9 +45,10 @@ public static class OpportunityMapping
             proposalCount, o.WinnerProposalId, o.ClosedAt,
             canSeePhone ? o.ContactPhone : null, responsible, myProposal,
             includeLand ? LandDto.From(land, o.Status == OpportunityStatus.Active) : null,
-            o.CreatedAt, o.UpdatedAt);
+            o.CreatedAt, o.UpdatedAt, o.ClosureReason,
+            viewer.IsAdmin || responsible ? o.ReviewNote : null);
     }
 }
 
-public sealed record CloseOpportunityRequest(OpportunityStatus? Status);
+public sealed record CloseOpportunityRequest(OpportunityStatus? Status, string? Reason);
 public sealed record SelectWinnerRequest(string? ProposalId);

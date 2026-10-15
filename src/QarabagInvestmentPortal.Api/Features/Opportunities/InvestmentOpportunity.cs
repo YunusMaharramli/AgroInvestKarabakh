@@ -19,6 +19,7 @@ public enum OpportunityStatus
     Draft,
     Active,
     Closed,
+    Rejected,
 }
 
 public sealed class InvestmentOpportunity
@@ -44,6 +45,10 @@ public sealed class InvestmentOpportunity
 
     public string? WinnerProposalId { get; set; }
     public DateTimeOffset? ClosedAt { get; set; }
+    public string? ClosureReason { get; set; }
+    public string? ReviewNote { get; set; }
+    public string? ReviewedById { get; set; }
+    public DateTimeOffset? ReviewedAt { get; set; }
     public string? CreatedById { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

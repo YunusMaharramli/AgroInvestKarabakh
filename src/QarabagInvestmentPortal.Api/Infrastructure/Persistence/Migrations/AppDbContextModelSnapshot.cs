@@ -126,25 +126,85 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("AdminNotes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
                     b.Property<string>("AgricultureType")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<double>("AreaHectares")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("Attributes")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
+                    b.Property<string>("BoundaryGeoJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("CadastralNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<bool>("CadastralUnavailable")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("CategoryConvertible")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ClientRequestId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedById")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("CurrentUse")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
+                    b.Property<string>("District")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Encumbrances")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("EntrySource")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<decimal>("EstimatedInvestmentRequirement")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool?>("HasEncumbrance")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("ImageUrl")
                         .IsRequired()
@@ -156,11 +216,26 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("LandUse")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("");
+
                     b.Property<double>("Latitude")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("LegalCategory")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<double>("Longitude")
                         .HasColumnType("double precision");
+
+                    b.Property<string>("OnBehalfOf")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("OwnerId")
                         .HasMaxLength(64)
@@ -170,15 +245,26 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<string>("OwnershipForm")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<string>("OwnershipType")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Region")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ResponsibleUserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("ReviewNote")
                         .HasMaxLength(2000)
@@ -190,6 +276,20 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                     b.Property<string>("ReviewedById")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("RoadAccessType")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<double?>("RoadDistanceKm")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Settlement")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<double?>("SettlementDistanceKm")
+                        .HasColumnType("double precision");
 
                     b.Property<string>("SoilQuality")
                         .HasMaxLength(500)
@@ -211,17 +311,84 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("UpdatedById")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Verification")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("VerificationNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VerifiedById")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("WaterAccess")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("WaterSupply")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CadastralNumber");
+
+                    b.HasIndex("ClientRequestId")
+                        .IsUnique()
+                        .HasFilter("\"ClientRequestId\" IS NOT NULL");
+
+                    b.HasIndex("LandUse");
+
                     b.HasIndex("OwnerId");
 
                     b.HasIndex("Status");
 
                     b.ToTable("lands", "portal");
+                });
+
+            modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Lands.LandAuditEntry", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ActorId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("LandId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LandId", "At");
+
+                    b.ToTable("land_audit", "portal");
                 });
 
             modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Lands.LandDocument", b =>
@@ -239,6 +406,13 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("ownership");
 
                     b.Property<string>("LandId")
                         .IsRequired()
@@ -266,6 +440,43 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                     b.HasIndex("LandId");
 
                     b.ToTable("land_documents", "portal");
+                });
+
+            modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Lands.LandPhoto", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("LandId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LandId", "SortOrder");
+
+                    b.ToTable("land_photos", "portal");
                 });
 
             modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Notifications.Notification", b =>
@@ -803,10 +1014,28 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
                     b.Navigation("Owner");
                 });
 
+            modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Lands.LandAuditEntry", b =>
+                {
+                    b.HasOne("QarabagInvestmentPortal.Api.Features.Lands.Land", null)
+                        .WithMany()
+                        .HasForeignKey("LandId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Lands.LandDocument", b =>
                 {
                     b.HasOne("QarabagInvestmentPortal.Api.Features.Lands.Land", null)
                         .WithMany("Documents")
+                        .HasForeignKey("LandId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Lands.LandPhoto", b =>
+                {
+                    b.HasOne("QarabagInvestmentPortal.Api.Features.Lands.Land", null)
+                        .WithMany("Photos")
                         .HasForeignKey("LandId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -890,6 +1119,8 @@ namespace QarabagInvestmentPortal.Api.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Lands.Land", b =>
                 {
                     b.Navigation("Documents");
+
+                    b.Navigation("Photos");
                 });
 
             modelBuilder.Entity("QarabagInvestmentPortal.Api.Features.Proposals.Proposal", b =>

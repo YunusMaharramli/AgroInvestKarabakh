@@ -96,21 +96,23 @@ public static partial class AssistantEndpoints
 
     private sealed record ListingInfo(
         string LandId, string Title, string Region, string Type, double Area, decimal Investment, string Use, string? Soil, string? Water,
-        string? OpportunityId, bool IsOwnerListing, string? Deadline, List<string> Conditions, List<string> Documents);
+        string? OpportunityId, bool IsOwnerListing, string? Deadline, List<string> Conditions, List<string> Documents,
+        string? Suitability = null);
     private sealed record MyProposalInfo(string Reference, string Title, ProposalStatus Status);
     private sealed record MyLandInfo(string Title, LandStatus Status, string? ReviewNote, int ProposalCount);
     private sealed record Snapshot(List<ListingInfo> Listings, string? UserName, List<MyProposalInfo> Proposals, List<MyLandInfo> MyLands, string Page, ListingInfo? Current);
 
     private static async Task<Snapshot> BuildSnapshotAsync(AppDbContext db, string? userId, string page, CancellationToken ct)
     {
-        var lands = await db.Lands.AsNoTracking().Where(l => l.Status == LandStatus.Approved).OrderBy(l => l.CreatedAt).ToListAsync(ct);
+        var lands = await db.Lands.AsNoTracking().Include(l => l.Photos).Where(l => l.Status == LandStatus.Approved).OrderBy(l => l.CreatedAt).ToListAsync(ct);
         var active = await db.Opportunities.AsNoTracking().Where(o => o.Status == OpportunityStatus.Active).ToListAsync(ct);
         var listings = lands.Select(l =>
         {
             var o = active.FirstOrDefault(x => x.LandId == l.Id);
             return new ListingInfo(l.Id, l.Title, l.Region, l.AgricultureType, l.AreaHectares, l.EstimatedInvestmentRequirement,
                 l.IntendedUse, l.SoilQuality, l.WaterSupply, o?.Id, l.OwnerId is not null,
-                o?.ApplicationDeadline is { } d ? DateAz(d) : null, o?.EligibilityConditions ?? [], o?.RequiredDocuments ?? []);
+                o?.ApplicationDeadline is { } d ? DateAz(d) : null, o?.EligibilityConditions ?? [], o?.RequiredDocuments ?? [],
+                LandSuitability.Summary(LandSuitability.Evaluate(l)));
         }).ToList();
 
         string? name = null;
@@ -203,6 +205,7 @@ public static partial class AssistantEndpoints
             sb.Append(CultureInfo.InvariantCulture, $"- id={l.LandId} | {l.Title} | {l.Region} | {l.Type} | {l.Area} ha | minimal sərmayə {Manat(l.Investment)} | təyinat: {l.Use}");
             if (!string.IsNullOrEmpty(l.Soil)) sb.Append(CultureInfo.InvariantCulture, $" | torpaq: {l.Soil}");
             if (!string.IsNullOrEmpty(l.Water)) sb.Append(CultureInfo.InvariantCulture, $" | su: {l.Water}");
+            if (!string.IsNullOrEmpty(l.Suitability)) sb.Append(CultureInfo.InvariantCulture, $" | yoxlama: {l.Suitability}");
             sb.AppendLine(l.OpportunityId is null
                 ? " | hazırda açıq elan yoxdur (təklif qəbul edilmir)"
                 : $" | açıq elan id={l.OpportunityId}{(l.IsOwnerListing ? " (sahibi yerləşdirib)" : "")}{(l.Deadline is null ? "" : $", son tarix {l.Deadline}")}");

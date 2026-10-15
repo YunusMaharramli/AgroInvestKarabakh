@@ -6,6 +6,12 @@ public sealed record FileRule(string Purpose, IReadOnlyList<string> AllowedTypes
     /// <summary>Land ownership documents: photos/scans only.</summary>
     public static readonly FileRule LandDocuments = new("land", ["image/jpeg", "image/png"], 10 * 1024 * 1024, 10);
 
+    /// <summary>Documents an administrator attaches to a land (ownership, lease, authorization, soil/water analysis): PDF or photos/scans.</summary>
+    public static readonly FileRule AdminLandDocuments = new("land", ["application/pdf", "image/jpeg", "image/png"], 10 * 1024 * 1024, 10);
+
+    /// <summary>Public land photos: JPG/PNG.</summary>
+    public static readonly FileRule LandPhotos = new("land-photo", ["image/jpeg", "image/png"], 10 * 1024 * 1024, 10);
+
     /// <summary>Investor proposal documents: PDF or photos/scans.</summary>
     public static readonly FileRule ProposalDocuments = new("proposal", ["application/pdf", "image/jpeg", "image/png"], 10 * 1024 * 1024, 10);
 

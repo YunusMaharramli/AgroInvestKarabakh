@@ -20,9 +20,12 @@ public static class RecommendationEndpoints
     {
         api.MapPost("/recommendations", async (RecommendationRequest req, ClaimsPrincipal user, AppDbContext db, OpportunityQueries queries, CancellationToken ct) =>
         {
-            var active = await db.Opportunities.AsNoTracking().Include(o => o.Land)
+            var active = (await db.Opportunities.AsNoTracking().Include(o => o.Land).ThenInclude(l => l!.Photos)
                 .Where(o => o.Status == OpportunityStatus.Active && o.Land!.Status == LandStatus.Approved)
-                .ToListAsync(ct);
+                .ToListAsync(ct))
+                // Lands that fail a deal-breaker for their own use are never recommended.
+                .Where(o => LandSuitability.Evaluate(o.Land!).Level != SuitabilityLevel.Unsuitable)
+                .ToList();
             var dtos = await queries.ToDtosAsync(active, new Viewer(user.UserId(), user.IsAdmin()), ct, includeLand: false);
 
             var results = active.Zip(dtos, (o, dto) => Score(o.Land!, dto, req))
@@ -31,6 +34,15 @@ public static class RecommendationEndpoints
             return Results.Ok(results);
         });
         return api;
+    }
+
+    /// <summary>Same land use, whether the request sends the key ("crops"), the name or an old short name.</summary>
+    internal static bool SameUse(Land land, string requested)
+    {
+        if (land.AgricultureType.Equals(requested, StringComparison.OrdinalIgnoreCase)) return true;
+        var wanted = LandUseCatalog.Find(requested);
+        var actual = LandUseCatalog.Find(land.LandUse) ?? LandUseCatalog.Find(land.AgricultureType);
+        return wanted is not null && wanted == actual;
     }
 
     internal static RecommendationResult Score(Land land, OpportunityDto opportunity, RecommendationRequest req)
@@ -45,7 +57,7 @@ public static class RecommendationEndpoints
 
         int sector;
         if (string.IsNullOrWhiteSpace(req.AgricultureType)) sector = 70;
-        else if (land.AgricultureType.Equals(req.AgricultureType, StringComparison.OrdinalIgnoreCase)) { sector = 100; matching.Add($"Fəaliyyət növü uyğundur: {land.AgricultureType}"); }
+        else if (SameUse(land, req.AgricultureType)) { sector = 100; matching.Add($"Fəaliyyət növü uyğundur: {land.AgricultureType}"); }
         else { sector = 15; mismatches.Add($"Fəaliyyət növü fərqlidir: {land.AgricultureType}"); }
 
         var budget = 70;
@@ -65,6 +77,9 @@ public static class RecommendationEndpoints
             if (ratio >= .8) matching.Add("Sahənin ölçüsü uyğundur");
             else mismatches.Add("Sahə istədiyinizdən kiçikdir");
         }
+
+        var suitability = LandSuitability.Evaluate(land);
+        if (suitability.Level == SuitabilityLevel.NeedsData) mismatches.Add($"Sahə haqqında məlumat natamamdır ({suitability.Completeness}%)");
 
         var score = (int)Math.Round(location * .35 + budget * .30 + sector * .20 + area * .15);
         var explanation = score >= 80 ? "Bu layihə parametrlərinizlə yüksək səviyyədə uzlaşır."

@@ -12,19 +12,23 @@ public sealed class LandReviewService(AppDbContext db, NotificationService notif
 {
     public async Task<List<LandReviewDto>> QueueAsync(string? status, string adminId, CancellationToken ct)
     {
-        var query = db.Lands.AsNoTracking().Include(l => l.Documents).Include(l => l.Owner).Where(l => l.OwnerId != null);
+        var query = db.Lands.AsNoTracking().Include(l => l.Documents).Include(l => l.Photos).Include(l => l.Owner).Where(l => l.OwnerId != null);
         if (string.IsNullOrWhiteSpace(status) || status == "open")
             query = query.Where(l => l.Status == LandStatus.PendingReview || l.Status == LandStatus.DocumentsRequested);
         else if (status != "all" && Enum.TryParse<LandStatus>(status.Replace("_", ""), true, out var s))
             query = query.Where(l => l.Status == s);
 
         var lands = await query.OrderBy(l => l.Status == LandStatus.PendingReview ? 0 : 1).ThenBy(l => l.SubmittedAt).ToListAsync(ct);
-        return await ToDtosAsync(lands, adminId, ct);
+        var dtos = await ToDtosAsync(lands, adminId, ct);
+        // Lands that fail a deal-breaker come first, so admins see problems before anything else.
+        return dtos.OrderBy(d => d.Land.Status == LandStatus.PendingReview ? 0 : 1)
+            .ThenBy(d => d.Land.Suitability.Level == SuitabilityLevel.Unsuitable ? 0 : 1)
+            .ThenBy(d => d.SubmittedAt).ToList();
     }
 
     public async Task<LandReviewDto?> GetAsync(string landId, string adminId, CancellationToken ct)
     {
-        var land = await db.Lands.AsNoTracking().Include(l => l.Documents).Include(l => l.Owner).FirstOrDefaultAsync(l => l.Id == landId, ct);
+        var land = await db.Lands.AsNoTracking().Include(l => l.Documents).Include(l => l.Photos).Include(l => l.Owner).FirstOrDefaultAsync(l => l.Id == landId, ct);
         return land is null ? null : (await ToDtosAsync([land], adminId, ct))[0];
     }
 

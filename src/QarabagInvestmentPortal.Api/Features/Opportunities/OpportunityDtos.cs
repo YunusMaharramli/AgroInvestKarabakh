@@ -27,11 +27,14 @@ public sealed record Viewer(string? UserId, bool IsAdmin)
 
 public static class OpportunityMapping
 {
-    /// <summary>The party managing the listing; ministry approval and winner selection are separate admin-only actions.</summary>
+    /// <summary>
+    /// The party managing the listing; ministry approval and winner selection are separate admin-only actions.
+    /// For admin listings this is the ministry, or the user an admin assigned to answer investor inquiries.
+    /// </summary>
     public static bool IsResponsibleParty(InvestmentOpportunity o, Land land, Viewer viewer) =>
         viewer.UserId is not null && (o.Source == OpportunitySource.Owner
             ? land.OwnerId == viewer.UserId
-            : viewer.IsAdmin);
+            : viewer.IsAdmin || land.ResponsibleUserId == viewer.UserId);
 
     public static OpportunityDto ToDto(
         InvestmentOpportunity o, Land land, Viewer viewer, int proposalCount, MyProposalSummary? myProposal,

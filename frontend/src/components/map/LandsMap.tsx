@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { APIProvider, Map, Marker, InfoWindow, MapMouseEvent, useApiIsLoaded } from '@vis.gl/react-google-maps';
-import { MapPin, MousePointerClick } from 'lucide-react';
+import { APIProvider, Map, Marker, InfoWindow, MapMouseEvent, useApiIsLoaded, useMap } from '@vis.gl/react-google-maps';
+import { MapPin, MousePointerClick, PenLine, Trash2, Undo2 } from 'lucide-react';
 import { CATEGORY_GROUPS, CategoryGroup, categoryByKey, groupColor } from '../../data/categories';
 import { useLocalePath } from '../../app/i18n';
 import type { Land } from '../../types/agro';
@@ -124,10 +124,68 @@ export const LandsMap: React.FC<{ lands: Land[]; height?: string; detailHref?: (
   );
 };
 
-/** Add Land: click the map to drop a pin. Without a key, latitude / longitude can be typed in. */
-export const PinPicker: React.FC<{ value: { lat: number; lng: number } | null; onChange: (v: { lat: number; lng: number }) => void; center?: { lat: number; lng: number }; error?: string }> = ({ value, onChange, center, error }) => {
+/** A boundary ring as [lng, lat] pairs (GeoJSON order), not closed. */
+export type BoundaryPath = [number, number][];
+
+/** Area of a lat/lng polygon on the sphere, in hectares. */
+export function polygonAreaHa(path: BoundaryPath): number {
+  if (path.length < 3) return 0;
+  const R = 6378137, rad = Math.PI / 180;
+  let sum = 0;
+  for (let i = 0; i < path.length; i++) {
+    const [lng1, lat1] = path[i];
+    const [lng2, lat2] = path[(i + 1) % path.length];
+    sum += (lng2 - lng1) * rad * (2 + Math.sin(lat1 * rad) + Math.sin(lat2 * rad));
+  }
+  return Math.abs((sum * R * R) / 2) / 10000;
+}
+
+/** Centre of a boundary (average of its corners) — used as the pin when only a boundary is drawn. */
+export function boundaryCentre(path: BoundaryPath): { lat: number; lng: number } {
+  const lat = path.reduce((a, p) => a + p[1], 0) / path.length;
+  const lng = path.reduce((a, p) => a + p[0], 0) / path.length;
+  return { lat: +lat.toFixed(5), lng: +lng.toFixed(5) };
+}
+
+const VERTEX_ICON = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"><circle cx="7" cy="7" r="5" fill="#ffffff" stroke="#1F4D2E" stroke-width="2.5"/></svg>');
+
+/** Draws the boundary polygon. Not clickable, so map clicks keep adding corners. */
+const BoundaryShape: React.FC<{ path: BoundaryPath }> = ({ path }) => {
+  const map = useMap();
+  const loaded = useApiIsLoaded();
+  const shape = useRef<google.maps.Polygon | null>(null);
+  useEffect(() => {
+    if (!map || !loaded) return;
+    const p = new google.maps.Polygon({ map, clickable: false, strokeColor: '#1F4D2E', strokeWeight: 2, fillColor: '#4C8C4A', fillOpacity: 0.22 });
+    shape.current = p;
+    return () => { p.setMap(null); shape.current = null; };
+  }, [map, loaded]);
+  useEffect(() => { shape.current?.setPath(path.map(([lng, lat]) => ({ lat, lng }))); }, [path, map, loaded]);
+  if (!loaded) return null;
+  return <>{path.map(([lng, lat], i) => <Marker key={i} position={{ lat, lng }} clickable={false} icon={{ url: VERTEX_ICON, anchor: new google.maps.Point(7, 7) }} />)}</>;
+};
+
+interface PinPickerProps {
+  value: { lat: number; lng: number } | null;
+  onChange: (v: { lat: number; lng: number }) => void;
+  center?: { lat: number; lng: number };
+  error?: string;
+  /** Optional boundary drawing: corners in [lng, lat] order. */
+  boundary?: BoundaryPath;
+  onBoundaryChange?: (path: BoundaryPath) => void;
+  /** Called with the drawn area (ha) when the owner chooses to use it as the land area. */
+  onUseArea?: (ha: number) => void;
+}
+
+/** Add Land: drop a pin or draw the land boundary on the map. Without a key, latitude / longitude can be typed in. */
+export const PinPicker: React.FC<PinPickerProps> = ({ value, onChange, center, error, boundary = [], onBoundaryChange, onUseArea }) => {
   const { t } = useTranslation();
   const [wheel, setWheel] = useState(false);
+  const [mode, setMode] = useState<'pin' | 'draw'>(boundary.length ? 'draw' : 'pin');
+  const canDraw = !!onBoundaryChange;
+  const areaHa = polygonAreaHa(boundary);
+
   if (!MAPS_KEY) {
     return (
       <div className="rounded-2xl border border-dashed border-[#CFC8B6] bg-white p-4">
@@ -140,19 +198,63 @@ export const PinPicker: React.FC<{ value: { lat: number; lng: number } | null; o
       </div>
     );
   }
+
+  const onMapClick = (e: MapMouseEvent) => {
+    const ll = e.detail.latLng;
+    if (!ll) return;
+    const lat = +ll.lat.toFixed(6), lng = +ll.lng.toFixed(6);
+    if (mode === 'draw' && onBoundaryChange) {
+      const next: BoundaryPath = [...boundary, [lng, lat]];
+      onBoundaryChange(next);
+      // The pin follows the boundary until the owner places it by hand.
+      if (next.length >= 3) onChange(boundaryCentre(next));
+    } else {
+      onChange({ lat: +lat.toFixed(5), lng: +lng.toFixed(5) });
+    }
+  };
+
+  const tab = (m: 'pin' | 'draw', icon: React.ReactNode, label: string) => (
+    <button type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
+      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold transition ${mode === m ? 'bg-brand text-white shadow-sm' : 'text-ink hover:bg-white'}`}>
+      {icon}{label}
+    </button>
+  );
+
   return (
     <div>
-      <p className="field-hint mb-2">{t('map.pinHint')}</p>
-      <div className={`h-80 rounded-2xl overflow-hidden border ${error ? 'border-danger' : 'border-line'}`} onClick={() => setWheel(true)}>
+      {canDraw && (
+        <div role="tablist" className="inline-flex gap-1 rounded-full border border-line bg-[#F3F1EA] p-1 mb-3">
+          {tab('pin', <MapPin className="w-4 h-4" aria-hidden="true" />, t('map.modePin'))}
+          {tab('draw', <PenLine className="w-4 h-4" aria-hidden="true" />, t('map.modeDraw'))}
+        </div>
+      )}
+      <p className="field-hint mb-2">{mode === 'draw' ? t('map.drawHint') : t('map.pinHint')}</p>
+      <div className={`h-80 rounded-2xl overflow-hidden border ${error ? 'border-danger' : 'border-line'} ${mode === 'draw' ? 'cursor-crosshair' : ''}`} onClick={() => setWheel(true)}>
         <APIProvider apiKey={MAPS_KEY}>
-          <Map key={center ? `${center.lat},${center.lng}` : 'az'} defaultCenter={center ?? AZ_CENTER} defaultZoom={center ? 10 : 7} styles={MAP_STYLE}
+          <Map key={center ? `${center.lat},${center.lng}` : 'az'} defaultCenter={value ?? center ?? AZ_CENTER} defaultZoom={value ? 14 : center ? 10 : 7} styles={MAP_STYLE}
             scrollwheel={wheel} streetViewControl={false} mapTypeControl={false} fullscreenControl={false} clickableIcons={false}
-            onClick={(e: MapMouseEvent) => { const ll = e.detail.latLng; if (ll) onChange({ lat: +ll.lat.toFixed(5), lng: +ll.lng.toFixed(5) }); }}>
-            {value && <Marker position={value} icon={markerIcon('#1F4D2E')} />}
+            draggableCursor={mode === 'draw' ? 'crosshair' : undefined} disableDoubleClickZoom={mode === 'draw'} onClick={onMapClick}>
+            {boundary.length > 0 && <BoundaryShape path={boundary} />}
+            {value && <Marker position={value} icon={markerIcon('#1F4D2E')} clickable={false} />}
           </Map>
         </APIProvider>
       </div>
-      <p className="text-sm mt-2 font-semibold" aria-live="polite">{value ? t('map.pinned', { lat: value.lat, lng: value.lng }) : ''}</p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
+        {/* Note: i18next reserves "lng" for the language, so the longitude is passed as "lon". */}
+        <p className="text-sm font-semibold" aria-live="polite">{value ? t('map.pinned', { lat: value.lat, lon: value.lng }) : ''}</p>
+        {canDraw && boundary.length > 0 && (
+          <>
+            <p className="text-sm text-muted" aria-live="polite">{t('map.boundary', { n: boundary.length, ha: areaHa.toFixed(2) })}</p>
+            <div className="flex flex-wrap gap-2 ml-auto">
+              {onUseArea && boundary.length >= 3 && (
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => onUseArea(+areaHa.toFixed(2))}>{t('map.useArea')}</button>
+              )}
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => onBoundaryChange!(boundary.slice(0, -1))}><Undo2 className="w-4 h-4" aria-hidden="true" />{t('map.undo')}</button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => onBoundaryChange!([])}><Trash2 className="w-4 h-4" aria-hidden="true" />{t('map.clear')}</button>
+            </div>
+          </>
+        )}
+      </div>
       {error && <p className="field-error" role="alert">{error}</p>}
     </div>
   );

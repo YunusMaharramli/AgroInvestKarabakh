@@ -54,7 +54,7 @@ export const LandResultCard: React.FC<{ land: Land; score: LandScore; href: stri
         </div>
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div><dt className="text-muted text-xs font-semibold">{t('land.required')}</dt><dd className="font-bold">{f.compactAzn(land.investmentMin)} – {f.compactAzn(land.investmentMax)}</dd></div>
-          <div><dt className="text-muted text-xs font-semibold">{t('land.return')}</dt><dd className="font-bold text-leaf-dark">{land.expectedReturnPct}%</dd></div>
+          <div><dt className="text-muted text-xs font-semibold">{t('land.return')}</dt><dd className="font-bold text-leaf-dark">{land.expectedReturnPct ? `${land.expectedReturnPct}%` : '—'}</dd></div>
         </dl>
         <ProgressBar label={t('land.fertility')} value={land.fertilityPct} />
         <div><RiskBadge level={score.risk} factors={score.riskFactors} /></div>

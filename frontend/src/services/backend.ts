@@ -9,14 +9,16 @@ export const TOKEN_KEY = 'agro_token';
 
 export class BackendError extends Error {
   /** status 0 = server not reachable */
-  constructor(public status: number, message: string) { super(message); }
+  /** data = the full error body (admin forms: { fields, blockers }) */
+  constructor(public status: number, message: string, public data: Record<string, unknown> = {}) { super(message); }
 }
 
 export function backendToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
 
-export async function backend<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+export async function backend<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
   const token = backendToken();
   let res: Response;
   try {
@@ -24,10 +26,10 @@ export async function backend<T>(method: 'GET' | 'POST', path: string, body?: un
       method,
       credentials: 'include',
       headers: {
-        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(body !== undefined && !isForm ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
     });
   } catch {
     throw new BackendError(0, '');
@@ -36,7 +38,7 @@ export async function backend<T>(method: 'GET' | 'POST', path: string, body?: un
   // No JSON (e.g. the dev proxy's 502/504, or index.html) means the API is not running.
   if (!type.includes('json')) throw new BackendError(res.ok || res.status >= 500 ? 0 : res.status, '');
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new BackendError(res.status, typeof data?.error === 'string' ? data.error : '');
+  if (!res.ok) throw new BackendError(res.status, typeof data?.error === 'string' ? data.error : '', data && typeof data === 'object' ? data : {});
   return data as T;
 }
 

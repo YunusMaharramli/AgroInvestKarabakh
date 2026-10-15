@@ -22,6 +22,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<Land> Lands => Set<Land>();
     public DbSet<LandDocument> LandDocuments => Set<LandDocument>();
+    public DbSet<LandPhoto> LandPhotos => Set<LandPhoto>();
+    public DbSet<LandAuditEntry> LandAudit => Set<LandAuditEntry>();
     public DbSet<InvestmentOpportunity> Opportunities => Set<InvestmentOpportunity>();
     public DbSet<Proposal> Proposals => Set<Proposal>();
     public DbSet<ProposalDocument> ProposalDocuments => Set<ProposalDocument>();
@@ -124,6 +126,61 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasIndex(x => x.Status);
             e.HasIndex(x => x.OwnerId);
             e.HasMany(x => x.Documents).WithOne().HasForeignKey(d => d.LandId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Photos).WithOne().HasForeignKey(p => p.LandId).OnDelete(DeleteBehavior.Cascade);
+
+            // Land-use type and common core (see LandUseCatalog / LandSuitability).
+            e.Property(x => x.LandUse).HasMaxLength(32).HasDefaultValue(string.Empty);
+            e.Property(x => x.CadastralNumber).HasMaxLength(50);
+            e.Property(x => x.LegalCategory).HasMaxLength(32);
+            e.Property(x => x.OwnershipForm).HasMaxLength(16);
+            e.Property(x => x.Encumbrances).HasMaxLength(1000);
+            e.Property(x => x.BoundaryGeoJson).HasColumnType("jsonb");
+            e.Property(x => x.RoadAccessType).HasMaxLength(16);
+            e.Property(x => x.CurrentUse).HasMaxLength(500);
+            e.Property(x => x.Attributes).HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb");
+            e.HasIndex(x => x.LandUse);
+
+            // Admin land management.
+            e.Property(x => x.District).HasMaxLength(100);
+            e.Property(x => x.Settlement).HasMaxLength(100);
+            e.Property(x => x.WaterAccess).HasMaxLength(32);
+            e.Property(x => x.Details).HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb");
+            e.Property(x => x.AdminNotes).HasMaxLength(4000);
+            e.Property(x => x.EntrySource).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.OnBehalfOf).HasMaxLength(200);
+            e.Property(x => x.CreatedById).HasMaxLength(64);
+            e.Property(x => x.UpdatedById).HasMaxLength(64);
+            e.Property(x => x.ResponsibleUserId).HasMaxLength(64);
+            e.Property(x => x.Verification).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.VerifiedById).HasMaxLength(64);
+            e.Property(x => x.VerificationNote).HasMaxLength(2000);
+            e.Property(x => x.ClientRequestId).HasMaxLength(64);
+            e.HasIndex(x => x.ClientRequestId).IsUnique().HasFilter("\"ClientRequestId\" IS NOT NULL");
+            e.HasIndex(x => x.CadastralNumber);
+        });
+
+        modelBuilder.Entity<LandAuditEntry>(e =>
+        {
+            e.ToTable("land_audit");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.LandId).HasMaxLength(64);
+            e.Property(x => x.ActorId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Action).HasMaxLength(32).IsRequired();
+            e.Property(x => x.Details).HasMaxLength(2000);
+            e.HasOne<Land>().WithMany().HasForeignKey(x => x.LandId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.LandId, x.At });
+        });
+
+        modelBuilder.Entity<LandPhoto>(e =>
+        {
+            e.ToTable("land_photos");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.LandId).HasMaxLength(64);
+            e.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
+            e.Property(x => x.StorageKey).HasMaxLength(500).IsRequired();
+            e.HasIndex(x => new { x.LandId, x.SortOrder });
         });
 
         modelBuilder.Entity<LandDocument>(e =>
@@ -136,6 +193,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
             e.Property(x => x.StorageKey).HasMaxLength(500).IsRequired();
             e.Property(x => x.UploadedById).HasMaxLength(64);
+            e.Property(x => x.Kind).HasMaxLength(32).HasDefaultValue("ownership");
         });
 
         modelBuilder.Entity<InvestmentOpportunity>(e =>

@@ -56,6 +56,7 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<OpportunityQueries>();
 builder.Services.AddScoped<LandSubmissionService>();
 builder.Services.AddScoped<LandReviewService>();
+builder.Services.AddScoped<AdminLandService>();
 builder.Services.AddScoped<ProposalService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddSignalR();
@@ -83,6 +84,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 var api = app.MapGroup("/api");
 api.MapAuthEndpoints()
     .MapLandEndpoints()
+    .MapAdminLandEndpoints()
     .MapOpportunityAndProposalEndpoints()
     .MapChatEndpoints()
     .MapDocumentEndpoints()

@@ -32,7 +32,7 @@ public sealed class OpportunityQueries(AppDbContext db, TimeProvider clock)
     /// <summary>Public list: ACTIVE and CLOSED. Admins also see DRAFT. Owners see their own drafts via "my lands".</summary>
     public async Task<List<OpportunityDto>> ListAsync(Viewer viewer, string? status, string? region, CancellationToken ct)
     {
-        var query = db.Opportunities.AsNoTracking().Include(o => o.Land).AsQueryable();
+        var query = db.Opportunities.AsNoTracking().Include(o => o.Land).ThenInclude(l => l!.Photos).AsQueryable();
         if (!viewer.IsAdmin)
             query = query.Where(o => o.Land!.Status == LandStatus.Approved
                 && o.Status != OpportunityStatus.Draft && o.Status != OpportunityStatus.Rejected);
@@ -46,7 +46,7 @@ public sealed class OpportunityQueries(AppDbContext db, TimeProvider clock)
 
     public async Task<OpportunityDto?> GetAsync(string id, Viewer viewer, CancellationToken ct)
     {
-        var o = await db.Opportunities.AsNoTracking().Include(x => x.Land).FirstOrDefaultAsync(x => x.Id == id, ct);
+        var o = await db.Opportunities.AsNoTracking().Include(x => x.Land).ThenInclude(l => l!.Photos).FirstOrDefaultAsync(x => x.Id == id, ct);
         if (o is null) return null;
         if ((o.Land!.Status != LandStatus.Approved
                 || o.Status is OpportunityStatus.Draft or OpportunityStatus.Rejected)

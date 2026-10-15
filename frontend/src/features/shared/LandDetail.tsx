@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, Inbox, MapPin, Star, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, Inbox, Info, Landmark, MapPin, ShieldAlert, ShieldCheck, Star, X } from 'lucide-react';
+import type { TFunction } from 'i18next';
 import { landService, requestService, useCurrentUser, useDbValue, ApiError } from '../../services/api';
 import { scoreLand, WEIGHTS } from '../../services/scoring';
 import { useFormat, useLocalePath } from '../../app/i18n';
@@ -112,7 +113,9 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
   useEffect(() => { if (land && mode !== 'owner') landService.addView(land.id); }, [id]);
   const score = useMemo(() => (land ? scoreLand(land, me?.preferences ?? {}) : null), [land, me?.preferences]);
 
-  if (!land || !score || (mode !== 'owner' && (land.status === 'draft' || land.status === 'underReview'))) {
+  // Owner pages only show the signed-in owner's own land; others' drafts and reviews are never visible.
+  const hidden = mode === 'owner' ? land?.ownerId !== me?.id : (land?.status === 'draft' || land?.status === 'underReview');
+  if (!land || !score || hidden) {
     return <div className="container-x py-20"><EmptyState title={t('land.notFound')} /></div>;
   }
   const title = name(land);
@@ -121,25 +124,45 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
   const facts: [string, string][] = [
     [t('land.soil'), t(`soil.${land.soilType}`)], [t('land.irrigation'), t(`irrigationTypes.${land.irrigation}`)],
     [t('land.lastCrop'), t(`crops.${land.lastCrop}`, { defaultValue: land.lastCrop })], [t('land.road'), land.roadAccess ? t('form.yes') : t('form.no')],
-    [t('land.electricity'), land.electricity ? t('form.yes') : t('form.no')], [t('land.duration'), t('land.months', { n: land.durationMonths })],
-    [t('land.model'), t(`models.${land.investmentModel}`)], [t('land.return'), `${land.expectedReturnPct}%`], [t('land.area'), t('land.ha', { n: land.areaHa })],
+    [t('land.electricity'), land.electricity ? t('form.yes') : t('form.no')], [t('land.duration'), land.durationMonths ? t('land.months', { n: land.durationMonths }) : '—'],
+    [t('land.model'), t(`models.${land.investmentModel}`)], [t('land.return'), land.expectedReturnPct ? `${land.expectedReturnPct}%` : '—'], [t('land.area'), t('land.ha', { n: land.areaHa })],
   ];
+  const ministry = land.source === 'ministry'
+    ? ministryFacts(land, facts, t)
+    : null;
 
   let cta: React.ReactNode;
-  if (mode === 'owner' || isOwn) cta = <p className="text-sm text-muted">{t('investor.detail.ownListing')}</p>;
+  if (mode === 'owner' || isOwn) cta = <p className="flex items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-muted"><Info className="w-4 h-4 shrink-0 text-brand" aria-hidden="true" />{t('investor.detail.ownListing')}</p>;
   else if (land.status !== 'active') cta = <p className="text-sm font-semibold text-muted">{t('investor.detail.notAccepting')}</p>;
   else if (myRequest) cta = <p className="text-sm font-semibold text-brand">{t('investor.detail.alreadySent')}</p>;
   else if (!me) cta = <Link to={lp('/login')} className="btn btn-primary w-full">{t('investor.detail.loginToInvest')}</Link>;
   else cta = <button type="button" className="btn btn-primary w-full" onClick={() => setInvest(true)}>{t('investor.detail.send')}</button>;
 
+  const compact = (n: number) => new Intl.NumberFormat(f.locale, { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+  const fundedPct = Math.max(0, Math.min(100, Math.round((land.raisedAmount / Math.max(goal, 1)) * 100)));
   const box = (
     <div className="card p-6 flex flex-col gap-4">
       <div>
-        <p className="text-sm text-muted font-semibold">{t('land.required')}</p>
-        <p className="font-display text-3xl text-brand mt-1">{f.compactAzn(land.investmentMin)} – {f.compactAzn(land.investmentMax)}</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-muted">{t('land.required')}</p>
+        <p className="mt-2 flex flex-wrap items-baseline gap-x-2 font-sans text-[1.75rem] font-extrabold leading-tight text-brand tabular-nums">
+          <span>{compact(land.investmentMin)}</span><span className="font-semibold text-muted" aria-hidden="true">–</span><span>{compact(land.investmentMax)}</span>
+          <span className="text-base font-bold text-muted">AZN</span>
+        </p>
       </div>
-      <ProgressBar label={t('land.fundingProgress')} value={(land.raisedAmount / goal) * 100} tone="gold"
-        showValue={t('land.raisedOf', { raised: f.compactAzn(land.raisedAmount), goal: f.compactAzn(goal) })} />
+      <div className="rounded-xl bg-[#F7F5EF] p-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-sm font-semibold text-ink">{t('land.fundingProgress')}</span>
+          <span className="text-sm font-extrabold text-brand tabular-nums">{fundedPct}%</span>
+        </div>
+        <div className="mt-2 h-2.5 rounded-full bg-[#E6E0D0] overflow-hidden" role="progressbar" aria-label={t('land.fundingProgress')}
+          aria-valuenow={fundedPct} aria-valuemin={0} aria-valuemax={100} aria-valuetext={t('land.raisedOf', { raised: f.compactAzn(land.raisedAmount), goal: f.compactAzn(goal) })}>
+          <div className="h-full rounded-full bg-gold" style={{ width: `${fundedPct}%` }} />
+        </div>
+        <div className="mt-2 flex justify-between gap-3 text-xs text-muted tabular-nums">
+          <span>{t('land.raised', { amount: f.compactAzn(land.raisedAmount) })}</span>
+          <span>{t('land.goal', { amount: f.compactAzn(goal) })}</span>
+        </div>
+      </div>
       {cta}
       {mode !== 'owner' && (
         <div className="flex gap-2">
@@ -176,6 +199,7 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
             {land.ownerVerified && <VerifiedBadge />}
             {land.isSpecial && <span className="inline-flex items-center gap-1 rounded-full bg-gold text-forest px-2.5 py-1 text-xs font-bold"><Star className="w-3 h-3" aria-hidden="true" />{t('land.special')}</span>}
             {mode === 'owner' && <StatusBadge status={land.status} />}
+            {land.source === 'ministry' && <span className="inline-flex items-center gap-1 rounded-full bg-sage text-brand px-2.5 py-1 text-xs font-bold"><Landmark className="w-3 h-3" aria-hidden="true" />{t('ministry.badge')}</span>}
           </div>
           <h1 className="font-display text-4xl lg:text-5xl text-brand leading-tight">{title}</h1>
           <p className="text-muted mt-2 flex items-center gap-1.5"><MapPin className="w-4 h-4" aria-hidden="true" />{t(`regions.${land.region}`)} · {t('land.ha', { n: land.areaHa })}</p>
@@ -212,8 +236,9 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
 
           <section className="mt-8">
             <h2 className="font-display text-2xl text-brand mb-4">{t('land.keyFacts')}</h2>
+            {ministry}
             <dl className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-line rounded-2xl overflow-hidden border border-line">
-              {facts.map(([k, v]) => <div key={k} className="bg-white p-4"><dt className="text-xs font-semibold text-muted">{k}</dt><dd className="font-bold mt-1">{v}</dd></div>)}
+              {(land.source === 'ministry' ? facts.filter(([k]) => ![t('land.soil'), t('land.lastCrop'), t('land.electricity'), t('land.model')].includes(k)) : facts).map(([k, v]) => <div key={k} className="bg-white p-4"><dt className="text-xs font-semibold text-muted">{k}</dt><dd className="font-bold mt-1">{v}</dd></div>)}
             </dl>
           </section>
           {land.description && <section className="mt-8"><h2 className="font-display text-2xl text-brand mb-3">{t('land.description')}</h2><p className="text-ink/80 leading-relaxed whitespace-pre-line">{land.description}</p></section>}
@@ -230,3 +255,18 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
 };
 
 export const PublicLandPage: React.FC = () => <LandDetail mode="public" />;
+
+/** Notice for ministry listings: verification status in plain words, and that the portal is not an official registry. */
+function ministryFacts(land: Land, _facts: [string, string][], t: TFunction): React.ReactNode {
+  const verified = land.verification === 'VERIFIED';
+  return (
+    <div className={`mb-4 rounded-2xl border p-4 text-sm flex gap-3 ${verified ? 'border-leaf/40 bg-sage' : 'border-gold/50 bg-[#FBF6E9]'}`}>
+      {verified ? <ShieldCheck className="w-5 h-5 shrink-0 text-leaf-dark" aria-hidden="true" /> : <ShieldAlert className="w-5 h-5 shrink-0 text-gold-dark" aria-hidden="true" />}
+      <div>
+        <p className="font-bold text-ink">{t(`ministry.verification.${land.verification ?? 'EVIDENCE_PENDING'}`)}</p>
+        <p className="text-muted mt-1">{t(verified ? 'ministry.verifiedText' : 'ministry.unverifiedText')}{land.hasBoundary ? ` ${t('ministry.boundaryNote')}` : ''}</p>
+        <p className="text-muted mt-1 text-xs">{t('ministry.notRegistry')}</p>
+      </div>
+    </div>
+  );
+}

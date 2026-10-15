@@ -9,8 +9,15 @@ public sealed class RecaptchaVerifier(
     IConfiguration configuration,
     ILogger<RecaptchaVerifier> logger)
 {
+    /// <summary>
+    /// Recaptcha:Enabled = false switches the check off (automated tests only).
+    /// In Development, appsettings.Development.json uses Google's public test keys, which always pass.
+    /// </summary>
     public async Task<bool> VerifyAsync(string? token, CancellationToken ct)
     {
+        if (!configuration.GetValue("Recaptcha:Enabled", true))
+            return true;
+
         if (string.IsNullOrWhiteSpace(token))
             return false;
 

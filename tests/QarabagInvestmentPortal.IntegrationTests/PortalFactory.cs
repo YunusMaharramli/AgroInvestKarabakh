@@ -46,6 +46,7 @@ public sealed class PortalFactory : WebApplicationFactory<Program>, IAsyncLifeti
         builder.UseSetting("Database:MigrateOnStartup", "false");
         builder.UseSetting("Storage:RootPath", _storageRoot);
         builder.UseSetting("Gemini:ApiKey", string.Empty);
+        builder.UseSetting("Recaptcha:Enabled", "false");
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>();
@@ -69,6 +70,7 @@ public sealed class PortalFactory : WebApplicationFactory<Program>, IAsyncLifeti
                 Phone = "+994 12 498 70 00",
                 Role = UserRole.Admin,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(AdminPassword),
+                EmailConfirmedAt = DateTimeOffset.UtcNow,
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow,
             });
@@ -118,9 +120,15 @@ public sealed class PortalFactory : WebApplicationFactory<Program>, IAsyncLifeti
             confirmPassword = "Parol-2026",
         });
         Assert.Equal(System.Net.HttpStatusCode.Created, res.StatusCode);
-        var body = await res.Content.ReadFromJsonAsync<JsonElement>(Json);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body.GetProperty("token").GetString());
-        return client;
+
+        // Registration now sends a confirmation link; confirm directly in the database, then log in.
+        await using (var db = NewDbContext())
+        {
+            var user = await db.Users.SingleAsync(u => u.Email == email.ToLowerInvariant());
+            user.EmailConfirmedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+        }
+        return await LoginAsync(email, "Parol-2026");
     }
 
     private static JsonSerializerOptions CreateJson()

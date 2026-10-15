@@ -18,6 +18,8 @@ export interface AppUser {
   phone: string;
   avatar: string | null;
   roles: CabinetRole[];
+  /** Ministry administrator (from the backend account role). Admin pages are also checked on the server. */
+  isAdmin?: boolean;
   verified: boolean;
   preferences: UserPreferences;
   investorType?: 'individual' | 'company';
@@ -67,6 +69,11 @@ export interface Land {
   priceVolatility: number; // 0..1, used by the mock risk score
   createdAt: string;
   winnerRequestId?: string | null;
+  /** Land published by the ministry through the real backend (admin land management). */
+  source?: 'ministry';
+  /** Backend verification status: entering data or uploading a file never makes a land "VERIFIED". */
+  verification?: 'ADMIN_ENTERED' | 'EVIDENCE_PENDING' | 'VERIFIED';
+  hasBoundary?: boolean;
 }
 
 /**

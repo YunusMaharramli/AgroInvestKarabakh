@@ -1,21 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
 import {
-  BadgeCheck, CheckCircle2, Coins, Eye, FileText, Grid3x3, Inbox, LayoutList, MapPin, MoreHorizontal, Plus, Search, Sprout, Trash2, Trophy, Upload, Users, X, GripVertical,
+  BadgeCheck, CheckCircle2, Clock, Coins, Eye, FileText, Grid3x3, Inbox, LayoutList, MapPin, MoreHorizontal, PencilLine, Plus, Search, Sprout, Trash2, Trophy, Upload, Users, X, GripVertical,
 } from 'lucide-react';
-import { authService, landService, requestService, useCurrentUser, useDbValue, userById, ApiError } from '../../services/api';
+import { landService, requestService, useCurrentUser, useDbValue, userById, ApiError } from '../../services/api';
 import { useFormat, useLocalePath } from '../../app/i18n';
 import { useLandName } from '../shared/landText';
 import { TypeBadge } from '../shared/LandCard';
 import { PageTitle, Avatar } from '../cabinet/CabinetShell';
 import { ConfirmDialog, Drawer, useDismiss, useToast } from '../../components/ui/Overlay';
 import { EmptyState, Field, Photo, ProgressBar, RequestBadge, SkeletonCard, StatCard, StatusBadge, Stepper, Tabs, Toggle, VerifiedBadge, Segmented } from '../../components/ui/Bits';
-import { PinPicker } from '../../components/map/LandsMap';
+import { PinPicker, polygonAreaHa, type BoundaryPath } from '../../components/map/LandsMap';
 import { CATEGORIES } from '../../data/categories';
 import { REGIONS, regionByKey } from '../../data/regions';
 import type { InvestmentModel, InvestmentRequest, Irrigation, Land, LandStatus, SoilType } from '../../types/agro';
+import { draftStore, useLandDrafts, type LandDraftRecord } from '../../services/drafts';
+import { LandSearchBar, matchesLandSearch } from '../shared/LandSearch';
 
 function useLoading(ms = 450) {
   const [loading, setLoading] = useState(true);
@@ -294,6 +296,43 @@ const PropertyMenu: React.FC<{ land: Land; title: string }> = ({ land, title }) 
   );
 };
 
+/** Unfinished add-land forms of THIS account (saved with "Save as draft"). */
+const DraftList: React.FC<{ drafts: LandDraftRecord<Draft>[]; userId: string }> = ({ drafts, userId }) => {
+  const { t } = useTranslation();
+  const f = useFormat();
+  const lp = useLocalePath();
+  const toast = useToast();
+  const [del, setDel] = useState<string | null>(null);
+  const steps = t('owner.add.steps', { returnObjects: true }) as unknown as string[];
+  return (
+    <section className="mb-8" aria-labelledby="drafts-title">
+      <h2 id="drafts-title" className="font-display text-2xl text-brand mb-1">{t('owner.drafts.title', { n: drafts.length })}</h2>
+      <p className="text-sm text-muted mb-4">{t('owner.drafts.text')}</p>
+      <ul className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        {drafts.map(dr => {
+          const title = dr.data.title.trim() || (dr.data.fieldType ? `${t(`fieldTypes.${dr.data.fieldType}`)}${dr.data.region ? ` · ${t(`regions.${dr.data.region}`)}` : ''}` : t('owner.drafts.untitled'));
+          return (
+            <li key={dr.id} className="card p-5 flex flex-col gap-3 border-dashed">
+              <div className="flex items-start justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-sand px-2.5 py-1 text-xs font-bold text-muted"><PencilLine className="w-3.5 h-3.5" aria-hidden="true" />{t('status.draft')}</span>
+                <span className="text-xs text-muted flex items-center gap-1"><Clock className="w-3.5 h-3.5" aria-hidden="true" />{f.date(dr.savedAt)}</span>
+              </div>
+              <h3 className="font-display text-xl text-brand leading-snug break-words">{title}</h3>
+              <p className="text-sm text-muted">{t('owner.drafts.step', { n: dr.step + 1, total: steps.length, name: steps[dr.step] ?? '' })}</p>
+              <div className="flex gap-2 mt-auto pt-1">
+                <Link to={lp(`/owner/add-land?draft=${dr.id}`)} className="btn btn-primary btn-sm flex-1">{t('owner.drafts.continue')}</Link>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setDel(dr.id)} aria-label={t('owner.drafts.delete', { title })}><Trash2 className="w-4 h-4" /></button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <ConfirmDialog open={!!del} danger title={t('owner.drafts.deleteTitle')} text={t('owner.drafts.deleteText')} confirmLabel={t('owner.props.delete')} onClose={() => setDel(null)}
+        onConfirm={() => { if (del) draftStore.remove(userId, del); setDel(null); toast(t('owner.drafts.deleted')); }} />
+    </section>
+  );
+};
+
 export const OwnerProperties: React.FC = () => {
   const { t } = useTranslation();
   const f = useFormat();
@@ -306,11 +345,16 @@ export const OwnerProperties: React.FC = () => {
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [status, setStatus] = useState<LandStatus | ''>('');
   const [type, setType] = useState('');
-  const shown = lands.filter(l => (!status || l.status === status) && (!type || l.fieldType === type));
+  const [q, setQ] = useState('');
+  const drafts = useLandDrafts<Draft>(me.id);
+  const shown = lands.filter(l => (!status || l.status === status) && matchesLandSearch(l, q, type));
   const types = Array.from(new Set(lands.map(l => l.fieldType)));
+  const shownDrafts = drafts.filter(dr => (!status || status === 'draft') && (!type || dr.data.fieldType === type)
+    && (!q.trim() || `${dr.data.title} ${dr.data.address} ${dr.data.region ? t(`regions.${dr.data.region}`) : ''} ${dr.data.fieldType ? t(`fieldTypes.${dr.data.fieldType}`) : ''}`.toLowerCase().includes(q.trim().toLowerCase())));
   return (
     <>
       <PageTitle title={t('owner.nav.properties')} actions={<Link to={lp('/owner/add-land')} className="btn btn-primary"><Plus className="w-4 h-4" />{t('owner.nav.add')}</Link>} />
+      <LandSearchBar value={q} onChange={setQ} className="mb-3" />
       <div className="flex flex-wrap gap-3 mb-6 items-center">
         <select className="field !w-auto" aria-label={t('owner.props.allStatuses')} value={status} onChange={e => setStatus(e.target.value as LandStatus | '')}>
           <option value="">{t('owner.props.allStatuses')}</option>
@@ -325,7 +369,9 @@ export const OwnerProperties: React.FC = () => {
           <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')} className={`p-2 rounded-full ${view === 'list' ? 'bg-white shadow text-brand' : 'text-muted'}`} aria-label={t('owner.props.list')}><LayoutList className="w-4 h-4" /></button>
         </div>
       </div>
+      {shownDrafts.length > 0 && <DraftList drafts={shownDrafts} userId={me.id} />}
       {loading ? <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">{[0, 1, 2].map(i => <SkeletonCard key={i} />)}</div>
+        : status === 'draft' && shownDrafts.length > 0 ? null
         : shown.length === 0 ? <EmptyState title={t('owner.props.empty')} action={<Link to={lp('/owner/add-land')} className="btn btn-primary mt-2"><Plus className="w-4 h-4" />{t('owner.nav.add')}</Link>} />
         : (
           <ul className={view === 'grid' ? 'grid sm:grid-cols-2 xl:grid-cols-3 gap-5' : 'grid gap-4'}>
@@ -359,16 +405,15 @@ export const OwnerProperties: React.FC = () => {
 /* ================= 3.2 Add land wizard ================= */
 interface PhotoItem { id: string; url: string; name: string }
 type Draft = {
-  title: string; fieldType: string; description: string; region: string; address: string; pin: { lat: number; lng: number } | null; areaHa: string;
+  title: string; fieldType: string; description: string; region: string; address: string; pin: { lat: number; lng: number } | null; boundary: BoundaryPath; areaHa: string;
   soilType: SoilType | ''; fertilityPct: number; irrigation: Irrigation | ''; lastCrop: string; roadAccess: boolean; electricity: boolean; ownershipDoc: string;
   investmentMin: string; investmentMax: string; investmentModel: InvestmentModel | ''; expectedReturnPct: string; durationMonths: string; isSpecial: boolean;
   photos: PhotoItem[]; documents: { name: string; size: number }[];
 };
 const EMPTY: Draft = {
-  title: '', fieldType: '', description: '', region: '', address: '', pin: null, areaHa: '', soilType: '', fertilityPct: 70, irrigation: '', lastCrop: '', roadAccess: true, electricity: true, ownershipDoc: 'extract',
+  title: '', fieldType: '', description: '', region: '', address: '', pin: null, boundary: [], areaHa: '', soilType: '', fertilityPct: 70, irrigation: '', lastCrop: '', roadAccess: true, electricity: true, ownershipDoc: 'extract',
   investmentMin: '', investmentMax: '', investmentModel: '', expectedReturnPct: '', durationMonths: '', isSpecial: false, photos: [], documents: [],
 };
-const DRAFT_KEY = 'agroinvest_add_land_draft';
 
 export const AddLandWizard: React.FC = () => {
   const { t } = useTranslation();
@@ -376,8 +421,26 @@ export const AddLandWizard: React.FC = () => {
   const lp = useLocalePath();
   const toast = useToast();
   const name = useLandName();
-  const [d, setD] = useState<Draft>(() => { try { const s = localStorage.getItem(DRAFT_KEY); return s ? { ...EMPTY, ...JSON.parse(s), photos: [] } : EMPTY; } catch { return EMPTY; } });
-  const [step, setStep] = useState(0);
+  const navigate = useNavigate();
+  const me = useCurrentUser()!;
+  const [params] = useSearchParams();
+  // Drafts belong to the signed-in account only (see services/drafts.ts).
+  const opened = useMemo(() => {
+    const id = params.get('draft');
+    return id ? draftStore.get<Draft>(me.id, id) : undefined;
+  }, [params, me.id]);
+  const [draftId, setDraftIdState] = useState<string | null>(opened?.id ?? null);
+  const draftIdRef = useRef<string | null>(opened?.id ?? null);
+  const setDraftId = (id: string | null) => { draftIdRef.current = id; setDraftIdState(id); };
+  const [d, setD] = useState<Draft>(() => (opened ? { ...EMPTY, ...opened.data, photos: [] } : EMPTY));
+  const [step, setStep] = useState(() => Math.min(opened?.step ?? 0, 5));
+  useEffect(() => {
+    // Opening another draft (or "add new") from the menu while on this page: load it.
+    if ((opened?.id ?? null) === draftIdRef.current) return; // our own save just updated the URL
+    setDraftId(opened?.id ?? null);
+    setD(opened ? { ...EMPTY, ...opened.data, photos: [] } : EMPTY);
+    setStep(Math.min(opened?.step ?? 0, 5));
+  }, [opened?.id]);
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -406,7 +469,9 @@ export const AddLandWizard: React.FC = () => {
   };
   const next = () => { if (validate(step)) { setStep(s => s + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); } };
   const saveDraft = () => {
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, photos: [] })); } catch { /* ignore */ }
+    const id = draftStore.save<Draft>(me.id, { id: draftId, step, data: { ...d, photos: [] } });
+    setDraftId(id);
+    if (params.get('draft') !== id) navigate(lp(`/owner/add-land?draft=${id}`), { replace: true });
     toast(t('owner.add.draftSaved'));
   };
   const addPhotos = (files: FileList | null) => {
@@ -426,14 +491,15 @@ export const AddLandWizard: React.FC = () => {
     setBusy(true);
     const r = regionByKey(d.region);
     await landService.create({
-      ownerId: authService.currentUser()!.id, title: d.title.trim() || undefined, fieldType: d.fieldType, description: d.description.trim(), region: d.region, address: d.address,
+      ownerId: me.id, title: d.title.trim() || undefined, fieldType: d.fieldType, description: d.description.trim(), region: d.region, address: d.address,
       lat: d.pin?.lat ?? r?.lat ?? 40, lng: d.pin?.lng ?? r?.lng ?? 47, areaHa: Number(d.areaHa), soilType: d.soilType as SoilType, fertilityPct: d.fertilityPct, irrigation: d.irrigation as Irrigation,
       lastCrop: d.lastCrop, roadAccess: d.roadAccess, electricity: d.electricity, ownershipDoc: d.ownershipDoc, investmentMin: Number(d.investmentMin), investmentMax: Number(d.investmentMax),
       investmentModel: d.investmentModel as InvestmentModel, expectedReturnPct: Number(d.expectedReturnPct), durationMonths: Number(d.durationMonths), isSpecial: d.isSpecial,
       // Mock: blob URLs only live for this tab — the real API will store the uploaded files.
       photos: d.photos.map(p => p.url), documents: d.documents, status: 'underReview',
     }, false);
-    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    if (draftId) draftStore.remove(me.id, draftId);
+    setDraftId(null);
     setBusy(false);
     setDone(true);
   };
@@ -446,7 +512,7 @@ export const AddLandWizard: React.FC = () => {
         <p className="text-muted mt-3">{t('owner.add.successText')}</p>
         <div className="flex flex-wrap justify-center gap-3 mt-8">
           <Link to={lp('/owner/properties')} className="btn btn-primary">{t('owner.add.toProperties')}</Link>
-          <button type="button" className="btn btn-outline" onClick={() => { setD(EMPTY); setStep(0); setDone(false); }}>{t('owner.add.addAnother')}</button>
+          <button type="button" className="btn btn-outline" onClick={() => { setD(EMPTY); setStep(0); setDone(false); navigate(lp('/owner/add-land'), { replace: true }); }}>{t('owner.add.addAnother')}</button>
         </div>
       </div>
     );
@@ -473,7 +539,7 @@ export const AddLandWizard: React.FC = () => {
 
   const reviewRows: [number, [string, string][]][] = [
     [0, [[t('owner.add.listingTitle'), d.title || name({ fieldType: d.fieldType || 'crops', region: d.region || 'aghdam' })], [t('owner.add.fieldType'), d.fieldType ? t(`fieldTypes.${d.fieldType}`) : '—'], [t('owner.add.description'), d.description || '—']]],
-    [1, [[t('owner.add.region'), d.region ? t(`regions.${d.region}`) : '—'], [t('owner.add.address'), d.address || '—'], [t('owner.add.pin'), d.pin ? `${d.pin.lat}, ${d.pin.lng}` : '—'], [t('owner.add.area'), d.areaHa ? t('land.ha', { n: d.areaHa }) : '—']]],
+    [1, [[t('owner.add.region'), d.region ? t(`regions.${d.region}`) : '—'], [t('owner.add.address'), d.address || '—'], [t('owner.add.pin'), d.pin ? `${d.pin.lat}, ${d.pin.lng}` : '—'], [t('owner.add.boundary'), d.boundary.length >= 3 ? t('map.boundary', { n: d.boundary.length, ha: polygonAreaHa(d.boundary).toFixed(2) }) : '—'], [t('owner.add.area'), d.areaHa ? t('land.ha', { n: d.areaHa }) : '—']]],
     [2, [[t('owner.add.soil'), d.soilType ? t(`soil.${d.soilType}`) : '—'], [t('owner.add.fertility'), `${d.fertilityPct}%`], [t('owner.add.irrigation'), d.irrigation ? t(`irrigationTypes.${d.irrigation}`) : '—'], [t('owner.add.lastCrop'), d.lastCrop || '—'], [t('owner.add.road'), d.roadAccess ? t('form.yes') : t('form.no')], [t('owner.add.electricity'), d.electricity ? t('form.yes') : t('form.no')], [t('owner.add.ownershipDoc'), t(`owner.add.docTypes.${d.ownershipDoc}`)]]],
     [3, [[t('land.required'), d.investmentMin && d.investmentMax ? `${f.azn(Number(d.investmentMin))} – ${f.azn(Number(d.investmentMax))}` : '—'], [t('owner.add.model'), d.investmentModel ? t(`models.${d.investmentModel}`) : '—'], [t('owner.add.return'), d.expectedReturnPct ? `${d.expectedReturnPct}%` : '—'], [t('owner.add.duration'), d.durationMonths ? t('land.months', { n: d.durationMonths }) : '—'], [t('owner.add.special'), d.isSpecial ? t('form.yes') : t('form.no')]]],
     [4, [[t('owner.add.photos'), String(d.photos.length)], [t('owner.add.docs'), d.documents.map(x => x.name).join(', ') || '—']]],
@@ -500,7 +566,8 @@ export const AddLandWizard: React.FC = () => {
               {sel('region', REGIONS.map(r => ({ value: r.key, label: t(`regions.${r.key}`) })), t('owner.add.region'))}
               <Field label={t('owner.add.address')} htmlFor="al-address" error={err.address}><input id="al-address" className="field" value={d.address} onChange={e => set('address', e.target.value)} aria-invalid={!!err.address} /></Field>
             </div>
-            <div><p className="field-label">{t('owner.add.pin')}</p><PinPicker value={d.pin} onChange={v => set('pin', v)} center={regionByKey(d.region) ?? undefined} error={err.pin} /></div>
+            <div><p className="field-label">{t('owner.add.pin')}</p><PinPicker value={d.pin} onChange={v => set('pin', v)} center={regionByKey(d.region) ?? undefined} error={err.pin}
+              boundary={d.boundary} onBoundaryChange={v => set('boundary', v)} onUseArea={ha => set('areaHa', String(ha))} /></div>
             <div className="sm:w-1/2">{num('areaHa', t('owner.add.area'), 'ha')}</div>
           </div>
         )}

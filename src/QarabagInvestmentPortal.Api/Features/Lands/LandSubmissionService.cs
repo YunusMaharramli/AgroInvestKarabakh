@@ -13,7 +13,8 @@ namespace QarabagInvestmentPortal.Api.Features.Lands;
 public sealed class LandSubmissionService(
     AppDbContext db, PrivateFileStorage storage, NotificationService notifications, OpportunityQueries opportunities, TimeProvider clock)
 {
-    public static readonly string[] AgricultureTypes = ["Əkinçilik", "Bağçılıq", "İstixana təsərrüfatı", "Heyvandarlıq", "Arıçılıq"];
+    /// <summary>Names of the 25 land-use types (LandUseCatalog). The form may send the key ("crops") or the name.</summary>
+    public static IReadOnlyList<string> AgricultureTypes => LandUseCatalog.All.Select(t => t.Name).ToList();
 
     // Azerbaijan's bounding box, to catch obviously wrong map points.
     private const double MinLat = 38.3, MaxLat = 41.95, MinLng = 44.7, MaxLng = 50.4;
@@ -29,10 +30,15 @@ public sealed class LandSubmissionService(
 
         var title = F("title");
         var region = F("region");
-        var type = F("agricultureType");
         if (title.Length is 0 or > 200) return Fail(400, "Sahənin adını yazın (ən çox 200 simvol).");
         if (region.Length is 0 or > 100) return Fail(400, "Rayonu seçin.");
-        if (!AgricultureTypes.Contains(type)) return Fail(400, "Fəaliyyət növünü seçin.");
+
+        // Land-use type + common core + type-specific inputs. All optional except the type;
+        // deal-breakers only warn (the admin sees them in the review queue).
+        var (input, inputError) = LandProfileParser.FromForm(form);
+        if (inputError is not null) return Fail(400, inputError);
+        var (profile, profileError) = LandProfileParser.Parse(input!);
+        if (profileError is not null) return Fail(400, profileError);
         if (!Num(F("areaHectares"), out var area) || area <= 0 || area > 100_000) return Fail(400, "Sahənin ölçüsünü hektarla düzgün yazın.");
         if (!Num(F("latitude"), out var lat) || !Num(F("longitude"), out var lng) || lat is < MinLat or > MaxLat || lng is < MinLng or > MaxLng)
             return Fail(400, "Sahənin yerini xəritədə seçin.");
@@ -61,6 +67,8 @@ public sealed class LandSubmissionService(
         if (files.Count == 0) return Fail(400, "Mülkiyyət sənədinin şəklini (JPG və ya PNG) yükləyin.");
         var (validated, fileError) = await PrivateFileStorage.ValidateAsync(files, FileRule.LandDocuments, ct);
         if (fileError is not null) return Fail(400, fileError);
+        var (photos, photoError) = await PrivateFileStorage.ValidateAsync(form.Files.GetFiles("photos"), FileRule.LandPhotos, ct);
+        if (photoError is not null) return Fail(400, photoError);
 
         var now = clock.GetUtcNow();
         var land = new Land
@@ -68,9 +76,12 @@ public sealed class LandSubmissionService(
             Id = Ids.New("land"),
             OwnerId = adminManaged ? null : ownerId,
             OwnershipType = adminManaged ? LandOwnershipType.State : LandOwnershipType.Private,
+            EntrySource = adminManaged ? LandEntrySource.Admin : LandEntrySource.Owner,
+            Verification = adminManaged ? LandVerificationStatus.AdminEntered : LandVerificationStatus.EvidencePending,
+            CreatedById = ownerId,
+            UpdatedById = ownerId,
             Title = title,
             Region = region,
-            AgricultureType = type,
             AreaHectares = area,
             Latitude = lat,
             Longitude = lng,
@@ -87,6 +98,7 @@ public sealed class LandSubmissionService(
             CreatedAt = now,
             UpdatedAt = now,
         };
+        profile!.ApplyTo(land);
         db.Lands.Add(land);
 
         // Owner listings await ministry review; ministry-managed state land is published immediately.
@@ -109,10 +121,13 @@ public sealed class LandSubmissionService(
         });
 
         var saved = await SaveDocumentsAsync(land, ownerId, validated, ct);
+        saved.AddRange(await SavePhotosAsync(land, photos, ct));
         if (!adminManaged)
         {
+            var check = LandSuitability.Evaluate(profile.Type, profile.ToFacts(photos.Count));
+            var warning = check.Level == SuitabilityLevel.Unsuitable ? $" Diqqət: {LandSuitability.Summary(check)}." : "";
             await notifications.NotifyAdminsAsync("Yeni torpaq yoxlanılmalıdır",
-                $"{owner.FullName} “{title}” ({region}) sahəsini yoxlamaya göndərdi.", ct);
+                $"{owner.FullName} “{title}” ({region}, {profile.Type.Name}) sahəsini yoxlamaya göndərdi.{warning}", ct);
             notifications.Notify(ownerId, "Torpağınız yoxlamaya göndərildi",
                 $"“{title}” sahəniz qəbul edildi. Nazirlik sənədləri yoxlayandan sonra sizə xəbər veriləcək.");
         }
@@ -128,7 +143,7 @@ public sealed class LandSubmissionService(
         }
 
         if (!adminManaged) return Outcome<MyLandDto>.Success((await GetMineAsync(ownerId, land.Id, ct))!);
-        var stateLand = await db.Lands.AsNoTracking().Include(l => l.Documents).FirstAsync(l => l.Id == land.Id, ct);
+        var stateLand = await db.Lands.AsNoTracking().Include(l => l.Documents).Include(l => l.Photos).FirstAsync(l => l.Id == land.Id, ct);
         var listing = await db.Opportunities.AsNoTracking().Include(o => o.Land).FirstAsync(o => o.LandId == land.Id, ct);
         var listingDto = await opportunities.GetAsync(listing.Id, new Viewer(ownerId, true), ct);
         return Outcome<MyLandDto>.Success(new MyLandDto(
@@ -216,14 +231,15 @@ public sealed class LandSubmissionService(
 
     public async Task<List<MyLandDto>> ListMineAsync(string ownerId, CancellationToken ct)
     {
-        var lands = await db.Lands.AsNoTracking().Include(l => l.Documents)
+        var lands = await db.Lands.AsNoTracking().Include(l => l.Documents).Include(l => l.Photos)
             .Where(l => l.OwnerId == ownerId).OrderByDescending(l => l.CreatedAt).ToListAsync(ct);
         return await ToMyLandDtosAsync(lands, ownerId, ct);
     }
 
     public async Task<MyLandDto?> GetMineAsync(string ownerId, string landId, CancellationToken ct)
     {
-        var land = await db.Lands.AsNoTracking().Include(l => l.Documents).FirstOrDefaultAsync(l => l.Id == landId && l.OwnerId == ownerId, ct);
+        var land = await db.Lands.AsNoTracking().Include(l => l.Documents).Include(l => l.Photos)
+            .FirstOrDefaultAsync(l => l.Id == landId && l.OwnerId == ownerId, ct);
         return land is null ? null : (await ToMyLandDtosAsync([land], ownerId, ct))[0];
     }
 
@@ -262,6 +278,67 @@ public sealed class LandSubmissionService(
                 UploadedById = uploadedBy,
                 UploadedAt = now,
             });
+        }
+        return keys;
+    }
+
+    /// <summary>
+    /// Owner fills in or corrects the land data (type, common core, type-specific inputs) and may add photos.
+    /// Allowed while the land is not yet decided, and for approved land (data only; it stays approved).
+    /// </summary>
+    public async Task<Outcome<MyLandDto>> UpdateProfileAsync(string ownerId, string landId, IFormCollection form, CancellationToken ct)
+    {
+        var land = await db.Lands.Include(l => l.Photos).FirstOrDefaultAsync(l => l.Id == landId, ct);
+        if (land is null || land.OwnerId != ownerId) return Fail(404, "Torpaq sahəsi tapılmadı.");
+        if (land.Status == LandStatus.Rejected) return Fail(400, "Rədd edilmiş sahənin məlumatları dəyişdirilə bilməz.");
+
+        var (input, inputError) = LandProfileParser.FromForm(form);
+        if (inputError is not null) return Fail(400, inputError);
+        var (profile, profileError) = LandProfileParser.Parse(input! with { LandUse = input!.LandUse ?? land.LandUse });
+        if (profileError is not null) return Fail(400, profileError);
+
+        var newPhotos = form.Files.GetFiles("photos");
+        if (land.Photos.Count + newPhotos.Count > 20) return Fail(400, "Bir sahə üçün ən çox 20 foto ola bilər.");
+        var (photos, photoError) = await PrivateFileStorage.ValidateAsync(newPhotos, FileRule.LandPhotos, ct);
+        if (photoError is not null) return Fail(400, photoError);
+
+        profile!.ApplyTo(land);
+        land.UpdatedAt = clock.GetUtcNow();
+        var saved = await SavePhotosAsync(land, photos, ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            foreach (var key in saved) storage.TryDelete(key);
+            throw;
+        }
+        return Outcome<MyLandDto>.Success((await GetMineAsync(ownerId, land.Id, ct))!);
+    }
+
+    private async Task<List<string>> SavePhotosAsync(Land land, List<ValidatedFile> files, CancellationToken ct)
+    {
+        var keys = new List<string>();
+        var now = clock.GetUtcNow();
+        var order = land.Photos.Count == 0 ? 0 : land.Photos.Max(p => p.SortOrder) + 1;
+        foreach (var file in files)
+        {
+            var photoId = Ids.New("lph");
+            var key = await storage.SaveAsync($"land-photos/{land.Id}", photoId, file, ct);
+            keys.Add(key);
+            var photo = new LandPhoto
+            {
+                Id = photoId,
+                LandId = land.Id,
+                ContentType = file.ContentType,
+                SizeBytes = file.File.Length,
+                StorageKey = key,
+                SortOrder = order++,
+                UploadedAt = now,
+            };
+            land.Photos.Add(photo);
+            db.LandPhotos.Add(photo);
         }
         return keys;
     }

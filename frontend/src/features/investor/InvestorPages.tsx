@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Coins, Activity, Clock, Percent, SlidersHorizontal, List, Map as MapIcon, Heart, Search, X } from 'lucide-react';
 import { landService, requestService, useCurrentUser, useDbValue } from '../../services/api';
+import { LandSearchBar, matchesLandSearch } from '../shared/LandSearch';
 import { scoreLand } from '../../services/scoring';
 import { useFormat, useLocalePath } from '../../app/i18n';
 import { useLandName } from '../shared/landText';
@@ -74,10 +75,12 @@ export const InvestorSearch: React.FC = () => {
   const [shown, setShown] = useState(9);
   const [loading, setLoading] = useState(true);
   const [sheet, setSheet] = useState(false);
+  const [q, setQ] = useState('');
+  const [qType, setQType] = useState('');
   useEffect(() => { setLoading(true); const id = setTimeout(() => setLoading(false), 450); return () => clearTimeout(id); }, [filters]);
 
   const results = useMemo(() => {
-    const rows = all.filter(l =>
+    const rows = all.filter(l => matchesLandSearch(l, q, qType) &&
       l.investmentMax >= filters.budgetMin && l.investmentMin <= filters.budgetMax &&
       (!filters.fieldTypes.length || filters.fieldTypes.includes(l.fieldType)) &&
       (!filters.regions.length || filters.regions.includes(l.region)) &&
@@ -94,7 +97,7 @@ export const InvestorSearch: React.FC = () => {
       return: (a, b) => b.land.expectedReturnPct - a.land.expectedReturnPct,
     };
     return rows.sort(by[sort]);
-  }, [all, filters, sort]);
+  }, [all, filters, sort, q, qType]);
 
   const apply = () => { setFilters(draft); setShown(9); setSheet(false); };
   const reset = () => { const d = defaultFilters({ budgetMin: 0, budgetMax: 0, fieldTypes: [], regions: [], riskTolerance: 'medium' }); setDraft(d); setFilters(d); };
@@ -142,6 +145,7 @@ export const InvestorSearch: React.FC = () => {
           <h2 className="font-display text-xl text-brand mb-5">{t('investor.search.filters')}</h2>{panel}
         </aside>
         <div className="min-w-0">
+          <LandSearchBar value={q} onChange={v => { setQ(v); setShown(9); }} type={qType} onTypeChange={v => { setQType(v); setShown(9); }} className="mb-4" />
           <div className="flex flex-wrap items-center gap-3 mb-5">
             <button type="button" className="lg:hidden btn btn-outline btn-sm" onClick={() => setSheet(true)}><SlidersHorizontal className="w-4 h-4" />{t('investor.search.showFilters')}</button>
             <p className="font-bold" aria-live="polite">{t('investor.search.found', { count: results.length })}</p>

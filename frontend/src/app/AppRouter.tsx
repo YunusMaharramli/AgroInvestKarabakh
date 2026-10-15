@@ -25,8 +25,12 @@ const InvestorSearch = lazy(() => import('../features/investor/InvestorPages').t
 const InvestorInvestments = lazy(() => import('../features/investor/InvestorPages').then(m => ({ default: m.InvestorInvestments })));
 const InvestorSaved = lazy(() => import('../features/investor/InvestorPages').then(m => ({ default: m.InvestorSaved })));
 const ComparePage = lazy(() => import('../features/compare/ComparePage').then(m => ({ default: m.ComparePage })));
+const AdminShell = lazy(() => import('../features/admin/AdminPages').then(m => ({ default: m.AdminShell })));
+const AdminLandsPage = lazy(() => import('../features/admin/AdminPages').then(m => ({ default: m.AdminLandsPage })));
+const AdminLandEditor = lazy(() => import('../features/admin/AdminPages').then(m => ({ default: m.AdminLandEditor })));
 
 import { CompareProvider } from '../features/compare/CompareContext';
+import { syncMinistryLands } from '../services/ministryLands';
 
 /** Keeps i18next, <html lang> and storage in sync with the /:lang prefix; fixes unknown prefixes. */
 const LangGuard: React.FC = () => {
@@ -80,7 +84,10 @@ const InvestorLayout: React.FC = () => {
   ]} />;
 };
 
-export const AppRouter: React.FC = () => (
+export const AppRouter: React.FC = () => {
+  // Listings published by the ministry (real backend) join the site's land lists.
+  useEffect(() => { void syncMinistryLands(); }, []);
+  return (
   <BrowserRouter>
     <ToastProvider>
       <SiteModalsProvider>
@@ -125,10 +132,16 @@ export const AppRouter: React.FC = () => (
                 <Route path="saved" element={<InvestorSaved />} />
                 <Route path="settings" element={<SettingsPage role="investor" />} />
               </Route>
+              <Route path="admin" element={<React.Suspense fallback={null}><AdminShell /></React.Suspense>}>
+                <Route index element={<AdminLandsPage />} />
+                <Route path="lands/new" element={<AdminLandEditor />} />
+                <Route path="lands/:id" element={<AdminLandEditor />} />
+              </Route>
             </Route>
           </Routes>
         </CompareProvider>
       </SiteModalsProvider>
     </ToastProvider>
   </BrowserRouter>
-);
+  );
+};

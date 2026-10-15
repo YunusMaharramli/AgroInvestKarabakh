@@ -76,14 +76,19 @@ export const authService = {
     }
     // The cabinets still run on mock data, so keep a local mirror of the backend user.
     const b = res.user;
+    const isAdmin = String(b.role).toUpperCase() === 'ADMIN' || b.role === 1;
     let user = db().users.find(u => u.id === b.id || u.email.toLowerCase() === b.email.toLowerCase());
     if (!user) {
       user = {
-        id: b.id, fullName: `${b.firstName} ${b.lastName}`.trim(), email: b.email, phone: b.phone ?? '', avatar: null, roles: [], verified: true,
+        id: b.id, fullName: `${b.firstName} ${b.lastName}`.trim(), email: b.email, phone: b.phone ?? '', avatar: null, roles: [], verified: true, isAdmin,
         preferences: { budgetMin: 50000, budgetMax: 500000, fieldTypes: [], regions: [], riskTolerance: 'medium' },
       };
       const created = user;
       mutate(d => { d.users.push(created); });
+    } else if (!!user.isAdmin !== isAdmin) {
+      const id = user.id;
+      mutate(d => { const u = d.users.find(x => x.id === id); if (u) u.isAdmin = isAdmin; });
+      user = { ...user, isAdmin };
     }
     startSession(user.id, remember, res.token);
     return user;
@@ -170,6 +175,21 @@ export const authService = {
     if (current !== pw) throw new ApiError('settings.errors.currentPassword');
     localStorage.setItem(`agroinvest_pw_${me.id}`, next);
   },
+
+  /** Re-reads the role from the server (an admin may have been promoted while signed in). */
+  async refreshRole(): Promise<boolean> {
+    const me = authService.currentUser();
+    if (!me || !readSession()?.token) return false;
+    try {
+      const b = (await backend<{ user: { role: string | number } }>('GET', '/auth/me')).user;
+      const isAdmin = String(b.role).toUpperCase() === 'ADMIN' || b.role === 1;
+      if (!!me.isAdmin !== isAdmin) mutate(d => { const u = d.users.find(x => x.id === me.id); if (u) u.isAdmin = isAdmin; });
+      return isAdmin;
+    } catch { return !!me.isAdmin; }
+  },
+
+  /** True when signed in with a real backend session (needed for admin pages). */
+  hasBackendSession(): boolean { return !!readSession()?.token; },
 
   logout() {
     if (readSession()?.token) void backend('POST', '/auth/logout').catch(() => undefined);

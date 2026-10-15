@@ -18,6 +18,13 @@ public static class ApiRateLimiting
                     if (!context.Request.Path.StartsWithSegments("/api"))
                         return RateLimitPartition.GetNoLimiter<string>("non-api");
 
+                    // Public land photos (many per page) are not counted.
+                    if (HttpMethods.IsGet(context.Request.Method)
+                        && context.Request.Path.Value is { } path
+                        && path.StartsWith("/api/lands/", StringComparison.Ordinal)
+                        && path.Contains("/photos/", StringComparison.Ordinal))
+                        return RateLimitPartition.GetNoLimiter<string>("land-photos");
+
                     var requiresAuth = context.GetEndpoint()?
                         .Metadata.GetMetadata<IAuthorizeData>() is not null;
 

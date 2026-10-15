@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { CATEGORIES } from '../../data/categories';
@@ -8,6 +8,7 @@ import { HeroSlider, PageHero, SplitSection, VideoSection, ParallaxBanner, CTABa
 import { CategoryGrid, ProjectsCarousel, FieldTypeCard } from '../../components/sections/Catalog';
 import { LandsMap } from '../../components/map/LandsMap';
 import { landService, useDbValue } from '../../services/api';
+import { LandSearchBar, matchesLandSearch } from '../shared/LandSearch';
 import { Reveal } from '../../components/ui/Bits';
 
 const IMG = (n: string) => `/images/site/${n}.jpg`;
@@ -108,6 +109,9 @@ const MarketPage: React.FC<{ audience: 'investments' | 'owners' }> = ({ audience
   const lp = useLocalePath();
   usePageTitle(audience === 'owners' ? 'nav.owners' : 'nav.investments');
   const lands = useDbValue(() => landService.publicLands());
+  const [q, setQ] = useState('');
+  const [type, setType] = useState('');
+  const found = lands.filter(l => matchesLandSearch(l, q, type));
   const k = (x: string) => t(`${audience}.${x}`);
   return (
     <>
@@ -120,7 +124,9 @@ const MarketPage: React.FC<{ audience: 'investments' | 'owners' }> = ({ audience
       <section id="map" className="py-20 lg:py-28 bg-cream scroll-mt-24">
         <div className="container-x">
           <SectionHeading title={k('mapTitle')} text={k('mapText')} />
-          <Reveal><LandsMap lands={lands} /></Reveal>
+          <LandSearchBar value={q} onChange={setQ} type={type} onTypeChange={setType} className="mb-3" />
+          <p className="text-sm text-muted mb-5" aria-live="polite">{t('search.found', { count: found.length })}</p>
+          <Reveal><LandsMap lands={found} /></Reveal>
         </div>
       </section>
     </>

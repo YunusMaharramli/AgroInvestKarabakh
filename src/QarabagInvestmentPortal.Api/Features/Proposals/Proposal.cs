@@ -29,6 +29,11 @@ public sealed class Proposal
     public string? TaxNumber { get; set; }
 
     public decimal ProposedInvestmentAmount { get; set; }
+    public decimal? ProjectCosts { get; set; }
+    public decimal? FundingGap { get; set; }
+    public decimal? AdditionalFinancingRequested { get; set; }
+    public decimal? ExpectedAnnualRevenue { get; set; }
+    public string? ExpectedProduction { get; set; }
     public string BusinessPlanSummary { get; set; } = string.Empty;
     public string EstimatedImplementationPeriod { get; set; } = string.Empty;
 

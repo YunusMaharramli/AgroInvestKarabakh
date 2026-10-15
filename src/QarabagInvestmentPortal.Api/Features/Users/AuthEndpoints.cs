@@ -136,6 +136,22 @@ public static class AuthEndpoints
             (await service.UpdateProfileAsync(principal.RequiredUserId(), req, ct)).ToResult(r => Results.Ok(r)))
             .RequireAuthorization(Policies.SignedIn);
 
+        auth.MapPatch("/investor-profile", async (InvestorProfileUpdateRequest req, ClaimsPrincipal principal, InvestorProfileService service, CancellationToken ct) =>
+            (await service.UpdateAsync(principal.RequiredUserId(), req, ct)).ToResult(r => Results.Ok(r)))
+            .RequireAuthorization(Policies.SignedIn);
+
+        auth.MapGet("/investor-profile/documents", async (ClaimsPrincipal principal, InvestorProfileService service, CancellationToken ct) =>
+            Results.Ok(await service.ListDocumentsAsync(principal.RequiredUserId(), ct)))
+            .RequireAuthorization(Policies.SignedIn);
+
+        auth.MapPost("/investor-profile/documents", async (HttpRequest request, ClaimsPrincipal principal, InvestorProfileService service, CancellationToken ct) =>
+            (await service.UploadAsync(principal.RequiredUserId(), await request.ReadFormAsync(ct), ct)).ToResult(r => Results.Ok(r)))
+            .RequireAuthorization(Policies.SignedIn);
+
+        auth.MapDelete("/investor-profile/documents/{id}", async (string id, ClaimsPrincipal principal, InvestorProfileService service, CancellationToken ct) =>
+            (await service.DeleteAsync(principal.RequiredUserId(), id, ct)).ToResult(r => Results.Ok(r)))
+            .RequireAuthorization(Policies.SignedIn);
+
         return api;
     }
 }

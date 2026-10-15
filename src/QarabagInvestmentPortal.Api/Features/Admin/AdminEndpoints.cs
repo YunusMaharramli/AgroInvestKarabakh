@@ -28,6 +28,7 @@ public sealed record IntegrationLogDto(string Id, string IntegrationType, string
 }
 
 public sealed record EktisSyncResponse(string Message, IntegrationLogDto Log, JsonNode? Response);
+public sealed record SetInvestorVerificationRequest(bool IsVerified);
 
 public static class AdminEndpoints
 {
@@ -39,6 +40,12 @@ public static class AdminEndpoints
 
         admin.MapGet("/investors", async (string? search, int? page, InvestorDirectoryService service, CancellationToken ct) =>
             Results.Ok(await service.ListAsync(search, page ?? 1, ct)));
+
+        admin.MapPatch("/investors/{userId}/verification", async (string userId, SetInvestorVerificationRequest req, InvestorDirectoryService service, CancellationToken ct) =>
+        {
+            var updated = await service.SetVerificationAsync(userId, req.IsVerified, ct);
+            return updated is null ? Results.NotFound() : Results.Ok(updated);
+        });
 
         admin.MapGet("/analytics", async (AppDbContext db, CancellationToken ct) =>
         {

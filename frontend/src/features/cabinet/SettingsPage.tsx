@@ -1,60 +1,78 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BadgeCheck, Upload } from 'lucide-react';
+import { BadgeCheck, Trash2, Upload } from 'lucide-react';
 import { authService, useCurrentUser, errorText } from '../../services/api';
 import { PageTitle, Avatar } from './CabinetShell';
 import { Chips, Field, Segmented, Toggle } from '../../components/ui/Bits';
 import { useToast } from '../../components/ui/Overlay';
-import { applyLang, LANGS, Lang, useFormat, useLang } from '../../app/i18n';
-import { countryName } from '../../data/countries';
+import { applyLang, LANGS, Lang, useLang } from '../../app/i18n';
 import { CATEGORIES } from '../../data/categories';
 import { REGIONS } from '../../data/regions';
-import type { CabinetRole, RiskTolerance } from '../../types/agro';
+import type { CabinetRole, InvestorProfile, RiskTolerance } from '../../types/agro';
 
-/** Read-only summary of what the investor entered at sign-up (applicant type and additional information). */
+/** Editable, applicant-specific profile; values remain private and are self-declared. */
 const InvestorProfileCard: React.FC = () => {
   const { t } = useTranslation();
-  const lang = useLang();
-  const fmt = useFormat();
   const me = useCurrentUser()!;
+  const [documentCategory, setDocumentCategory] = useState('OTHER');
+  const [currentPassword, setCurrentPassword] = useState('');
   const p = me.investorProfile;
-  const money = (n: number | null | undefined) => (n === null || n === undefined ? null : fmt.azn(n));
-  const yesNo = (b: boolean | null | undefined) => (b === null || b === undefined ? null : b ? t('form.yes') : t('form.no'));
-  const rows: [string, string | null | undefined][] = !p ? [] : [
-    [t('auth.companyName'), p.companyName || null],
-    [t('auth.voen'), p.taxIdentificationNumber || null],
-    [t('auth.foreignTax'), p.foreignTaxNumber],
-    [t('auth.details.country'), p.country ? countryName(p.country, lang) : null],
-    [t('auth.details.activityStatus'), p.activityStatus ? t(`auth.details.activityStatusOptions.${p.activityStatus}`) : null],
-    [t('auth.details.activity'), p.businessActivity || null],
-    [t('auth.details.startDate'), p.activityStartDate ? fmt.date(p.activityStartDate) : null],
-    [t('auth.details.ceo'), p.ceoName],
-    [t('auth.details.residency'), p.residencyStatus ? t(`auth.details.residencyOptions.${p.residencyStatus}`) : null],
-    [t('auth.details.address'), p.address],
-    [t('auth.details.incomeSource'), p.incomeSource],
-    [t('auth.details.maritalStatus'), p.maritalStatus ? t(p.maritalStatus === 'MARRIED' ? 'auth.details.married' : 'auth.details.single') : null],
-    [t('auth.details.income6'), money(p.incomeLast6Months)],
-    [t('auth.details.hasCredit'), yesNo(p.hasCredit)],
-    [t('auth.details.creditPayment'), money(p.monthlyCreditPayment)],
-    [t('auth.details.hasFixedIncome'), yesNo(p.hasFixedIncome)],
-    [t('auth.details.fixedIncome'), money(p.fixedMonthlyIncome)],
-    [me.applicantType === 'INDIVIDUAL' ? t('auth.details.minInitial') : me.applicantType === 'LEGAL_ENTITY' ? t('auth.details.minCompany') : t('auth.details.minProject'), money(p.minimumFunds)],
-  ];
-  const filled = rows.filter((r): r is [string, string] => !!r[1]);
+  const individual = me.applicantType === 'INDIVIDUAL' || me.applicantType === 'FOREIGN_INDIVIDUAL';
+  const foreign = me.applicantType === 'FOREIGN_INDIVIDUAL' || me.applicantType === 'FOREIGN_ENTITY';
+  const keys = individual
+    ? ['incomeStability','monthlyNetIncome','incomePeriod','financialCurrency','outstandingDebt','debtRepaymentAmount','debtRepaymentFrequency','ownContribution','postInvestmentReserve','additionalFinancingRequired','incomeSource','experienceYears','experienceDescription',...(foreign ? ['citizenshipCountry','residenceCountry','residencyStatus','address','dateOfBirth','identityDocumentType','identityDocumentNumber'] : [])]
+    : ['companyName','taxIdentificationNumber','foreignTaxNumber','country','legalForm','registrationDate','activityStartDate','activityStatus','businessActivity','ceoName','address','operatingAddress','representativeRole','annualRevenue','netProfitOrLoss','operatingCashFlow','financialReportingPeriod','liquidFundsAvailable','outstandingDebt','debtRepaymentAmount','ownContribution','postInvestmentReserve','additionalFinancingRequired','experienceYears','experienceDescription','operationalCapacity','previousProjects'];
+  const stringKeys = new Set(['incomeStability','incomePeriod','financialCurrency','debtRepaymentFrequency','incomeSource','experienceDescription','citizenshipCountry','residenceCountry','residencyStatus','address','dateOfBirth','identityDocumentType','identityDocumentNumber','companyName','taxIdentificationNumber','foreignTaxNumber','country','legalForm','registrationDate','activityStatus','businessActivity','ceoName','operatingAddress','representativeRole','financialReportingPeriod','operationalCapacity','previousProjects']);
+  const saveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const patch: Record<string, unknown> = { ...(p ?? {}) };
+    keys.forEach(key => { const value = String(form.get(key) ?? '').trim(); patch[key] = value === '' ? null : stringKeys.has(key) ? value : Number(value); });
+    try { await authService.updateInvestorProfile({ ...patch, currentPassword } as Partial<InvestorProfile>); setCurrentPassword(''); toast(t('settings.savedToast')); }
+    catch (x) { toast(errorText(t, x)); }
+  };
+  const upload = async (file?: File) => {
+    if (!file) return;
+    try { await authService.uploadInvestorProfileDocument(file, documentCategory); await authService.refreshRole(); toast(t('settings.savedToast')); }
+    catch (x) { toast(errorText(t, x)); }
+  };
+  const deleteDocument = async (id: string) => {
+    try { await authService.deleteInvestorProfileDocument(id); await authService.refreshRole(); toast(t('settings.savedToast')); }
+    catch (x) { toast(errorText(t, x)); }
+  };
   return (
     <section className="card p-6 xl:col-span-2">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <h2 className="font-display text-2xl text-brand">{t('settings.investorProfile')}</h2>
         <span className="inline-flex items-center gap-2 rounded-full bg-[#F4ECD6] text-gold-dark px-4 py-1.5 text-sm font-bold">{t('settings.applicantType')}: {t(`auth.applicant.${me.applicantType}`)}</span>
       </div>
-      {filled.length === 0 ? <p className="text-muted">{t('settings.profileEmpty')}</p> : (
-        <dl className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-          {filled.map(([label, value]) => (
-            <div key={label}><dt className="text-xs font-bold uppercase tracking-wide text-muted">{label}</dt><dd className="font-semibold mt-1 break-words">{value}</dd></div>
-          ))}
-        </dl>
-      )}
+      <p className="text-sm text-muted mb-5">{t('settings.profilePrivacy')}</p>
+      {foreign && <p className="rounded-xl bg-[#FBF6E8] p-4 text-sm text-ink mb-5">{t('settings.foreignLandNotice')} <a className="font-bold underline text-brand" href="https://e-qanun.az/framework/46942" target="_blank" rel="noreferrer">{t('settings.foreignLandLaw')}</a></p>}
+      <form onSubmit={saveProfile} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {keys.map(key => {
+          const value = p?.[key as keyof typeof p];
+          const date = key === 'registrationDate' || key === 'activityStartDate' || key === 'dateOfBirth';
+          const area = ['experienceDescription','operationalCapacity','previousProjects'].includes(key);
+          const options: Record<string, string[]> = { incomeStability: ['STABLE','SEASONAL','IRREGULAR','OTHER'], incomePeriod: ['MONTHLY','ANNUAL'], debtRepaymentFrequency: ['MONTHLY','ANNUAL'], residencyStatus: ['PERMANENT_RESIDENT','TEMPORARY_RESIDENT','NON_RESIDENT'], activityStatus: ['BRANCH','REPRESENTATIVE_OFFICE','SUBSIDIARY','NOT_REGISTERED'] };
+          return <Field key={key} label={t(`settings.profileFields.${key}`, { defaultValue: key })} htmlFor={`inv-${key}`} className={area ? 'sm:col-span-2 lg:col-span-3' : ''}>
+            {area ? <textarea id={`inv-${key}`} name={key} className="field min-h-24" defaultValue={typeof value === 'string' ? value : ''} />
+              : options[key] ? <select id={`inv-${key}`} name={key} className="field" defaultValue={value == null ? '' : String(value)}><option value="">—</option>{options[key].map(option => <option key={option} value={option}>{t(`settings.profileOptions.${key}.${option}`, { defaultValue: option })}</option>)}</select>
+              : <input id={`inv-${key}`} name={key} className="field" type={date ? 'date' : stringKeys.has(key) ? 'text' : 'number'} step={stringKeys.has(key) || date ? undefined : '0.01'} defaultValue={value == null ? '' : String(value)} />}
+          </Field>;
+        })}
+        <div className="sm:col-span-2 lg:col-span-3">
+          <Field label={t('settings.currentPasswordConfirm')} htmlFor="investor-profile-password" hint={t('settings.currentPasswordConfirmHint')}>
+            <input id="investor-profile-password" type="password" autoComplete="current-password" className="field" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+          </Field>
+        </div>
+        <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap gap-3 items-center"><button className="btn btn-primary" type="submit">{t('form.save')}</button><span className="text-xs text-muted">{t('settings.profileSelfDeclared')}</span></div>
+      </form>
+      <div className="border-t border-line mt-6 pt-5">
+        <h3 className="font-semibold mb-3">{t('settings.profileDocuments')}</h3>
+        <div className="flex flex-wrap gap-3 items-center"><select className="field !w-auto" aria-label={t('settings.profileDocumentCategory')} value={documentCategory} onChange={e => setDocumentCategory(e.target.value)}>{['IDENTITY','REGISTRATION','FINANCIAL','EXPERIENCE','OTHER'].map(category => <option key={category} value={category}>{t(`settings.documentCategories.${category}`)}</option>)}</select><label className="btn btn-outline btn-sm cursor-pointer"><Upload className="w-4 h-4" />{t('settings.profileUpload')}<input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png" onChange={e => { void upload(e.target.files?.[0]); e.currentTarget.value = ''; }} /></label></div>
+        <ul className="mt-3 grid gap-2">{(p?.documents ?? []).map(doc => <li key={doc.id} className="flex gap-3 items-center text-sm"><a className="text-brand underline" href={doc.url} target="_blank" rel="noreferrer">{doc.fileName}</a><button type="button" aria-label={t('settings.profileDelete')} onClick={() => void deleteDocument(doc.id)} className="text-danger"><Trash2 className="w-4 h-4" /></button></li>)}</ul>
+      </div>
     </section>
   );
 };
@@ -71,6 +89,7 @@ export const SettingsPage: React.FC<{ role: CabinetRole }> = ({ role }) => {
   const [notify, setNotify] = useState(me.notify ?? { email: true, sms: false, push: true });
   const [prefs, setPrefs] = useState(me.preferences);
   const [pw, setPw] = useState({ current: '', next: '' });
+  const [identityPassword, setIdentityPassword] = useState('');
   const [pwErr, setPwErr] = useState('');
   const save = async (patch: Parameters<typeof authService.updateProfile>[0]) => { await authService.updateProfile(patch); toast(t('settings.savedToast')); };
   const changeLang = (l: Lang) => { applyLang(l); navigate(pathname.replace(/^\/(az|en|ru)/, `/${l}`), { replace: true }); };
@@ -85,13 +104,14 @@ export const SettingsPage: React.FC<{ role: CabinetRole }> = ({ role }) => {
             <Avatar name={me.fullName} gold={role === 'investor'} />
             <label className="btn btn-outline btn-sm cursor-pointer"><Upload className="w-4 h-4" />{t('settings.changePhoto')}<input type="file" accept="image/*" className="sr-only" onChange={() => toast(t('settings.savedToast'))} /></label>
           </div>
-          <form className="grid gap-4" onSubmit={e => { e.preventDefault(); void save({ fullName: info.fullName, phone: info.phone, companyName: info.companyName || undefined }); }}>
+          <form className="grid gap-4" onSubmit={e => { e.preventDefault(); void save({ fullName: info.fullName, phone: info.phone, companyName: info.companyName || undefined, currentPassword: identityPassword }).then(() => setIdentityPassword('')).catch(x => toast(errorText(t, x))); }}>
             <Field label={t('auth.fullName')} htmlFor="st-name"><input id="st-name" className="field" value={info.fullName} onChange={e => setInfo({ ...info, fullName: e.target.value })} /></Field>
             <div className="grid sm:grid-cols-2 gap-4">
               <Field label={t('auth.email')} htmlFor="st-email"><input id="st-email" className="field bg-sand/40" value={info.email} readOnly /></Field>
               <Field label={t('auth.phone')} htmlFor="st-phone"><input id="st-phone" className="field" value={info.phone} onChange={e => setInfo({ ...info, phone: e.target.value })} /></Field>
             </div>
-            {role === 'investor' && <Field label={t('settings.company')} htmlFor="st-company" optional><input id="st-company" className="field" value={info.companyName} onChange={e => setInfo({ ...info, companyName: e.target.value })} /></Field>}
+            {role === 'investor' && <Field label={t('settings.company')} htmlFor="st-company"><input id="st-company" className="field" value={info.companyName} onChange={e => setInfo({ ...info, companyName: e.target.value })} /></Field>}
+            <Field label={t('settings.currentPasswordConfirm')} htmlFor="st-current-password" hint={t('settings.currentPasswordConfirmHint')}><input id="st-current-password" type="password" autoComplete="current-password" className="field" value={identityPassword} onChange={e => setIdentityPassword(e.target.value)} /></Field>
             <button type="submit" className="btn btn-primary justify-self-start">{t('form.save')}</button>
           </form>
         </section>
@@ -101,7 +121,7 @@ export const SettingsPage: React.FC<{ role: CabinetRole }> = ({ role }) => {
             <h2 className="font-display text-2xl text-brand mb-4">{t('settings.verification')}</h2>
             {me.verified
               ? <span className="inline-flex items-center gap-2 rounded-full bg-[#F4ECD6] text-gold-dark px-4 py-2 font-bold"><BadgeCheck className="w-5 h-5" />{role === 'landowner' ? t('settings.verifiedOwner') : t('settings.verifiedInvestor')}</span>
-              : <div className="flex items-center gap-4"><span className="text-muted">{t('settings.notVerified')}</span><label className="btn btn-outline btn-sm cursor-pointer"><Upload className="w-4 h-4" />{t('settings.verifyCta')}<input type="file" className="sr-only" accept=".jpg,.png,.pdf" /></label></div>}
+              : <span className="text-muted">{t('settings.notVerified')}</span>}
           </section>
           <section className="card p-6">
             <h2 className="font-display text-2xl text-brand mb-4">{t('settings.language')}</h2>

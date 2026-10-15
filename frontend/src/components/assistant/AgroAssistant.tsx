@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, MessageCircle, Mic, MicOff, Phone, RotateCcw, Send, Sparkles, X } from 'lucide-react';
+import { ArrowRight, Mic, MicOff, Phone, RotateCcw, Send, X } from 'lucide-react';
 import { useLang, useLocalePath } from '../../app/i18n';
 import { useCurrentUser } from '../../services/api';
 import { backendToken } from '../../services/backend';
@@ -9,7 +9,7 @@ import { CONTACT } from '../layout/Header';
 import { cabinetHome } from '../../features/auth/routing';
 
 /**
- * AgroKöməkçi — the portal chat assistant (restored from the previous site).
+ * AGROR — the portal chat assistant.
  * Talks to POST /api/ai/chat: the server adds live portal data and calls Gemini (the key never reaches the browser).
  * Other parts of the site can open it with a ready question:
  *   window.dispatchEvent(new CustomEvent('agro:ask', { detail: 'Hansı sənədlər lazımdır?' }))
@@ -270,9 +270,7 @@ export const AgroAssistant: React.FC = () => {
           aria-haspopup="dialog"
           className={`fixed right-4 sm:right-6 z-[45] flex items-center gap-3 min-h-14 pl-2.5 pr-5 rounded-full bg-brand hover:bg-brand-dark text-cream shadow-[0_10px_30px_rgba(20,54,33,0.35)] border-2 border-cream transition ${launcherBottom}`}
         >
-          <span className="w-10 h-10 rounded-full bg-gold text-forest grid place-items-center" aria-hidden="true">
-            <MessageCircle className="w-5 h-5" />
-          </span>
+          <img src="/brand/agror-character.png" alt="" aria-hidden="true" className="w-11 h-11 rounded-xl object-cover border border-gold/60 bg-[#FFF9E8]" />
           <span className="font-bold text-sm leading-tight text-left">
             {t('assistant.launcher')}
             <span className="hidden sm:block font-normal text-xs text-cream/80">{t('assistant.launcherSub')}</span>
@@ -289,11 +287,9 @@ export const AgroAssistant: React.FC = () => {
         >
           {/* Header */}
           <div className="bg-forest text-cream px-4 py-3 flex items-center gap-3 shrink-0">
-            <span className="w-11 h-11 rounded-full bg-gold text-forest grid place-items-center shrink-0" aria-hidden="true">
-              <Sparkles className="w-6 h-6" />
-            </span>
+            <img src="/brand/agror-character.png" alt="" aria-hidden="true" className="w-12 h-12 rounded-xl object-cover border border-gold/60 bg-[#FFF9E8] shrink-0" />
             <div className="flex-1 min-w-0">
-              <h2 id="agro-chat-title" className="font-display text-xl leading-tight">AgroKöməkçi</h2>
+              <h2 id="agro-chat-title" className="font-display text-xl leading-tight">{t('assistant.name')}</h2>
               <p className="text-sm text-cream/75 leading-tight truncate">{t('assistant.subtitle')}</p>
             </div>
             {messages.length > 0 && (
@@ -338,7 +334,7 @@ export const AgroAssistant: React.FC = () => {
               ) : (
                 <div key={m.id} className="max-w-[92%] flex flex-col gap-2.5">
                   <div className={`bg-white rounded-2xl rounded-tl-md border px-4 py-3 leading-relaxed ${m.failed ? 'border-danger' : 'border-line'}`}>
-                    <span className="sr-only">AgroKöməkçi: </span>
+                    <span className="sr-only">{t('assistant.name')}: </span>
                     <FormattedText text={m.text} />
                   </div>
                   {m.failed && (

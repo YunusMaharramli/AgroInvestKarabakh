@@ -14,7 +14,9 @@ public sealed record ProposalDto(
     string ContactPhone, ProposalStatus Status, DateTimeOffset SubmittedAt, DateTimeOffset UpdatedAt, DateTimeOffset? DecidedAt,
     PersonDto? User, OpportunityDto? Opportunity, LandDto? Land,
     IReadOnlyList<ProposalDocumentDto> Documents, IReadOnlyList<ProposalHistoryDto> StatusHistory,
-    bool CanSelectWinner, string ApplicantType, string ApplicantName, string? TaxNumber);
+    bool CanSelectWinner, string ApplicantType, string ApplicantName, string? TaxNumber,
+    decimal? ProjectCosts = null, decimal? FundingGap = null, decimal? AdditionalFinancingRequested = null,
+    decimal? ExpectedAnnualRevenue = null, string? ExpectedProduction = null);
 
 public sealed record ProposalDocumentDto(string Id, string FileName, string MimeType, long FileSize, DateTimeOffset UploadedAt, string Url)
 {

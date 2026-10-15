@@ -20,6 +20,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<User> Users => Set<User>();
     public DbSet<AuthActionToken> AuthActionTokens => Set<AuthActionToken>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
+    public DbSet<InvestorProfileDocument> InvestorProfileDocuments => Set<InvestorProfileDocument>();
     public DbSet<Land> Lands => Set<Land>();
     public DbSet<LandDocument> LandDocuments => Set<LandDocument>();
     public DbSet<LandPhoto> LandPhotos => Set<LandPhoto>();
@@ -55,6 +56,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.ApplicantType).HasConversion<string>().HasMaxLength(32);
             e.Property(x => x.PasswordHash).HasMaxLength(200).IsRequired();
+            e.Property(x => x.IsVerified).HasDefaultValue(false);
             e.Ignore(x => x.FullName);
             e.HasOne(x => x.Profile).WithOne().HasForeignKey<UserProfile>(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
         });
@@ -98,6 +100,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Id).HasMaxLength(64);
             e.Property(x => x.UserId).HasMaxLength(64);
             e.HasIndex(x => x.UserId).IsUnique();
+            e.HasMany(x => x.Documents).WithOne().HasForeignKey(d => d.UserId).OnDelete(DeleteBehavior.Cascade);
             e.Property(x => x.CompanyName).HasMaxLength(200);
             e.Property(x => x.TaxIdentificationNumber).HasMaxLength(20);
             e.Property(x => x.BusinessActivity).HasMaxLength(1000);
@@ -106,14 +109,45 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.ActivityStatus).HasMaxLength(32);
             e.Property(x => x.CeoName).HasMaxLength(200);
             e.Property(x => x.Address).HasMaxLength(500);
+            e.Property(x => x.OperatingAddress).HasMaxLength(500);
+            e.Property(x => x.LegalForm).HasMaxLength(100);
+            e.Property(x => x.RepresentativeRole).HasMaxLength(100);
             e.Property(x => x.MaritalStatus).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.ResidencyStatus).HasMaxLength(32);
             e.Property(x => x.IncomeSource).HasMaxLength(500);
+            e.Property(x => x.IncomeStability).HasMaxLength(32);
+            e.Property(x => x.IncomePeriod).HasMaxLength(16);
+            e.Property(x => x.FinancialCurrency).HasMaxLength(3);
+            e.Property(x => x.DebtRepaymentFrequency).HasMaxLength(16);
+            e.Property(x => x.FinancialReportingPeriod).HasMaxLength(100);
+            e.Property(x => x.ExperienceDescription).HasMaxLength(2000);
+            e.Property(x => x.OperationalCapacity).HasMaxLength(2000);
+            e.Property(x => x.PreviousProjects).HasMaxLength(2000);
+            e.Property(x => x.CitizenshipCountry).HasMaxLength(2);
+            e.Property(x => x.ResidenceCountry).HasMaxLength(2);
+            e.Property(x => x.IdentityDocumentType).HasMaxLength(50);
+            e.Property(x => x.IdentityDocumentNumber).HasMaxLength(100);
             e.Property(x => x.IncomeLast6Months).HasPrecision(18, 2);
             e.Property(x => x.MonthlyCreditPayment).HasPrecision(18, 2);
             e.Property(x => x.FixedMonthlyIncome).HasPrecision(18, 2);
             e.Property(x => x.MinimumFunds).HasPrecision(18, 2);
+            foreach (var property in new[] { nameof(UserProfile.MonthlyNetIncome), nameof(UserProfile.OutstandingDebt), nameof(UserProfile.DebtRepaymentAmount), nameof(UserProfile.AnnualRevenue), nameof(UserProfile.NetProfitOrLoss), nameof(UserProfile.OperatingCashFlow), nameof(UserProfile.LiquidFundsAvailable), nameof(UserProfile.OwnContribution), nameof(UserProfile.PostInvestmentReserve), nameof(UserProfile.AdditionalFinancingRequired) })
+                e.Property<decimal?>(property).HasPrecision(18, 2);
             e.HasIndex(x => x.TaxIdentificationNumber);
+        });
+
+        modelBuilder.Entity<InvestorProfileDocument>(e =>
+        {
+            e.ToTable("investor_profile_documents");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(64);
+            e.Property(x => x.UserId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.FileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.Category).HasMaxLength(32).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
+            e.Property(x => x.StorageKey).HasMaxLength(500).IsRequired();
+            e.HasIndex(x => new { x.UserId, x.UploadedAt });
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Land>(e =>
@@ -252,6 +286,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasOne(x => x.Opportunity).WithMany().HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Investor).WithMany().HasForeignKey(x => x.InvestorId).OnDelete(DeleteBehavior.Restrict);
             e.Property(x => x.ProposedInvestmentAmount).HasPrecision(18, 2);
+            e.Property(x => x.ProjectCosts).HasPrecision(18, 2);
+            e.Property(x => x.FundingGap).HasPrecision(18, 2);
+            e.Property(x => x.AdditionalFinancingRequested).HasPrecision(18, 2);
+            e.Property(x => x.ExpectedAnnualRevenue).HasPrecision(18, 2);
+            e.Property(x => x.ExpectedProduction).HasMaxLength(1000);
             e.Property(x => x.BusinessPlanSummary).HasMaxLength(4000);
             e.Property(x => x.EstimatedImplementationPeriod).HasMaxLength(100);
             e.Property(x => x.ContactPhone).HasMaxLength(32);

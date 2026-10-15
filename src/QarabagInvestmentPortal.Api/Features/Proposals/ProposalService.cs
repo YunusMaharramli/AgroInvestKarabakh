@@ -22,6 +22,7 @@ public sealed class ProposalService(
     {
         var investorId = viewer.UserId!;
         string F(string key) => form[key].ToString().Trim();
+        decimal? OptionalAmount(string key) => decimal.TryParse(F(key).Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out var value) ? value : null;
 
         // Accept the old field name too, so nothing breaks if an old page is still open.
         var opportunityId = F("opportunityId") is { Length: > 0 } oid ? oid : F("competitionId");
@@ -39,6 +40,14 @@ public sealed class ProposalService(
         if (summary.Length == 0) return Fail(400, "Layihənizi qısa təsvir edin.");
         if (summary.Length > 4000) return Fail(400, "Layihə təsviri çox uzundur (ən çox 4000 simvol).");
         var period = F("estimatedImplementationPeriod") is { Length: > 0 } p ? Limit(p, 100) : "24 ay";
+        var projectCosts = OptionalAmount("projectCosts");
+        var fundingGap = OptionalAmount("fundingGap");
+        var additionalFinancing = OptionalAmount("additionalFinancingRequested");
+        var expectedRevenue = OptionalAmount("expectedAnnualRevenue");
+        var expectedProduction = F("expectedProduction");
+        if (new[] { projectCosts, fundingGap, additionalFinancing, expectedRevenue }.Any(x => x is < 0 or > 1_000_000_000_000m))
+            return Fail(400, "Maliyyə göstəricilərini düzgün daxil edin.");
+        if (expectedProduction.Length > 500) return Fail(400, "İstehsal planının təsviri çox uzundur.");
 
         if (viewer.IsAdmin) return Fail(403, "İnzibatçı investisiya təklifi göndərə bilməz.");
 
@@ -86,6 +95,11 @@ public sealed class ProposalService(
             ProposedInvestmentAmount = amount,
             BusinessPlanSummary = summary,
             EstimatedImplementationPeriod = period,
+            ProjectCosts = projectCosts,
+            FundingGap = fundingGap,
+            AdditionalFinancingRequested = additionalFinancing,
+            ExpectedAnnualRevenue = expectedRevenue,
+            ExpectedProduction = expectedProduction.Length == 0 ? null : expectedProduction,
             ContactPhone = contactPhone,
             Status = ProposalStatus.Open,
             SubmittedAt = now,
@@ -406,7 +420,8 @@ public sealed class ProposalService(
                 p.History.OrderBy(h => h.CreatedAt).Select(ProposalHistoryDto.From).ToList(),
                 CanSelectWinner: viewer.IsAdmin && IsPending(p.Status)
                     && o.WinnerProposalId is null && o.Status == OpportunityStatus.Active,
-                p.ApplicantType, p.ApplicantName, p.TaxNumber);
+                p.ApplicantType, p.ApplicantName, p.TaxNumber, p.ProjectCosts, p.FundingGap,
+                p.AdditionalFinancingRequested, p.ExpectedAnnualRevenue, p.ExpectedProduction);
         }).ToList();
     }
 

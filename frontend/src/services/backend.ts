@@ -46,7 +46,7 @@ export async function backend<T>(method: 'GET' | 'POST' | 'DELETE' | 'PATCH', pa
 
 export interface BackendUser {
   id: string; firstName: string; lastName: string; email: string; phone: string | null; role: string | number;
-  applicantType?: ApplicantType | null; needsOnboarding?: boolean;
+  applicantType?: ApplicantType | null; needsOnboarding?: boolean; emailConfirmed?: boolean; isVerified?: boolean;
 }
 export interface MessageResponse { message: string }
 export interface RegistrationResponse { message: string; requiresEmailConfirmation: boolean; emailDeliveryFailed: boolean; signupToken?: string | null }

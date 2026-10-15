@@ -15,7 +15,7 @@ public sealed record ApplicantRegistration(
     string Voen,
     string? ForeignTaxNumber);
 
-/// <summary>Validated additional information (last sign-up step). Only the fields of the applicant's type are set.</summary>
+/// <summary>Validated core eligibility and capacity information required after email confirmation.</summary>
 public sealed record ApplicantDetails(
     MaritalStatus? MaritalStatus,
     decimal? IncomeLast6Months,
@@ -31,19 +31,28 @@ public sealed record ApplicantDetails(
     string? ActivityStatus,
     string? MainActivity,
     DateOnly? ActivityStartDate,
-    string? CeoName);
+    string? CeoName)
+{
+    public string? CompanyName { get; init; }
+    public string? TaxIdentificationNumber { get; init; }
+    public string? ForeignTaxNumber { get; init; }
+    public string? LegalForm { get; init; }
+    public DateOnly? RegistrationDate { get; init; }
+    public string? RepresentativeRole { get; init; }
+    public string? IncomeStability { get; init; }
+    public decimal? MonthlyNetIncome { get; init; }
+    public string? FinancialCurrency { get; init; }
+    public string? CitizenshipCountry { get; init; }
+    public string? ResidenceCountry { get; init; }
+    public decimal? AnnualRevenue { get; init; }
+    public decimal? OwnContribution { get; init; }
+}
 
 /// <summary>
-/// What each applicant type fills in, and the checks. Pure functions, so the rules are unit-tested on their own.
+/// Validates the minimum account signup fields and the mandatory core profile step after email confirmation.
 /// <list type="bullet">
-/// <item>Individual: name, email, phone, password → marital status, last 6 months income, credit (+ monthly payment),
-/// fixed income (+ amount), minimum funds for the initial payment.</item>
-/// <item>Legal entity: company name, company email, VÖEN, password → address, field of activity, activity start date,
-/// CEO, minimum company funds for a project.</item>
-/// <item>Foreign individual: name, email, password → living status in Azerbaijan, address, income source,
-/// credit (+ monthly payment), minimum funds for a project.</item>
-/// <item>Foreign entity: company name, foreign tax number, VÖEN in Azerbaijan (if any), company email, password →
-/// country, status in Azerbaijan, address, main field of activity, CEO.</item>
+/// <item>Every applicant: first name, last name, email, phone and password.</item>
+/// <item>Only core eligibility and capacity data is required after confirmation; detailed financial information stays editable in settings.</item>
 /// </list>
 /// </summary>
 public static partial class ApplicantSignupRules
@@ -102,6 +111,8 @@ public static partial class ApplicantSignupRules
         {
             case ApplicantType.Individual:
             case ApplicantType.ForeignIndividual:
+            case ApplicantType.LegalEntity:
+            case ApplicantType.ForeignEntity:
             {
                 var (first, last) = SplitName(req);
                 if (first.Length == 0 || last.Length == 0)
@@ -109,46 +120,33 @@ public static partial class ApplicantSignupRules
                 if (first.Length > 100 || last.Length > 100)
                     return Fail("Ad və ya soyad çox uzundur.");
 
-                string? phone = null;
-                if (type == ApplicantType.Individual)
+                if (string.IsNullOrWhiteSpace(req.Phone)) return Fail("Telefon nömrəsini yazın.");
+                string? phone;
+                if (type is ApplicantType.ForeignIndividual or ApplicantType.ForeignEntity)
                 {
-                    if (string.IsNullOrWhiteSpace(req.Phone))
-                        return Fail("Bütün məcburi sahələr doldurulmalıdır.");
-                    if (!AzerbaijaniPhone.TryNormalize(req.Phone, out var normalized))
-                        return Fail(AzerbaijaniPhone.InvalidMessage);
-                    phone = normalized;
-                }
-                return (new ApplicantRegistration(type, first, last, email, phone, password, string.Empty, string.Empty, null), null);
-            }
-
-            case ApplicantType.LegalEntity:
-            case ApplicantType.ForeignEntity:
-            {
-                var company = req.CompanyName?.Trim() ?? string.Empty;
-                if (company.Length < 2)
-                    return Fail("Şirkətin adını yazın.");
-                if (company.Length > 200)
-                    return Fail("Şirkətin adı çox uzundur.");
-
-                var voen = req.TaxIdentificationNumber?.Trim() ?? string.Empty;
-                string? foreignTax = null;
-                if (type == ApplicantType.LegalEntity)
-                {
-                    if (!IsVoen(voen))
-                        return Fail("VÖEN 10 rəqəmdən ibarət olmalıdır.");
+                    var digits = new string(req.Phone.Where(char.IsDigit).ToArray());
+                    if (!req.Phone.TrimStart().StartsWith('+') || digits.Length is < 8 or > 15)
+                        return Fail("Telefon nömrəsini beynəlxalq formatda, ölkə kodu ilə yazın.");
+                    phone = "+" + digits;
                 }
                 else
                 {
-                    foreignTax = req.ForeignTaxNumber?.Trim() ?? string.Empty;
-                    if (!ForeignTaxPattern().IsMatch(foreignTax))
-                        return Fail("Xarici vergi nömrəsini düzgün yazın (3–40 simvol: hərf, rəqəm, '-', '/', '.').");
-                    if (voen.Length > 0 && !IsVoen(voen))
-                        return Fail("Azərbaycandakı VÖEN 10 rəqəmdən ibarət olmalıdır (yoxdursa boş saxlayın).");
+                    if (!AzerbaijaniPhone.TryNormalize(req.Phone, out var normalized)) return Fail(AzerbaijaniPhone.InvalidMessage);
+                    phone = normalized;
                 }
 
-                // The account's display name is the company name.
-                return (new ApplicantRegistration(type, company.Length > 100 ? company[..100] : company, string.Empty, email,
-                    null, password, company, voen, foreignTax), null);
+                var company = req.CompanyName?.Trim() ?? string.Empty;
+                if (company.Length > 200) return Fail("Şirkətin adı çox uzundur.");
+                var voen = req.TaxIdentificationNumber?.Trim() ?? string.Empty;
+                if (voen.Length > 0 && !IsVoen(voen)) return Fail("VÖEN 10 rəqəmdən ibarət olmalıdır.");
+                var foreignTax = req.ForeignTaxNumber?.Trim();
+                if (!string.IsNullOrEmpty(foreignTax) && !ForeignTaxPattern().IsMatch(foreignTax))
+                    return Fail("Xarici vergi nömrəsini düzgün yazın.");
+                if (type is ApplicantType.Individual or ApplicantType.ForeignIndividual)
+                {
+                    company = string.Empty; voen = string.Empty; foreignTax = null;
+                }
+                return (new ApplicantRegistration(type, first, last, email, phone, password, company, voen, foreignTax), null);
             }
 
             default:
@@ -159,80 +157,100 @@ public static partial class ApplicantSignupRules
     /// <summary>Last sign-up step: the additional information for the applicant's type.</summary>
     public static (ApplicantDetails? Value, string? Error) ValidateDetails(ApplicantType type, InvestorDetailsRequest req, DateOnly today)
     {
-        string? Text(string? v, int max) => string.IsNullOrWhiteSpace(v) ? null : v.Trim().Length > max ? v.Trim()[..max] : v.Trim();
-
-        var address = Text(req.Address, 500);
-        var ceo = Text(req.CeoName, 200);
-        var activity = Text(req.MainActivity, 1000);
-
-        string? amountError = null;
-        decimal? Amount(decimal? v, string label, bool required, bool positive = false)
+        const string currencyDefault = "AZN";
+        string? error = null;
+        string? RequiredText(string? input, int max, string label)
         {
-            if (v is null) { if (required) amountError ??= $"{label} daxil edilməlidir."; return null; }
-            if (v < 0 || (positive && v == 0)) { amountError ??= $"{label} müsbət məbləğ olmalıdır."; return null; }
-            if (v > MaxAmount) { amountError ??= $"{label} çox böyükdür."; return null; }
-            return decimal.Round(v.Value, 2);
+            var value = input?.Trim();
+            if (string.IsNullOrWhiteSpace(value)) { error ??= $"{label} daxil edilməlidir."; return null; }
+            if (value.Length > max) { error ??= $"{label} çox uzundur."; return null; }
+            return value;
+        }
+        decimal? Amount(decimal? value, string label)
+        {
+            if (value is null) { error ??= $"{label} daxil edilməlidir."; return null; }
+            if (value < 0 || value > MaxAmount) { error ??= $"{label} düzgün məbləğ deyil."; return null; }
+            return decimal.Round(value.Value, 2);
+        }
+        DateOnly? RegistrationDate()
+        {
+            if (req.RegistrationDate is not { } date) { error ??= "Qeydiyyat tarixini daxil edin."; return null; }
+            if (date.Year < 1900 || date > today) { error ??= "Qeydiyyat tarixi düzgün deyil."; return null; }
+            return date;
+        }
+        string? Currency()
+        {
+            var value = (req.FinancialCurrency ?? currencyDefault).Trim().ToUpperInvariant();
+            if (value.Length != 3 || value.Any(c => c is < 'A' or > 'Z')) { error ??= "Valyuta kodunu düzgün seçin."; return null; }
+            return value;
+        }
+        string? Stability()
+        {
+            var value = req.IncomeStability?.Trim().ToUpperInvariant();
+            if (value is not ("STABLE" or "SEASONAL" or "IRREGULAR" or "OTHER")) { error ??= "Gəlirin sabitliyini seçin."; return null; }
+            return value;
         }
 
+        var funds = Amount(req.MinimumFunds, "Layihəyə qoyula bilən öz vəsaiti");
         switch (type)
         {
             case ApplicantType.Individual:
-            {
-                if (req.MaritalStatus is null) return FailDetails("Ailə vəziyyətini seçin.");
-                if (req.HasCredit is null) return FailDetails("Kredit mövcudluğunu seçin.");
-                if (req.HasFixedIncome is null) return FailDetails("Sabit gəlirin mövcudluğunu seçin.");
-                var income = Amount(req.IncomeLast6Months, "Son 6 ay üzrə gəlir", required: true);
-                var payment = req.HasCredit == true ? Amount(req.MonthlyCreditPayment, "Mövcud kreditin aylıq ödənişi", required: true, positive: true) : null;
-                var fixedIncome = req.HasFixedIncome == true ? Amount(req.FixedMonthlyIncome, "Sabit gəlirin aylıq məbləği", required: true, positive: true) : null;
-                var funds = Amount(req.MinimumFunds, "İlkin ödəniş üçün minimum vəsait", required: true);
-                if (amountError is not null) return FailDetails(amountError);
-                return (new ApplicantDetails(req.MaritalStatus, income, req.HasCredit, payment, req.HasFixedIncome, fixedIncome, funds,
-                    null, null, null, null, null, null, null, null), null);
-            }
-
             case ApplicantType.ForeignIndividual:
             {
-                var residency = req.ResidencyStatus?.Trim().ToUpperInvariant();
-                if (residency is null || !ResidencyStatuses.Contains(residency)) return FailDetails("Azərbaycanda yaşayış statusunu seçin.");
-                if (address is null) return FailDetails("Ünvanı yazın.");
-                var source = Text(req.IncomeSource, 500);
-                if (source is null) return FailDetails("Gəlir mənbəyini yazın.");
-                if (req.HasCredit is null) return FailDetails("Mövcud kreditin olub-olmadığını seçin.");
-                var payment = req.HasCredit == true ? Amount(req.MonthlyCreditPayment, "Mövcud kreditin aylıq ödənişi", required: true, positive: true) : null;
-                var funds = Amount(req.MinimumFunds, "Layihəyə qoyacağınız minimum vəsait", required: true);
-                if (amountError is not null) return FailDetails(amountError);
-                return (new ApplicantDetails(null, null, req.HasCredit, payment, null, null, funds,
-                    residency, address, source, null, null, null, null, null), null);
+                var stability = Stability();
+                var income = Amount(req.MonthlyNetIncome, "Aylıq xalis gəlir");
+                var currency = Currency();
+                string? citizenship = null, residence = null, residency = null;
+                if (type == ApplicantType.ForeignIndividual)
+                {
+                    citizenship = RequiredText(req.CitizenshipCountry, 2, "Vətəndaşlıq ölkəsi")?.ToUpperInvariant();
+                    residence = RequiredText(req.ResidenceCountry, 2, "Yaşayış ölkəsi")?.ToUpperInvariant();
+                    if (citizenship is null || !CountryPattern().IsMatch(citizenship) || citizenship == "AZ"
+                        || residence is null || !CountryPattern().IsMatch(residence)) error ??= "Əcnəbi vətəndaşlığı və yaşayış ölkəsini düzgün seçin.";
+                    residency = req.ResidencyStatus?.Trim().ToUpperInvariant();
+                    if (residency is null || !ResidencyStatuses.Contains(residency)) error ??= "Azərbaycanda yaşayış statusunu seçin.";
+                }
+                if (error is not null) return FailDetails(error);
+                return (new ApplicantDetails(null, null, null, null, null, null, funds, residency, null, null, null, null, null, null, null)
+                {
+                    IncomeStability = stability, MonthlyNetIncome = income, FinancialCurrency = currency,
+                    CitizenshipCountry = citizenship, ResidenceCountry = residence, OwnContribution = funds,
+                }, null);
             }
-
+            case ApplicantType.LegalEntity:
             case ApplicantType.ForeignEntity:
             {
-                var country = req.Country?.Trim().ToUpperInvariant();
-                if (country is null || !CountryPattern().IsMatch(country) || country == "AZ") return FailDetails("Şirkətin ölkəsini siyahıdan seçin.");
-                var status = req.ActivityStatus?.Trim().ToUpperInvariant();
-                if (status is null || !ActivityStatuses.Contains(status)) return FailDetails("Fəaliyyət statusunu seçin.");
-                if (address is null) return FailDetails("Ünvanı yazın.");
-                if (activity is null) return FailDetails("Əsas fəaliyyət sahəsini yazın.");
-                if (ceo is null) return FailDetails("Şirkətin rəhbərini (CEO) yazın.");
-                return (new ApplicantDetails(null, null, null, null, null, null, null,
-                    null, address, null, country, status, activity, null, ceo), null);
+                var companyName = RequiredText(req.CompanyName, 200, "Şirkətin hüquqi adı");
+                var legalForm = RequiredText(req.LegalForm, 100, "Hüquqi forma");
+                var address = RequiredText(req.Address, 500, "Hüquqi ünvan");
+                var activity = RequiredText(req.MainActivity, 1000, "Fəaliyyət sahəsi");
+                var representativeRole = RequiredText(req.RepresentativeRole, 100, "Nümayəndənin vəzifəsi");
+                var registrationDate = RegistrationDate();
+                var annualRevenue = Amount(req.AnnualRevenue, "İllik dövriyyə");
+                string? voen = null, foreignTax = null, country = null;
+                if (type == ApplicantType.LegalEntity)
+                {
+                    voen = req.TaxIdentificationNumber?.Trim();
+                    if (!IsVoen(voen)) error ??= "VÖEN 10 rəqəmdən ibarət olmalıdır.";
+                    if (voen?.Length > 20) error ??= "VÖEN düzgün deyil.";
+                }
+                else
+                {
+                    country = req.Country?.Trim().ToUpperInvariant();
+                    if (country is null || !CountryPattern().IsMatch(country) || country == "AZ") error ??= "Şirkətin qeydiyyat ölkəsini seçin.";
+                    foreignTax = RequiredText(req.ForeignTaxNumber, 40, "Xarici vergi nömrəsi");
+                    if (foreignTax is not null && !ForeignTaxPattern().IsMatch(foreignTax)) error ??= "Xarici vergi nömrəsi düzgün deyil.";
+                }
+                if (error is not null) return FailDetails(error);
+                return (new ApplicantDetails(null, null, null, null, null, null, funds, null, address, null,
+                    country, null, activity, null, null)
+                {
+                    CompanyName = companyName, TaxIdentificationNumber = voen, ForeignTaxNumber = foreignTax,
+                    LegalForm = legalForm, RegistrationDate = registrationDate, RepresentativeRole = representativeRole,
+                    AnnualRevenue = annualRevenue, OwnContribution = funds, FinancialCurrency = "AZN",
+                }, null);
             }
-
-            case ApplicantType.LegalEntity:
-            {
-                if (address is null) return FailDetails("Ünvanı yazın.");
-                if (activity is null) return FailDetails("Fəaliyyət sahəsini yazın.");
-                if (req.ActivityStartDate is not { } started) return FailDetails("Fəaliyyətə başlama tarixini seçin.");
-                if (started > today || started.Year < 1900) return FailDetails("Fəaliyyətə başlama tarixi düzgün deyil.");
-                if (ceo is null) return FailDetails("Şirkətin rəhbərini (CEO) yazın.");
-                var funds = Amount(req.MinimumFunds, "Layihəyə ayrılacaq minimum şirkət vəsaiti", required: true);
-                if (amountError is not null) return FailDetails(amountError);
-                return (new ApplicantDetails(null, null, null, null, null, null, funds,
-                    null, address, null, null, null, activity, started, ceo), null);
-            }
-
-            default:
-                return FailDetails("Müraciətçi növü düzgün deyil.");
+            default: return FailDetails("Müraciətçi növü düzgün deyil.");
         }
     }
 
@@ -246,13 +264,26 @@ public static partial class ApplicantSignupRules
         profile.HasFixedIncome = d.HasFixedIncome;
         profile.FixedMonthlyIncome = d.FixedMonthlyIncome;
         profile.MinimumFunds = d.MinimumFunds;
+        profile.OwnContribution = d.OwnContribution;
         profile.ResidencyStatus = d.ResidencyStatus;
-        profile.Address = d.Address;
-        profile.IncomeSource = d.IncomeSource;
+        if (d.Address is not null) profile.Address = d.Address;
+        if (d.IncomeSource is not null) profile.IncomeSource = d.IncomeSource;
         profile.Country = d.Country;
         profile.ActivityStatus = d.ActivityStatus;
         profile.ActivityStartDate = d.ActivityStartDate;
         profile.CeoName = d.CeoName;
+        if (d.CompanyName is not null) profile.CompanyName = d.CompanyName;
+        if (d.TaxIdentificationNumber is not null) profile.TaxIdentificationNumber = d.TaxIdentificationNumber;
+        if (d.ForeignTaxNumber is not null) profile.ForeignTaxNumber = d.ForeignTaxNumber;
+        if (d.LegalForm is not null) profile.LegalForm = d.LegalForm;
+        if (d.RegistrationDate is not null) profile.RegistrationDate = d.RegistrationDate;
+        if (d.RepresentativeRole is not null) profile.RepresentativeRole = d.RepresentativeRole;
+        if (d.AnnualRevenue is not null) profile.AnnualRevenue = d.AnnualRevenue;
+        profile.IncomeStability = d.IncomeStability;
+        profile.MonthlyNetIncome = d.MonthlyNetIncome;
+        profile.FinancialCurrency = d.FinancialCurrency;
+        profile.CitizenshipCountry = d.CitizenshipCountry;
+        profile.ResidenceCountry = d.ResidenceCountry;
         if (d.MainActivity is not null) profile.BusinessActivity = d.MainActivity;
     }
 

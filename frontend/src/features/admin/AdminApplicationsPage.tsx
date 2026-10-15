@@ -42,7 +42,15 @@ export default function AdminApplicationsPage() {
     <div className="flex flex-wrap gap-3 mb-6"><input className="field flex-1" aria-label={t('form.search')} placeholder={t('form.search')} value={search} onChange={e => setSearch(e.target.value)} /><select className="field !w-auto" aria-label={t('competition.review')} value={status} onChange={e => setStatus(e.target.value)}><option value="all">{t('competition.all')}</option>{['OPEN','UNDER_REVIEW','INFORMATION_REQUESTED','SELECTED','NOT_SELECTED','REJECTED','CANCELLED'].map(s => <option key={s} value={s}>{t('competition.status.'+s)}</option>)}</select></div>
     {loading ? <div className="skeleton h-40" /> : !filtered.length ? <EmptyState title={t('investor.inv.empty')} /> : <ul className="grid gap-4">{filtered.map(row => {
       const r = toRequest(row); const pending = ['OPEN','UNDER_REVIEW','INFORMATION_REQUESTED'].includes(row.status);
-      return <li key={row.id} className="card p-5"><div className="flex justify-between gap-3"><div><h2 className="font-display text-xl text-brand">{row.applicantName || row.referenceNumber}</h2><p>{row.taxNumber} · {f.azn(row.proposedInvestmentAmount)}</p></div><RequestBadge status={r.status} /></div><p className="mt-3 whitespace-pre-wrap">{row.businessPlanSummary}</p><ApplicationHistory application={r} />
+      return <li key={row.id} className="card p-5"><div className="flex justify-between gap-3"><div><h2 className="font-display text-xl text-brand">{row.applicantName || row.referenceNumber}</h2><p>{row.taxNumber} · {f.azn(row.proposedInvestmentAmount)}</p></div><RequestBadge status={r.status} /></div><p className="mt-3 whitespace-pre-wrap">{row.businessPlanSummary}</p>
+        {(row.projectCosts != null || row.fundingGap != null || row.additionalFinancingRequested != null || row.expectedAnnualRevenue != null || row.expectedProduction) && <dl className="grid sm:grid-cols-2 gap-3 mt-4 text-sm">
+          {row.projectCosts != null && <div><dt className="text-muted">{t('investor.detail.projectCosts')}</dt><dd className="font-semibold">{f.azn(row.projectCosts)}</dd></div>}
+          {row.fundingGap != null && <div><dt className="text-muted">{t('investor.detail.fundingGap')}</dt><dd className="font-semibold">{f.azn(row.fundingGap)}</dd></div>}
+          {row.additionalFinancingRequested != null && <div><dt className="text-muted">{t('investor.detail.additionalFinance')}</dt><dd className="font-semibold">{f.azn(row.additionalFinancingRequested)}</dd></div>}
+          {row.expectedAnnualRevenue != null && <div><dt className="text-muted">{t('investor.detail.expectedRevenue')}</dt><dd className="font-semibold">{f.azn(row.expectedAnnualRevenue)}</dd></div>}
+          {row.expectedProduction && <div className="sm:col-span-2"><dt className="text-muted">{t('investor.detail.expectedProduction')}</dt><dd className="font-semibold whitespace-pre-wrap">{row.expectedProduction}</dd></div>}
+        </dl>}
+        <ApplicationHistory application={r} />
         {pending && <div className="flex flex-wrap gap-2 mt-4">{['UNDER_REVIEW','INFORMATION_REQUESTED','SELECTED','REJECTED'].filter(s => s !== row.status).map(kind => <button key={kind} className="btn btn-outline btn-sm" onClick={() => { setAction({ row, kind }); setNote(''); }}>{t('competition.status.'+kind)}</button>)}</div>}
       </li>;
     })}</ul>}

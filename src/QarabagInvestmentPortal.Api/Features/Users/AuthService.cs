@@ -116,7 +116,7 @@ public sealed class AuthService(
         if (userId is null)
             return Outcome<AuthResponse>.Fail(401, "Qeydiyyat sessiyası tapılmadı və ya vaxtı bitib. Daxil olub qeydiyyatı tamamlayın.");
 
-        var user = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == userId, ct);
+        var user = await db.Users.Include(u => u.Profile).ThenInclude(p => p!.Documents).FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user is null)
             return Outcome<AuthResponse>.Fail(401, "Giriş tələb olunur.");
         if (user.Role != UserRole.User || user.ApplicantType is not { } type)
@@ -184,7 +184,7 @@ public sealed class AuthService(
 
     public async Task<MeResponse?> MeAsync(string userId, CancellationToken ct)
     {
-        var user = await db.Users.AsNoTracking().Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == userId, ct);
+        var user = await db.Users.AsNoTracking().Include(u => u.Profile).ThenInclude(p => p!.Documents).FirstOrDefaultAsync(u => u.Id == userId, ct);
         return user is null ? null : new MeResponse(UserDto.From(user), ProfileDto.From(user.Profile));
     }
 
@@ -234,8 +234,17 @@ public sealed class AuthService(
 
     public async Task<Outcome<ProfileUpdatedResponse>> UpdateProfileAsync(string userId, UpdateProfileRequest req, CancellationToken ct)
     {
-        var user = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == userId, ct);
+        var user = await db.Users.Include(u => u.Profile).ThenInclude(p => p!.Documents).FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user is null) return Outcome<ProfileUpdatedResponse>.Fail(401, "Giriş tələb olunur.");
+
+        static string Clean(string? value) => value?.Trim() ?? string.Empty;
+        var identityChanged = (req.FirstName is not null && Clean(req.FirstName) != user.FirstName) ||
+            (req.LastName is not null && Clean(req.LastName) != user.LastName) ||
+            (req.Phone is not null && Clean(req.Phone) != (user.Phone ?? string.Empty)) ||
+            (req.CompanyName is not null && Clean(req.CompanyName) != (user.Profile?.CompanyName ?? string.Empty)) ||
+            (req.TaxIdentificationNumber is not null && Clean(req.TaxIdentificationNumber) != (user.Profile?.TaxIdentificationNumber ?? string.Empty));
+        if (identityChanged && (string.IsNullOrWhiteSpace(req.CurrentPassword) || !BCrypt.Net.BCrypt.Verify(req.CurrentPassword, user.PasswordHash)))
+            return Outcome<ProfileUpdatedResponse>.Fail(400, "Həssas məlumatları dəyişmək üçün hazırkı şifrənizi düzgün daxil edin.");
 
         if (req.Phone is not null)
         {

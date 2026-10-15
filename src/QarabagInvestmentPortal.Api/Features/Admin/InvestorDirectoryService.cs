@@ -9,6 +9,16 @@ public sealed record InvestorDirectoryPage(IReadOnlyList<InvestorDirectoryItem> 
 
 public sealed class InvestorDirectoryService(AppDbContext db)
 {
+    public async Task<UserDto?> SetVerificationAsync(string userId, bool isVerified, CancellationToken ct)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && u.Role == UserRole.User, ct);
+        if (user is null) return null;
+        user.IsVerified = isVerified;
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return UserDto.From(user);
+    }
+
     public async Task<InvestorDirectoryPage> ListAsync(string? search, int page, CancellationToken ct)
     {
         const int pageSize = 25;
@@ -24,7 +34,7 @@ public sealed class InvestorDirectoryService(AppDbContext db)
         }
 
         var total = await query.CountAsync(ct);
-        var users = await query.Include(u => u.Profile).OrderByDescending(u => u.CreatedAt).ThenBy(u => u.Id)
+        var users = await query.Include(u => u.Profile).ThenInclude(p => p!.Documents).OrderByDescending(u => u.CreatedAt).ThenBy(u => u.Id)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         var ids = users.Select(u => u.Id).ToList();
         var totals = await db.Proposals.AsNoTracking().Where(p => ids.Contains(p.InvestorId))

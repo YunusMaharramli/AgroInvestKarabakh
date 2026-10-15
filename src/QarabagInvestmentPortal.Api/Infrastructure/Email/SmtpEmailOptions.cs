@@ -9,5 +9,5 @@ public sealed class SmtpEmailOptions
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public string FromEmail { get; set; } = string.Empty;
-    public string FromName { get; set; } = "Qarabag Investment Portal";
+    public string FromName { get; set; } = "AgroMatch";
 }

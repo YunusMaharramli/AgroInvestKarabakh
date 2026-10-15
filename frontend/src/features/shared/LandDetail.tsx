@@ -51,6 +51,11 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
   const [contactPhone, setContactPhone] = useState(me?.phone ?? '');
   const [documents, setDocuments] = useState<File[]>([]);
   const [message, setMessage] = useState('');
+  const [projectCosts, setProjectCosts] = useState('');
+  const [fundingGap, setFundingGap] = useState('');
+  const [additionalFinancing, setAdditionalFinancing] = useState('');
+  const [expectedRevenue, setExpectedRevenue] = useState('');
+  const [expectedProduction, setExpectedProduction] = useState('');
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const submit = async (e: React.FormEvent) => {
@@ -64,7 +69,9 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
     if (Object.keys(er).length) return;
     setBusy(true);
     try {
-      await requestService.create({ landId: land.id, amount: a, investmentModel: model, durationMonths: Number(duration), message: message.trim(), applicantType, applicantName, taxNumber, contactPhone, documents });
+      await requestService.create({ landId: land.id, amount: a, investmentModel: model, durationMonths: Number(duration), message: message.trim(), applicantType, applicantName, taxNumber, contactPhone, documents,
+        projectCosts: projectCosts ? Number(projectCosts) : null, fundingGap: fundingGap ? Number(fundingGap) : null,
+        additionalFinancingRequested: additionalFinancing ? Number(additionalFinancing) : null, expectedAnnualRevenue: expectedRevenue ? Number(expectedRevenue) : null, expectedProduction });
       toast(t('investor.detail.sentToast'));
       onClose();
     } catch (x) {
@@ -81,6 +88,13 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
         <Field label={t('investor.detail.amount')} htmlFor="inv-amount" error={err.amount} hint={`${t('admin.form.investment')}: ${f.azn(land.investmentMin)}`}>
           <input id="inv-amount" className="field" type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)} aria-invalid={!!err.amount} data-autofocus />
         </Field>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label={t('investor.detail.projectCosts')} htmlFor="inv-costs" optional><input id="inv-costs" className="field" type="number" min="0" step="0.01" value={projectCosts} onChange={e => setProjectCosts(e.target.value)} /></Field>
+          <Field label={t('investor.detail.fundingGap')} htmlFor="inv-gap" optional><input id="inv-gap" className="field" type="number" min="0" step="0.01" value={fundingGap} onChange={e => setFundingGap(e.target.value)} /></Field>
+          <Field label={t('investor.detail.additionalFinance')} htmlFor="inv-finance" optional><input id="inv-finance" className="field" type="number" min="0" step="0.01" value={additionalFinancing} onChange={e => setAdditionalFinancing(e.target.value)} /></Field>
+          <Field label={t('investor.detail.expectedRevenue')} htmlFor="inv-revenue" optional><input id="inv-revenue" className="field" type="number" min="0" step="0.01" value={expectedRevenue} onChange={e => setExpectedRevenue(e.target.value)} /></Field>
+        </div>
+        <Field label={t('investor.detail.expectedProduction')} htmlFor="inv-production" optional><textarea id="inv-production" className="field min-h-20" maxLength={500} value={expectedProduction} onChange={e => setExpectedProduction(e.target.value)} /></Field>
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label={t('land.model')} htmlFor="inv-model">
             <select id="inv-model" className="field" value={model} onChange={e => setModel(e.target.value as InvestmentModel)}>

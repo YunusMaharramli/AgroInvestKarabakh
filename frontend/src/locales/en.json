@@ -1,11 +1,11 @@
 {
   "meta": {
-    "title": "AGROInvest — Agricultural land investment in Azerbaijan",
+    "title": "AgroMatch — Agricultural land investment in Azerbaijan",
     "placeholderNote": "Placeholder text — replace before launch"
   },
   "brand": {
-    "name": "AGROInvest",
-    "tagline": "AGROInvest · Grow Together"
+    "name": "AgroMatch",
+    "tagline": "AgroMatch · Grow Together"
   },
   "lang": {
     "az": "Azərbaycan",
@@ -52,7 +52,7 @@
     "title": "Help centre",
     "faqItems": [
       {
-        "q": "What is AGROInvest?",
+        "q": "What is AgroMatch?",
         "a": "A platform that connects landowners who need investment with investors looking for agricultural projects in Azerbaijan."
       },
       {
@@ -96,12 +96,12 @@
     "address": "28 May street 12, Baku AZ1010, Azerbaijan",
     "contactTitle": "Contact Us",
     "stay": "Stay in touch!",
-    "social": "Follow AGROInvest on {{name}}",
+    "social": "Follow AgroMatch on {{name}}",
     "firstName": "First Name",
     "email": "Email Address",
     "subscribe": "Subscribe",
     "subscribed": "Thanks for subscribing! Please check your inbox.",
-    "rights": "© {{year}} AGROInvest. All rights reserved.",
+    "rights": "© {{year}} AgroMatch. All rights reserved.",
     "credits": "Photography: Pexels contributors · Built with care in Azerbaijan"
   },
   "form": {
@@ -149,10 +149,10 @@
     "pause": "Pause slideshow",
     "play": "Play slideshow",
     "whatEyebrow": "About the platform",
-    "whatTitle": "What is AGROInvest?",
+    "whatTitle": "What is AgroMatch?",
     "whatText": "Explore published farm areas, submit your business plan and track your application.",
     "videoEyebrow": "How it works",
-    "videoTitle": "Getting Started with AGROInvest",
+    "videoTitle": "Getting Started with AgroMatch",
     "videoText": "A short walkthrough: how to sign up, log in and find your way around the site.",
     "banner": "From Soil to Success",
     "ownersEyebrow": "Applications",
@@ -169,7 +169,7 @@
     "missingHint": "Upload the video file to replace this placeholder."
   },
   "about": {
-    "title": "About AGROInvest",
+    "title": "About AgroMatch",
     "intro": "Explore published farm areas, submit your business plan and track your application.",
     "storyEyebrow": "Our story",
     "storyTitle": "Why we started",
@@ -210,14 +210,14 @@
     "gridText": "From grain fields to greenhouses and pastures — choose the type of agriculture that matches your goals.",
     "seeAll": "See all fields",
     "projectsTitle": "Successful investments",
-    "projectsText": "Real projects funded through AGROInvest — a new selection every visit.",
+    "projectsText": "Real projects funded through AgroMatch — a new selection every visit.",
     "allProjects": "All projects",
     "raised": "{{amount}} raised · {{year}}",
     "prev": "Previous",
     "next": "Next",
     "mapTitle": "Investment map",
     "mapText": "Every available listing on one map. Use the chips to show or hide field groups.",
-    "videoTitle": "How to invest on AGROInvest",
+    "videoTitle": "How to invest on AgroMatch",
     "videoText": "Sign up, log in, find a land and send your first investment request."
   },
   "owners": {
@@ -226,7 +226,7 @@
     "gridTitle": "What can you list?",
     "gridText": "Arable fields, orchards, greenhouses, pastures and more — every type of rural land has investors looking for it.",
     "projectsTitle": "Owners who found investors",
-    "projectsText": "Listings that were funded through AGROInvest.",
+    "projectsText": "Listings that were funded through AgroMatch.",
     "mapTitle": "Where investors are active",
     "mapText": "See listed land near you and how it is presented to investors.",
     "videoTitle": "How to list your land",
@@ -236,7 +236,7 @@
   "guides": {
     "eyebrow": "Guides",
     "title": "Picking Guides",
-    "subtitle": "Every type of land you can list or invest in on AGROInvest.",
+    "subtitle": "Every type of land you can list or invest in on AgroMatch.",
     "ctaTitle": "Ready to grow with us?",
     "ctaText": "Create a free account and start investing — or list your land today.",
     "ctaButton": "Start investing",
@@ -449,7 +449,7 @@
     "quoteLogin": "Grow your capital with the land.",
     "quoteSignup": "Every harvest starts with one decision.",
     "loginTitle": "Welcome back",
-    "loginSubtitle": "Log in to your AGROInvest account.",
+    "loginSubtitle": "Log in to your AgroMatch account.",
     "identifier": "Email or phone number",
     "password": "Password",
     "show": "Show password",
@@ -480,6 +480,8 @@
       "Details"
     ],
     "fullName": "Full name",
+    "firstName": "First name",
+    "lastName": "Last name",
     "email": "Email",
     "phone": "Phone number",
     "countryCode": "Country code",
@@ -499,7 +501,7 @@
     "verifyText": "We sent a confirmation link to {{email}}. Open the email and click the link to activate your account.",
     "resend": "Send the link again",
     "resent": "If the account needs confirmation, a new link has been sent.",
-    "roleTitle": "How do you want to use AGROInvest?",
+    "roleTitle": "How do you want to use AgroMatch?",
     "roleNote": "You can open the other cabinet later from your account.",
     "ownerCard": "Landowner",
     "ownerCardText": "List your land and receive investment",
@@ -604,7 +606,22 @@
     "details": {
       "title": "About you",
       "companyTitle": "About the company",
-      "subtitle": "This information is kept in your investor profile. Applicant type:",
+      "subtitle": "Complete the core information required to enter your investor cabinet. Applicant type:",
+      "coreOnly": "This step collects only essential eligibility and investment-capacity details. You can add debts, reserves, and other financial details later in your profile.",
+      "incomeStability": "Income stability",
+      "incomeStabilityOptions": { "STABLE": "Stable", "SEASONAL": "Seasonal", "IRREGULAR": "Variable", "OTHER": "Other" },
+      "monthlyIncome": "Approximate monthly net income",
+      "currency": "Currency",
+      "ownContribution": "Own funds available for the project",
+      "citizenshipCountry": "Country of citizenship",
+      "residenceCountry": "Country of residence",
+      "companyLegalName": "Company's registered legal name",
+      "taxId": "VÖEN (tax identification number)",
+      "foreignTaxId": "Tax number in the country of registration",
+      "legalForm": "Legal form",
+      "registrationDate": "Registration date",
+      "representativeRole": "Authorized representative's role",
+      "annualRevenue": "Approximate annual revenue (AZN)",
       "maritalStatus": "Marital status",
       "single": "Single",
       "married": "Married",
@@ -814,6 +831,11 @@
       "r12": "12 months",
       "investors": "Investors",
       "amount": "Amount (AZN)",
+      "projectCosts": "Total project costs (AZN)",
+      "fundingGap": "Funding gap (AZN)",
+      "additionalFinance": "Additional financing needed (AZN)",
+      "expectedRevenue": "Expected annual revenue (AZN)",
+      "expectedProduction": "Expected production and output",
       "topRegions": "Top regions by investment",
       "vsMarket": "Your properties vs. market",
       "vsMarketText": "Average days to get funded",
@@ -975,6 +997,8 @@
     "title": "Profile & Settings",
     "personal": "Personal information",
     "company": "Company name",
+    "currentPasswordConfirm": "Current password",
+    "currentPasswordConfirmHint": "Required when you change personal or registration details.",
     "photo": "Profile photo",
     "changePhoto": "Change photo",
     "password": "Change password",
@@ -1001,6 +1025,16 @@
     "investorProfile": "Investor profile",
     "applicantType": "Applicant type",
     "profileEmpty": "The additional information has not been filled in yet.",
+    "profilePrivacy": "This information is stored in your profile and you can update it at any time.",
+    "foreignLandNotice": "Under the Land Code, foreign individuals and foreign legal entities may obtain land only through lease rights. Eligibility must be checked for each project.",
+    "foreignLandLaw": "Land Code, Article 48.4",
+    "profileSelfDeclared": "Information is self-declared and is not verified unless separately confirmed.",
+    "profileDocuments": "Supporting documents",
+    "profileDocumentCategory": "Document category",
+    "documentCategories": { "IDENTITY": "Identity", "REGISTRATION": "Registration", "FINANCIAL": "Financial", "EXPERIENCE": "Experience", "OTHER": "Other" },
+    "profileUpload": "Upload a document",
+    "profileDelete": "Delete document",
+    "profileFields": { "incomeStability": "Income stability", "monthlyNetIncome": "Net income", "incomePeriod": "Income period", "financialCurrency": "Currency", "outstandingDebt": "Total outstanding debt", "debtRepaymentAmount": "Debt payment", "debtRepaymentFrequency": "Payment frequency", "ownContribution": "Own project contribution", "postInvestmentReserve": "Reserve after investment", "additionalFinancingRequired": "Additional financing needed", "incomeSource": "Income source", "experienceYears": "Experience (years)", "experienceDescription": "Experience details", "citizenshipCountry": "Country of citizenship", "residenceCountry": "Country of residence", "residencyStatus": "Residency status", "address": "Address", "dateOfBirth": "Date of birth", "identityDocumentType": "Identity document type", "identityDocumentNumber": "Identity document number", "companyName": "Legal name", "taxIdentificationNumber": "Tax identification number", "foreignTaxNumber": "Foreign tax number", "country": "Country of registration", "legalForm": "Legal form", "registrationDate": "Registration date", "activityStatus": "Operating status", "businessActivity": "Sector and activity", "operatingAddress": "Operating address", "representativeRole": "Representative's role", "annualRevenue": "Annual revenue", "netProfitOrLoss": "Net profit or loss", "operatingCashFlow": "Operating cash flow", "financialReportingPeriod": "Financial reporting period", "liquidFundsAvailable": "Available liquid funds", "operationalCapacity": "Operational capacity", "previousProjects": "Previous projects" },
     "adminPassword": "Admin passwords are managed in the database only and cannot be changed."
   },
   "common": {
@@ -1011,13 +1045,14 @@
     "dev": "Development"
   },
   "assistant": {
+    "name": "AGROR",
     "launcher": "Have a question?",
     "launcherSub": "Ask the assistant",
     "subtitle": "Your guide to the portal",
     "newChat": "New chat",
     "close": "Close",
-    "hello": "Hi! I'm AgroKöməkçi.",
-    "helloName": "Hi, {{name}}! I'm AgroKöməkçi.",
+    "hello": "Hi! I'm AGROR.",
+    "helloName": "Hi, {{name}}! I'm AGROR.",
     "intro": "I help you choose land, send an investment request and list your own land.",
     "pickTopic": "Pick a topic:",
     "topics": [
@@ -1059,11 +1094,11 @@
     "unverifiedText": "The information has not been fully checked against documents yet.",
     "verifiedText": "The legal documents have been checked by a ministry officer.",
     "boundaryNote": "The boundary on the map is approximate.",
-    "notRegistry": "AGROInvest is not an official land registry; for official records contact the State Service on Property Issues."
+    "notRegistry": "AgroMatch is not an official land registry; for official records contact the State Service on Property Issues."
   },
   "admin": {
     "panel": {
-      "investors": "Investors", "investorsHint": "Registered applicants and their profile information", "statistics": "Statistics", "statisticsHint": "Applications and investment activity", "allRegions": "All regions", "noInvestors": "No investors found", "applicationsCount": "{{count}} applications", "registered": "Registered", "accountStatus": "Account status", "incomplete": "Profile incomplete", "confirmed": "Confirmed", "unconfirmed": "Email unconfirmed", "previous": "Previous", "next": "Next", "noData": "No data yet", "publishedLands": "Published lands", "byRegion": "Applications by region", "byActivity": "Applications by activity", "byStatus": "Applications by status", "byMonth": "Recent months",
+      "investors": "Investors", "investorsHint": "Registered applicants and their profile information", "statistics": "Statistics", "statisticsHint": "Applications and investment activity", "allRegions": "All regions", "noInvestors": "No investors found", "applicationsCount": "{{count}} applications", "registered": "Registered", "accountStatus": "Account status", "incomplete": "Profile incomplete", "confirmed": "Confirmed", "unconfirmed": "Email unconfirmed", "markVerified": "Mark as verified", "markUnverified": "Revoke verification", "previous": "Previous", "next": "Next", "noData": "No data yet", "publishedLands": "Published lands", "byRegion": "Applications by region", "byActivity": "Applications by activity", "byStatus": "Applications by status", "byMonth": "Recent months",
       "types": { "INDIVIDUAL": "Individual", "LEGAL_ENTITY": "Legal entity", "FOREIGN_INDIVIDUAL": "Foreign individual", "FOREIGN_ENTITY": "Foreign entity" },
       "fields": { "companyName": "Company", "taxIdentificationNumber": "Tax number", "businessActivity": "Main activity", "foreignTaxNumber": "Foreign tax number", "country": "Country", "activityStatus": "Activity status", "activityStartDate": "Activity start date", "ceoName": "CEO", "address": "Address", "maritalStatus": "Marital status", "incomeLast6Months": "Income in last 6 months", "residencyStatus": "Residency status", "incomeSource": "Income source", "hasCredit": "Has credit", "monthlyCreditPayment": "Monthly credit payment", "hasFixedIncome": "Fixed income", "fixedMonthlyIncome": "Fixed monthly income", "minimumFunds": "Minimum funds" }
     },

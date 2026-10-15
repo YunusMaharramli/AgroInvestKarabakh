@@ -65,7 +65,7 @@ export const authService = {
   async signup(input: SignupInput): Promise<RegistrationResponse> {
     try {
       const r = await backend<RegistrationResponse>('POST', '/auth/register', {
-        applicantType: input.applicantType, fullName: input.fullName?.trim(), email: input.email.trim().toLowerCase(),
+        applicantType: input.applicantType, firstName: input.firstName?.trim(), lastName: input.lastName?.trim(), fullName: input.fullName?.trim(), email: input.email.trim().toLowerCase(),
         phone: input.phone, companyName: input.companyName?.trim(), taxIdentificationNumber: input.voen?.trim(),
         foreignTaxNumber: input.foreignTaxNumber?.trim(), password: input.password, confirmPassword: input.confirmPassword,
         acceptTerms: input.acceptTerms, recaptchaToken: input.recaptchaToken,
@@ -103,6 +103,24 @@ export const authService = {
     return adoptSession(res, true);
   },
 
+  async updateInvestorProfile(patch: Partial<InvestorProfile>) {
+    try {
+      await backend<InvestorProfile>('PATCH', '/auth/investor-profile', patch);
+      await authService.refreshRole();
+    } catch (x) { throw fromBackend(x); }
+  },
+
+  async uploadInvestorProfileDocument(file: File, category: string) {
+    const body = new FormData(); body.set('file', file); body.set('category', category);
+    try { return await backend<InvestorProfileDocument>('POST', '/auth/investor-profile/documents', body); }
+    catch (x) { throw fromBackend(x); }
+  },
+
+  async deleteInvestorProfileDocument(id: string) {
+    try { await backend('DELETE', '/auth/investor-profile/documents/' + encodeURIComponent(id)); }
+    catch (x) { throw fromBackend(x); }
+  },
+
   /** Confirms the email with the token from the link in the confirmation email. */
   async confirmEmail(token: string): Promise<string> {
     try { return (await backend<MessageResponse>('POST', '/auth/confirm-email', { token })).message; }
@@ -132,13 +150,14 @@ export const authService = {
     mutate(d => { d.users.find(x => x.id === me.id)!.roles = ['investor']; });
   },
 
-  async updateProfile(patch: Partial<AppUser>) {
+  async updateProfile(patch: Partial<AppUser> & { currentPassword?: string }) {
     const me = authService.currentUser();
     if (!me) throw new ApiError('auth.errors.notSignedIn');
+    const { currentPassword, ...userPatch } = patch;
     const parts = (patch.fullName ?? me.fullName).trim().split(/\s+/);
     try {
-      await backend('PATCH', '/auth/profile', { firstName: parts.shift(), lastName: parts.join(' '), phone: patch.phone ?? me.phone, companyName: patch.companyName ?? me.companyName ?? '' });
-      mutate(d => { Object.assign(d.users.find(x => x.id === me.id)!, patch); });
+      await backend('PATCH', '/auth/profile', { firstName: parts.shift(), lastName: parts.join(' '), phone: patch.phone ?? me.phone, companyName: patch.companyName ?? me.companyName ?? '', currentPassword });
+      mutate(d => { Object.assign(d.users.find(x => x.id === me.id)!, userPatch); });
     } catch (x) { throw fromBackend(x); }
   },
 
@@ -209,7 +228,7 @@ export const authService = {
 
 export interface SignupInput {
   applicantType: ApplicantType; email: string; password: string; confirmPassword: string; acceptTerms: boolean; recaptchaToken: string;
-  fullName?: string; phone?: string; companyName?: string; voen?: string; foreignTaxNumber?: string;
+  firstName?: string; lastName?: string; fullName?: string; phone?: string; companyName?: string; voen?: string; foreignTaxNumber?: string;
 }
 export interface PendingSignup { token: string; email: string; type: ApplicantType }
 
@@ -226,7 +245,7 @@ function toAppUser(b: BackendUser, profile: InvestorProfile | null | undefined, 
   const company = b.applicantType === 'LEGAL_ENTITY' || b.applicantType === 'FOREIGN_ENTITY';
   return {
     id: b.id, fullName: `${b.firstName} ${b.lastName}`.trim(), email: b.email, phone: b.phone ?? '',
-    avatar: old?.avatar ?? null, roles: ['investor'], verified: true, isAdmin,
+    avatar: old?.avatar ?? null, roles: ['investor'], verified: !!b.isVerified, isAdmin,
     applicantType: isAdmin ? null : b.applicantType ?? null, needsOnboarding: !isAdmin && !!b.needsOnboarding,
     investorProfile: profile ?? null,
     investorType: company ? 'company' : 'individual', companyName: profile?.companyName || old?.companyName,
@@ -291,6 +310,7 @@ export function useDbValue<T>(read: () => T): T {
 export interface BackendApplication {
   id: string; referenceNumber: string; userId: string; opportunityId: string;
   proposedInvestmentAmount: number; businessPlanSummary: string; estimatedImplementationPeriod: string;
+  projectCosts?: number | null; fundingGap?: number | null; additionalFinancingRequested?: number | null; expectedAnnualRevenue?: number | null; expectedProduction?: string | null;
   status: string; submittedAt: string; updatedAt: string; applicantType: string; applicantName: string; taxNumber: string | null;
   land: { id: string } | null; statusHistory: NonNullable<InvestmentRequest['history']>;
   documents: NonNullable<InvestmentRequest['documents']>;
@@ -300,6 +320,8 @@ export function toRequest(b: BackendApplication): InvestmentRequest {
   return { id: b.id, referenceNumber: b.referenceNumber, opportunityId: b.opportunityId, landId: b.land?.id ?? '', investorId: b.userId,
     amount: b.proposedInvestmentAmount, message: b.businessPlanSummary, durationMonths: parseInt(b.estimatedImplementationPeriod) || 0,
     investmentModel: 'lease', status: statusMap[b.status] ?? 'pending', viewedByOwner: b.status !== 'OPEN',
+    projectCosts: b.projectCosts, fundingGap: b.fundingGap, additionalFinancingRequested: b.additionalFinancingRequested,
+    expectedAnnualRevenue: b.expectedAnnualRevenue, expectedProduction: b.expectedProduction,
     createdAt: b.submittedAt, updatedAt: b.updatedAt, applicantType: b.applicantType, applicantName: b.applicantName, taxNumber: b.taxNumber,
     history: b.statusHistory, documents: b.documents };
 }
@@ -335,7 +357,7 @@ export const landService = {
 export const requestService = {
   forInvestor(id: string): InvestmentRequest[] { return db().requests.filter(r => r.investorId === id); },
   forLand(id: string) { return db().requests.filter(r => r.landId === id); },
-  async create(input: { landId: string; amount: number; investmentModel: InvestmentRequest['investmentModel']; durationMonths: number; message: string; applicantType?: string; applicantName?: string; taxNumber?: string; contactPhone?: string; documents?: File[] }) {
+  async create(input: { landId: string; amount: number; investmentModel: InvestmentRequest['investmentModel']; durationMonths: number; message: string; applicantType?: string; applicantName?: string; taxNumber?: string; contactPhone?: string; documents?: File[]; projectCosts?: number | null; fundingGap?: number | null; additionalFinancingRequested?: number | null; expectedAnnualRevenue?: number | null; expectedProduction?: string }) {
     const me = authService.currentUser();
     if (!me) throw new ApiError('auth.errors.notSignedIn');
     const land = landService.get(input.landId);
@@ -345,6 +367,11 @@ export const requestService = {
     form.set('businessPlanSummary', input.message); form.set('estimatedImplementationPeriod', input.durationMonths + ' ay');
     form.set('applicantType', input.applicantType ?? 'individual'); form.set('applicantName', input.applicantName ?? me.fullName);
     form.set('taxNumber', input.taxNumber ?? ''); form.set('contactPhone', input.contactPhone ?? me.phone);
+    if (input.projectCosts != null) form.set('projectCosts', String(input.projectCosts));
+    if (input.fundingGap != null) form.set('fundingGap', String(input.fundingGap));
+    if (input.additionalFinancingRequested != null) form.set('additionalFinancingRequested', String(input.additionalFinancingRequested));
+    if (input.expectedAnnualRevenue != null) form.set('expectedAnnualRevenue', String(input.expectedAnnualRevenue));
+    if (input.expectedProduction) form.set('expectedProduction', input.expectedProduction);
     input.documents?.forEach(file => form.append('documents', file));
     try { const created = await backend<BackendApplication>('POST', '/proposals', form); await refreshPortal(); return toRequest(created); }
     catch(x) { throw fromBackend(x); }

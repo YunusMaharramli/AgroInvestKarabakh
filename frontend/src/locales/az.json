@@ -1,11 +1,11 @@
 {
   "meta": {
-    "title": "AGROInvest — Azərbaycanda kənd təsərrüfatı torpaqlarına investisiya",
+    "title": "AgroMatch — Azərbaycanda kənd təsərrüfatı torpaqlarına investisiya",
     "placeholderNote": "Nümunə mətn — yayımdan əvvəl dəyişin"
   },
   "brand": {
-    "name": "AGROInvest",
-    "tagline": "AGROInvest · Birlikdə böyüyək"
+    "name": "AgroMatch",
+    "tagline": "AgroMatch · Birlikdə böyüyək"
   },
   "lang": {
     "az": "Azərbaycan",
@@ -52,7 +52,7 @@
     "title": "Kömək mərkəzi",
     "faqItems": [
       {
-        "q": "AGROInvest nədir?",
+        "q": "AgroMatch nədir?",
         "a": "İnvestisiyaya ehtiyacı olan torpaq sahiblərini Azərbaycanda kənd təsərrüfatı layihəsi axtaran investorlarla birləşdirən platformadır."
       },
       {
@@ -96,12 +96,12 @@
     "address": "28 May küçəsi 12, Bakı AZ1010, Azərbaycan",
     "contactTitle": "Əlaqə",
     "stay": "Bizimlə qalın!",
-    "social": "AGROInvest-i {{name}}-da izləyin",
+    "social": "AgroMatch-i {{name}}-da izləyin",
     "firstName": "Ad",
     "email": "E-poçt ünvanı",
     "subscribe": "Abunə ol",
     "subscribed": "Abunə olduğunuz üçün təşəkkürlər! E-poçtunuzu yoxlayın.",
-    "rights": "© {{year}} AGROInvest. Bütün hüquqlar qorunur.",
+    "rights": "© {{year}} AgroMatch. Bütün hüquqlar qorunur.",
     "credits": "Fotolar: Pexels müəllifləri · Azərbaycanda sevgi ilə hazırlanıb"
   },
   "form": {
@@ -149,10 +149,10 @@
     "pause": "Slaydları dayandır",
     "play": "Slaydları başlat",
     "whatEyebrow": "Platforma haqqında",
-    "whatTitle": "AGROInvest nədir?",
+    "whatTitle": "AgroMatch nədir?",
     "whatText": "Dərc edilmiş təsərrüfat sahələrini araşdırın, biznes planınızı təqdim edin və müraciətinizi izləyin.",
     "videoEyebrow": "Necə işləyir",
-    "videoTitle": "AGROInvest-də ilk addımlar",
+    "videoTitle": "AgroMatch-də ilk addımlar",
     "videoText": "Qısa bələdçi: necə qeydiyyatdan keçmək, daxil olmaq və saytda yol tapmaq.",
     "banner": "Torpaqdan uğura",
     "ownersEyebrow": "Müraciətlər",
@@ -169,7 +169,7 @@
     "missingHint": "Bu yeri əvəz etmək üçün video faylını yükləyin."
   },
   "about": {
-    "title": "AGROInvest haqqında",
+    "title": "AgroMatch haqqında",
     "intro": "Dərc edilmiş təsərrüfat sahələrini araşdırın, biznes planınızı təqdim edin və müraciətinizi izləyin.",
     "storyEyebrow": "Hekayəmiz",
     "storyTitle": "Niyə başladıq",
@@ -210,14 +210,14 @@
     "gridText": "Taxıl sahələrindən istixanalara və otlaqlara qədər — məqsədinizə uyğun kənd təsərrüfatı növünü seçin.",
     "seeAll": "Bütün sahələrə bax",
     "projectsTitle": "Uğurlu investisiyalar",
-    "projectsText": "AGROInvest vasitəsilə maliyyələşdirilmiş real layihələr — hər girişdə yeni seçim.",
+    "projectsText": "AgroMatch vasitəsilə maliyyələşdirilmiş real layihələr — hər girişdə yeni seçim.",
     "allProjects": "Bütün layihələr",
     "raised": "{{amount}} cəlb olunub · {{year}}",
     "prev": "Əvvəlki",
     "next": "Növbəti",
     "mapTitle": "İnvestisiya xəritəsi",
     "mapText": "Bütün mövcud elanlar bir xəritədə. Qrupları göstərmək və gizlətmək üçün düymələrdən istifadə edin.",
-    "videoTitle": "AGROInvest-də necə investisiya etmək olar",
+    "videoTitle": "AgroMatch-də necə investisiya etmək olar",
     "videoText": "Qeydiyyatdan keçin, daxil olun, torpaq tapın və ilk investisiya müraciətinizi göndərin."
   },
   "owners": {
@@ -226,7 +226,7 @@
     "gridTitle": "Nəyi yerləşdirə bilərsiniz?",
     "gridText": "Əkin sahələri, bağlar, istixanalar, otlaqlar və daha çoxu — hər növ kənd torpağını axtaran investorlar var.",
     "projectsTitle": "İnvestor tapan torpaq sahibləri",
-    "projectsText": "AGROInvest vasitəsilə maliyyələşdirilmiş elanlar.",
+    "projectsText": "AgroMatch vasitəsilə maliyyələşdirilmiş elanlar.",
     "mapTitle": "İnvestorların fəal olduğu yerlər",
     "mapText": "Yaxınlığınızdakı elanlara və onların investorlara necə göstərildiyinə baxın.",
     "videoTitle": "Torpağınızı necə yerləşdirmək olar",
@@ -236,7 +236,7 @@
   "guides": {
     "eyebrow": "Bələdçi",
     "title": "Sahə bələdçisi",
-    "subtitle": "AGROInvest-də yerləşdirə və ya investisiya edə biləcəyiniz bütün torpaq növləri.",
+    "subtitle": "AgroMatch-də yerləşdirə və ya investisiya edə biləcəyiniz bütün torpaq növləri.",
     "ctaTitle": "Bizimlə böyüməyə hazırsınız?",
     "ctaText": "Pulsuz hesab yaradın və investisiyaya başlayın — və ya bu gün torpağınızı yerləşdirin.",
     "ctaButton": "İnvestisiyaya başla",
@@ -449,7 +449,7 @@
     "quoteLogin": "Kapitalınızı torpaqla böyüdün.",
     "quoteSignup": "Hər məhsul bir qərarla başlayır.",
     "loginTitle": "Yenidən xoş gəldiniz",
-    "loginSubtitle": "AGROInvest hesabınıza daxil olun.",
+    "loginSubtitle": "AgroMatch hesabınıza daxil olun.",
     "identifier": "E-poçt və ya telefon nömrəsi",
     "password": "Şifrə",
     "show": "Şifrəni göstər",
@@ -480,6 +480,8 @@
       "Məlumat"
     ],
     "fullName": "Ad və soyad",
+    "firstName": "Ad",
+    "lastName": "Soyad",
     "email": "E-poçt",
     "phone": "Telefon nömrəsi",
     "countryCode": "Ölkə kodu",
@@ -499,7 +501,7 @@
     "verifyText": "{{email}} ünvanına təsdiq linki göndərdik. Hesabınızı aktivləşdirmək üçün məktubu açıb linkə klikləyin.",
     "resend": "Linki yenidən göndər",
     "resent": "Hesab təsdiq tələb edirsə, yeni link göndərildi.",
-    "roleTitle": "AGROInvest-dən necə istifadə etmək istəyirsiniz?",
+    "roleTitle": "AgroMatch-dən necə istifadə etmək istəyirsiniz?",
     "roleNote": "Digər kabineti sonra hesabınızdan aça bilərsiniz.",
     "ownerCard": "Torpaq sahibi",
     "ownerCardText": "Torpağınızı yerləşdirin və investisiya alın",
@@ -604,7 +606,22 @@
     "details": {
       "title": "Özünüz haqqında məlumat",
       "companyTitle": "Şirkət haqqında məlumat",
-      "subtitle": "Bu məlumatlar investor profilinizdə saxlanılır. Müraciətçi növü:",
+      "subtitle": "İnvestor kabinetinə keçmək üçün əsas məlumatları tamamlayın. Müraciətçi növü:",
+      "coreOnly": "Bu mərhələdə yalnız uyğunluq və investisiya imkanını qiymətləndirmək üçün əsas məlumatlar tələb olunur. Borclar, ehtiyatlar və digər detalları sonra profilinizdə əlavə edə bilərsiniz.",
+      "incomeStability": "Gəlirin sabitliyi",
+      "incomeStabilityOptions": { "STABLE": "Sabit", "SEASONAL": "Mövsümi", "IRREGULAR": "Dəyişkən", "OTHER": "Digər" },
+      "monthlyIncome": "Təxmini aylıq xalis gəlir",
+      "currency": "Valyuta",
+      "ownContribution": "Layihəyə qoya biləcəyiniz öz vəsait",
+      "citizenshipCountry": "Vətəndaşlıq ölkəsi",
+      "residenceCountry": "Yaşadığınız ölkə",
+      "companyLegalName": "Şirkətin hüquqi adı",
+      "taxId": "VÖEN",
+      "foreignTaxId": "Qeydiyyat ölkəsində vergi nömrəsi",
+      "legalForm": "Hüquqi forma",
+      "registrationDate": "Qeydiyyat tarixi",
+      "representativeRole": "Səlahiyyətli nümayəndənin vəzifəsi",
+      "annualRevenue": "Təxmini illik gəlir (AZN)",
       "maritalStatus": "Ailə vəziyyəti",
       "single": "Subay",
       "married": "Evli",
@@ -814,6 +831,11 @@
       "r12": "12 ay",
       "investors": "İnvestorlar",
       "amount": "Məbləğ (AZN)",
+      "projectCosts": "Layihənin ümumi xərcləri (AZN)",
+      "fundingGap": "Maliyyə çatışmazlığı (AZN)",
+      "additionalFinance": "Tələb olunan əlavə maliyyə (AZN)",
+      "expectedRevenue": "Gözlənilən illik gəlir (AZN)",
+      "expectedProduction": "Gözlənilən istehsal və məhsul",
       "topRegions": "İnvestisiyaya görə öndə olan rayonlar",
       "vsMarket": "Torpaqlarınız və bazar",
       "vsMarketText": "Maliyyələşməyə qədər orta gün sayı",
@@ -975,6 +997,8 @@
     "title": "Profil və ayarlar",
     "personal": "Şəxsi məlumatlar",
     "company": "Şirkətin adı",
+    "currentPasswordConfirm": "Hazırkı şifrə",
+    "currentPasswordConfirmHint": "Şəxsi və ya qeydiyyat məlumatlarını dəyişərkən tələb olunur.",
     "photo": "Profil şəkli",
     "changePhoto": "Şəkli dəyiş",
     "password": "Şifrəni dəyiş",
@@ -1001,6 +1025,16 @@
     "investorProfile": "İnvestor profili",
     "applicantType": "Müraciətçi növü",
     "profileEmpty": "Əlavə məlumat hələ doldurulmayıb.",
+    "profilePrivacy": "Bu məlumatlar yalnız profilinizdə saxlanılır və siz onları istənilən vaxt dəyişə bilərsiniz.",
+    "foreignLandNotice": "Qanuna əsasən, əcnəbilər və xarici hüquqi şəxslər torpaq sahəsini yalnız icarə hüququ ilə əldə edə bilərlər. Konkret uyğunluq layihə üzrə yoxlanmalıdır.",
+    "foreignLandLaw": "Torpaq Məcəlləsi, maddə 48.4",
+    "profileSelfDeclared": "Məlumatlar istifadəçi tərəfindən təqdim olunur; ayrıca yoxlanılmadıqda təsdiqlənmiş sayılmır.",
+    "profileDocuments": "Dəstəkləyici sənədlər",
+    "profileDocumentCategory": "Sənəd kateqoriyası",
+    "documentCategories": { "IDENTITY": "Şəxsiyyət", "REGISTRATION": "Qeydiyyat", "FINANCIAL": "Maliyyə", "EXPERIENCE": "Təcrübə", "OTHER": "Digər" },
+    "profileUpload": "Sənəd yüklə",
+    "profileDelete": "Sənədi sil",
+    "profileFields": { "incomeStability": "Gəlirin sabitliyi", "monthlyNetIncome": "Xalis gəlir", "incomePeriod": "Gəlir dövrü", "financialCurrency": "Valyuta", "outstandingDebt": "Borcların ümumi qalığı", "debtRepaymentAmount": "Borc ödənişi", "debtRepaymentFrequency": "Ödəniş dövrü", "ownContribution": "Layihəyə qoyulacaq öz vəsaiti", "postInvestmentReserve": "Layihədən sonra saxlanacaq ehtiyat", "additionalFinancingRequired": "Tələb olunan əlavə maliyyə", "incomeSource": "Gəlir mənbəyi", "experienceYears": "Təcrübə (il)", "experienceDescription": "Təcrübənin təsviri", "citizenshipCountry": "Vətəndaşlıq ölkəsi", "residenceCountry": "Yaşayış ölkəsi", "residencyStatus": "Yaşayış statusu", "address": "Ünvan", "dateOfBirth": "Doğum tarixi", "identityDocumentType": "Şəxsiyyət sənədinin növü", "identityDocumentNumber": "Şəxsiyyət sənədinin nömrəsi", "companyName": "Hüquqi şəxsin adı", "taxIdentificationNumber": "VÖEN", "foreignTaxNumber": "Xarici vergi nömrəsi", "country": "Qeydiyyat ölkəsi", "legalForm": "Hüquqi forma", "registrationDate": "Qeydiyyat tarixi", "activityStatus": "Fəaliyyət statusu", "businessActivity": "Sektor və fəaliyyət", "operatingAddress": "Fəaliyyət ünvanı", "representativeRole": "Nümayəndənin vəzifəsi", "annualRevenue": "İllik gəlir", "netProfitOrLoss": "Xalis mənfəət və ya zərər", "operatingCashFlow": "Əməliyyat pul axını", "financialReportingPeriod": "Maliyyə hesabatı dövrü", "liquidFundsAvailable": "Mövcud likvid vəsait", "operationalCapacity": "Əməliyyat imkanları", "previousProjects": "Əvvəlki layihələr" },
     "adminPassword": "Admin hesabının şifrəsi yalnız verilənlər bazasında idarə olunur və dəyişdirilə bilməz."
   },
   "common": {
@@ -1011,13 +1045,14 @@
     "dev": "Tərtibat"
   },
   "assistant": {
+    "name": "AGROR",
     "launcher": "Sualınız var?",
     "launcherSub": "Köməkçiyə yazın",
     "subtitle": "Portal üzrə köməkçiniz",
     "newChat": "Yeni söhbət",
     "close": "Bağla",
-    "hello": "Salam! Mən AgroKöməkçiyəm.",
-    "helloName": "Salam, {{name}}! Mən AgroKöməkçiyəm.",
+    "hello": "Salam! Mən AGROR-am.",
+    "helloName": "Salam, {{name}}! Mən AGROR-am.",
     "intro": "Sahə seçməyə, investisiya təklifi göndərməyə və torpağınızı yerləşdirməyə kömək edirəm.",
     "pickTopic": "Bir mövzu seçin:",
     "topics": [
@@ -1059,11 +1094,11 @@
     "unverifiedText": "Məlumat hələ sənədlərlə tam yoxlanılmayıb.",
     "verifiedText": "Hüquqi sənədlər nazirlik əməkdaşı tərəfindən yoxlanılıb.",
     "boundaryNote": "Xəritədəki sərhəd təxminidir.",
-    "notRegistry": "AGROInvest rəsmi torpaq reyestri deyil; rəsmi məlumat üçün Əmlak Məsələləri Dövlət Xidmətinə müraciət edin."
+    "notRegistry": "AgroMatch rəsmi torpaq reyestri deyil; rəsmi məlumat üçün Əmlak Məsələləri Dövlət Xidmətinə müraciət edin."
   },
   "admin": {
     "panel": {
-      "investors": "İnvestorlar", "investorsHint": "Qeydiyyatdan keçmiş müraciətçilər və profil məlumatları", "statistics": "Statistika", "statisticsHint": "Müraciətlər və investisiya fəaliyyəti", "allRegions": "Bütün rayonlar", "noInvestors": "İnvestor tapılmadı", "applicationsCount": "{{count}} müraciət", "registered": "Qeydiyyat tarixi", "accountStatus": "Hesab statusu", "incomplete": "Profil tamamlanmayıb", "confirmed": "Təsdiqlənib", "unconfirmed": "E-poçt təsdiqlənməyib", "previous": "Əvvəlki", "next": "Növbəti", "noData": "Hələ məlumat yoxdur", "publishedLands": "Dərc olunmuş sahələr", "byRegion": "Rayonlar üzrə müraciətlər", "byActivity": "Fəaliyyət üzrə müraciətlər", "byStatus": "Status üzrə müraciətlər", "byMonth": "Son aylar",
+      "investors": "İnvestorlar", "investorsHint": "Qeydiyyatdan keçmiş müraciətçilər və profil məlumatları", "statistics": "Statistika", "statisticsHint": "Müraciətlər və investisiya fəaliyyəti", "allRegions": "Bütün rayonlar", "noInvestors": "İnvestor tapılmadı", "applicationsCount": "{{count}} müraciət", "registered": "Qeydiyyat tarixi", "accountStatus": "Hesab statusu", "incomplete": "Profil tamamlanmayıb", "confirmed": "Təsdiqlənib", "unconfirmed": "E-poçt təsdiqlənməyib", "markVerified": "Təsdiqlənmiş kimi işarələ", "markUnverified": "Təsdiqi ləğv et", "previous": "Əvvəlki", "next": "Növbəti", "noData": "Hələ məlumat yoxdur", "publishedLands": "Dərc olunmuş sahələr", "byRegion": "Rayonlar üzrə müraciətlər", "byActivity": "Fəaliyyət üzrə müraciətlər", "byStatus": "Status üzrə müraciətlər", "byMonth": "Son aylar",
       "types": { "INDIVIDUAL": "Fiziki şəxs", "LEGAL_ENTITY": "Hüquqi şəxs", "FOREIGN_INDIVIDUAL": "Xarici fiziki şəxs", "FOREIGN_ENTITY": "Xarici hüquqi şəxs" },
       "fields": { "companyName": "Şirkət", "taxIdentificationNumber": "VÖEN", "businessActivity": "Əsas fəaliyyət", "foreignTaxNumber": "Xarici vergi nömrəsi", "country": "Ölkə", "activityStatus": "Fəaliyyət statusu", "activityStartDate": "Fəaliyyətə başlama tarixi", "ceoName": "Rəhbər", "address": "Ünvan", "maritalStatus": "Ailə vəziyyəti", "incomeLast6Months": "Son 6 ayın gəliri", "residencyStatus": "Yaşayış statusu", "incomeSource": "Gəlir mənbəyi", "hasCredit": "Krediti var", "monthlyCreditPayment": "Aylıq kredit ödənişi", "hasFixedIncome": "Sabit gəliri var", "fixedMonthlyIncome": "Aylıq sabit gəlir", "minimumFunds": "Minimum vəsait" }
     },

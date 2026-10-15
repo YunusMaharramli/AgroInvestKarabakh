@@ -19,7 +19,7 @@ export const VIDEOS: { howItWorks?: string; about?: string; investors?: string; 
 
 function usePageTitle(key: string) {
   const { t, i18n } = useTranslation();
-  useEffect(() => { document.title = `${t(key)} · AGROInvest`; }, [key, i18n.language]);
+  useEffect(() => { document.title = `${t(key)} · AgroMatch`; }, [key, i18n.language]);
 }
 
 /* ---------------- Home (section 3) ---------------- */

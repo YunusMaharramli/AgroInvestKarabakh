@@ -164,7 +164,7 @@ export const LoginPage: React.FC = () => {
   const [unconfirmed, setUnconfirmed] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const recaptchaRef = useRef<ReCAPTCHA>(null);
-  useEffect(() => { document.title = `${t('auth.login')} · AGROInvest`; }, [t]);
+  useEffect(() => { document.title = `${t('auth.login')} · AgroMatch`; }, [t]);
   if (user && !busy) return <Navigate to={lp(cabinetHome(user))} replace />;
 
   const submit = async (e: React.FormEvent) => {
@@ -224,7 +224,7 @@ export const ForgotPage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const recaptchaRef = useRef<ReCAPTCHA>(null);
-  useEffect(() => { document.title = `${t('auth.forgotTitle')} · AGROInvest`; }, [t]);
+  useEffect(() => { document.title = `${t('auth.forgotTitle')} · AgroMatch`; }, [t]);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!EMAIL_RE.test(email.trim())) { setErr(t('form.email')); return; }
@@ -270,8 +270,6 @@ function strength(pw: string) {
   return pw ? s : 0;
 }
 const COUNTRY_CODES = [['+994', '🇦🇿 +994'], ['+90', '🇹🇷 +90'], ['+7', '🇷🇺 +7'], ['+995', '🇬🇪 +995'], ['+1', '🇺🇸 +1'], ['+44', '🇬🇧 +44']];
-const VOEN_RE = /^\d{10}$/;
-const FOREIGN_TAX_RE = /^[A-Za-z0-9][A-Za-z0-9 ./-]{2,39}$/;
 
 const StepHeader: React.FC<{ n: number }> = ({ n }) => {
   const { t } = useTranslation();
@@ -391,19 +389,22 @@ const YesNo: React.FC<{ label: string; value: boolean | null; onChange: (v: bool
 };
 
 interface DetailsState {
-  maritalStatus: '' | 'SINGLE' | 'MARRIED'; incomeLast6Months: string; hasCredit: boolean | null; monthlyCreditPayment: string;
-  hasFixedIncome: boolean | null; fixedMonthlyIncome: string; minimumFunds: string; residencyStatus: string; address: string;
-  incomeSource: string; country: string; activityStatus: string; mainActivity: string; activityStartDate: string; ceoName: string;
+  incomeStability: string; monthlyNetIncome: string; financialCurrency: string; minimumFunds: string;
+  citizenshipCountry: string; residenceCountry: string; residencyStatus: string; address: string;
+  country: string; companyName: string; taxIdentificationNumber: string; foreignTaxNumber: string;
+  legalForm: string; registrationDate: string; mainActivity: string; representativeRole: string; annualRevenue: string;
 }
 const EMPTY_DETAILS: DetailsState = {
-  maritalStatus: '', incomeLast6Months: '', hasCredit: null, monthlyCreditPayment: '', hasFixedIncome: null, fixedMonthlyIncome: '',
-  minimumFunds: '', residencyStatus: '', address: '', incomeSource: '', country: '', activityStatus: '', mainActivity: '',
-  activityStartDate: '', ceoName: '',
+  incomeStability: '', monthlyNetIncome: '', financialCurrency: 'AZN', minimumFunds: '',
+  citizenshipCountry: '', residenceCountry: '', residencyStatus: '', address: '', country: '',
+  companyName: '', taxIdentificationNumber: '', foreignTaxNumber: '', legalForm: '', registrationDate: '',
+  mainActivity: '', representativeRole: '', annualRevenue: '',
 };
 const RESIDENCY = ['PERMANENT_RESIDENT', 'TEMPORARY_RESIDENT', 'NON_RESIDENT'];
-const ACTIVITY_STATUS = ['BRANCH', 'REPRESENTATIVE_OFFICE', 'SUBSIDIARY', 'NOT_REGISTERED'];
+const INCOME_STABILITY = ['STABLE', 'SEASONAL', 'IRREGULAR', 'OTHER'];
+const CURRENCIES = ['AZN', 'USD', 'EUR', 'TRY', 'GBP'];
 
-/** Last sign-up step: the additional information for the applicant's type; finishing signs the investor in. */
+/** Required core eligibility and investment-capacity step after email confirmation. */
 const DetailsStep: React.FC<{ type: ApplicantType }> = ({ type }) => {
   const { t, i18n } = useTranslation();
   const lp = useLocalePath();
@@ -415,7 +416,7 @@ const DetailsStep: React.FC<{ type: ApplicantType }> = ({ type }) => {
   const countries = useMemo(() => countryOptions(i18n.language), [i18n.language]);
   const today = new Date().toISOString().slice(0, 10);
   const set = <K extends keyof DetailsState>(k: K, value: DetailsState[K]) => setV(prev => ({ ...prev, [k]: value }));
-  const text = (k: keyof DetailsState) => ({ id: `dt-${k}`, value: v[k] as string, 'aria-invalid': !!err[k], onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => set(k, e.target.value as never) });
+  const text = (k: keyof DetailsState) => ({ id: `dt-${k}`, value: v[k] as string, 'aria-invalid': !!err[k], onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => set(k, e.target.value as never) });
   const money = (k: keyof DetailsState) => ({ ...text(k), type: 'number', min: 0, step: '0.01', inputMode: 'decimal' as const, className: 'field' });
   const num = (s: string) => (s.trim() === '' ? null : Number(s));
 
@@ -433,45 +434,38 @@ const DetailsStep: React.FC<{ type: ApplicantType }> = ({ type }) => {
       const n = num(v[k] as string);
       if (!er[k] && (n === null || Number.isNaN(n) || n < 0 || (positive && n === 0))) er[k] = t('auth.details.errors.amount');
     };
-    if (individual) {
-      need('maritalStatus', t('auth.details.errors.choose'));
-      amount('incomeLast6Months');
-      need('hasCredit', t('auth.details.errors.choose'));
-      if (v.hasCredit) amount('monthlyCreditPayment', true);
-      need('hasFixedIncome', t('auth.details.errors.choose'));
-      if (v.hasFixedIncome) amount('fixedMonthlyIncome', true);
-      amount('minimumFunds');
+    if (individual || foreignPerson) {
+      need('incomeStability', t('auth.details.errors.choose')); amount('monthlyNetIncome'); amount('minimumFunds');
+      if (foreignPerson) {
+        need('citizenshipCountry', t('auth.details.errors.choose')); need('residenceCountry', t('auth.details.errors.choose'));
+        need('residencyStatus', t('auth.details.errors.choose'));
+      }
     }
-    if (foreignPerson) {
-      need('residencyStatus', t('auth.details.errors.choose')); need('address'); need('incomeSource');
-      need('hasCredit', t('auth.details.errors.choose'));
-      if (v.hasCredit) amount('monthlyCreditPayment', true);
-      amount('minimumFunds');
-    }
-    if (foreignCompany) { need('country', t('auth.details.errors.choose')); need('activityStatus', t('auth.details.errors.choose')); need('address'); need('mainActivity'); need('ceoName'); }
-    if (legal) {
-      need('address'); need('mainActivity'); need('activityStartDate'); need('ceoName'); amount('minimumFunds');
-      if (!er.activityStartDate && v.activityStartDate > today) er.activityStartDate = t('auth.details.errors.date');
+    if (legal || foreignCompany) {
+      need('companyName'); need('legalForm'); need('address'); need('mainActivity'); need('representativeRole');
+      need('registrationDate'); amount('annualRevenue'); amount('minimumFunds');
+      if (legal && !/^\d{10}$/.test(v.taxIdentificationNumber.trim())) er.taxIdentificationNumber = t('auth.errors.voen');
+      if (foreignCompany) {
+        need('country', t('auth.details.errors.choose'));
+        if (v.foreignTaxNumber.trim().length < 3) er.foreignTaxNumber = t('form.required');
+      }
+      if (!er.registrationDate && v.registrationDate > today) er.registrationDate = t('auth.details.errors.date');
     }
     setErr(er);
     if (Object.keys(er).length) { document.getElementById(`dt-${Object.keys(er)[0]}`)?.focus(); return; }
     setBusy(true);
     try {
-      const details = individual ? {
-        maritalStatus: v.maritalStatus, incomeLast6Months: num(v.incomeLast6Months),
-        hasCredit: v.hasCredit, monthlyCreditPayment: v.hasCredit ? num(v.monthlyCreditPayment) : null,
-        hasFixedIncome: v.hasFixedIncome, fixedMonthlyIncome: v.hasFixedIncome ? num(v.fixedMonthlyIncome) : null,
+      const details = individual || foreignPerson ? {
+        incomeStability: v.incomeStability, monthlyNetIncome: num(v.monthlyNetIncome), financialCurrency: v.financialCurrency,
         minimumFunds: num(v.minimumFunds),
-      } : foreignPerson ? {
-        residencyStatus: v.residencyStatus, address: v.address, incomeSource: v.incomeSource,
-        hasCredit: v.hasCredit, monthlyCreditPayment: v.hasCredit ? num(v.monthlyCreditPayment) : null,
-        minimumFunds: num(v.minimumFunds),
-      } : foreignCompany ? {
-        country: v.country, activityStatus: v.activityStatus, address: v.address,
-        mainActivity: v.mainActivity, ceoName: v.ceoName,
+        ...(foreignPerson ? { citizenshipCountry: v.citizenshipCountry, residenceCountry: v.residenceCountry, residencyStatus: v.residencyStatus } : {}),
       } : {
-        address: v.address, mainActivity: v.mainActivity, activityStartDate: v.activityStartDate,
-        ceoName: v.ceoName, minimumFunds: num(v.minimumFunds),
+        companyName: v.companyName, legalForm: v.legalForm,
+        taxIdentificationNumber: legal ? v.taxIdentificationNumber : null,
+        foreignTaxNumber: foreignCompany ? v.foreignTaxNumber : null,
+        country: foreignCompany ? v.country : null, address: v.address, mainActivity: v.mainActivity,
+        representativeRole: v.representativeRole, registrationDate: v.registrationDate,
+        annualRevenue: num(v.annualRevenue), minimumFunds: num(v.minimumFunds),
       };
       const user = await authService.completeSignup(details);
       toast(t('auth.details.done'));
@@ -487,72 +481,38 @@ const DetailsStep: React.FC<{ type: ApplicantType }> = ({ type }) => {
       <StepHeader n={3} />
       <h1 className="font-display text-4xl text-brand">{isCompany(type) ? t('auth.details.companyTitle') : t('auth.details.title')}</h1>
       <p className="text-muted mt-2 mb-8">{t('auth.details.subtitle')} <span className="font-semibold text-ink">{t(`auth.applicant.${type}`)}</span></p>
+      <p className="text-sm text-muted mb-5">{t('auth.details.coreOnly')}</p>
       {err.form && <div className="mb-5"><Alert>{err.form}</Alert></div>}
       <form onSubmit={submit} noValidate className="grid sm:grid-cols-2 gap-5">
-        {individual && (
-          <>
-            <div id="dt-maritalStatus" className="sm:col-span-2">
-              <p className="field-label">{t('auth.details.maritalStatus')}</p>
-              <Segmented label={t('auth.details.maritalStatus')} value={v.maritalStatus} onChange={x => set('maritalStatus', x)}
-                options={[{ value: 'SINGLE' as const, label: t('auth.details.single') }, { value: 'MARRIED' as const, label: t('auth.details.married') }]} />
-              {err.maritalStatus && <p className="field-error" role="alert">{err.maritalStatus}</p>}
-            </div>
-            <Field label={t('auth.details.income6')} htmlFor="dt-incomeLast6Months" error={err.incomeLast6Months} className="sm:col-span-2"><input {...money('incomeLast6Months')} /></Field>
-          </>
-        )}
-        {foreignPerson && (
-          <>
-            <Field label={t('auth.details.residency')} htmlFor="dt-residencyStatus" error={err.residencyStatus} className="sm:col-span-2">
-              <select className="field" {...text('residencyStatus')}>
-                <option value="">{t('auth.details.choose')}</option>
-                {RESIDENCY.map(r => <option key={r} value={r}>{t(`auth.details.residencyOptions.${r}`)}</option>)}
-              </select>
-            </Field>
-            <Field label={t('auth.details.address')} htmlFor="dt-address" error={err.address} className="sm:col-span-2"><input className="field" autoComplete="street-address" {...text('address')} /></Field>
-            <Field label={t('auth.details.incomeSource')} htmlFor="dt-incomeSource" error={err.incomeSource} className="sm:col-span-2"><input className="field" {...text('incomeSource')} /></Field>
-          </>
-        )}
-        {(individual || foreignPerson) && (
-          <>
-            <div className="sm:col-span-2"><YesNo id="dt-hasCredit" label={individual ? t('auth.details.hasCredit') : t('auth.details.hasCreditQ')} value={v.hasCredit} onChange={x => set('hasCredit', x)} error={err.hasCredit} /></div>
-            {v.hasCredit && <Field label={t('auth.details.creditPayment')} htmlFor="dt-monthlyCreditPayment" error={err.monthlyCreditPayment} className="sm:col-span-2"><input {...money('monthlyCreditPayment')} /></Field>}
-          </>
-        )}
-        {individual && (
-          <>
-            <div className="sm:col-span-2"><YesNo id="dt-hasFixedIncome" label={t('auth.details.hasFixedIncome')} value={v.hasFixedIncome} onChange={x => set('hasFixedIncome', x)} error={err.hasFixedIncome} /></div>
-            {v.hasFixedIncome && <Field label={t('auth.details.fixedIncome')} htmlFor="dt-fixedMonthlyIncome" error={err.fixedMonthlyIncome} className="sm:col-span-2"><input {...money('fixedMonthlyIncome')} /></Field>}
-          </>
-        )}
-        {foreignCompany && (
-          <>
-            <Field label={t('auth.details.country')} htmlFor="dt-country" error={err.country}>
-              <select className="field" {...text('country')}>
-                <option value="">{t('auth.details.chooseCountry')}</option>
-                {countries.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
-              </select>
-            </Field>
-            <Field label={t('auth.details.activityStatus')} htmlFor="dt-activityStatus" error={err.activityStatus}>
-              <select className="field" {...text('activityStatus')}>
-                <option value="">{t('auth.details.choose')}</option>
-                {ACTIVITY_STATUS.map(s => <option key={s} value={s}>{t(`auth.details.activityStatusOptions.${s}`)}</option>)}
-              </select>
-            </Field>
-          </>
-        )}
-        {(foreignCompany || legal) && (
-          <>
-            <Field label={t('auth.details.address')} htmlFor="dt-address" error={err.address} className="sm:col-span-2"><input className="field" autoComplete="street-address" {...text('address')} /></Field>
-            <Field label={foreignCompany ? t('auth.details.mainActivity') : t('auth.details.activity')} htmlFor="dt-mainActivity" error={err.mainActivity} className="sm:col-span-2"><input className="field" {...text('mainActivity')} /></Field>
-            {legal && <Field label={t('auth.details.startDate')} htmlFor="dt-activityStartDate" error={err.activityStartDate}><input className="field" type="date" max={today} {...text('activityStartDate')} /></Field>}
-            <Field label={t('auth.details.ceo')} htmlFor="dt-ceoName" error={err.ceoName} className={legal ? '' : 'sm:col-span-2'}><input className="field" {...text('ceoName')} /></Field>
-          </>
-        )}
-        {!foreignCompany && (
-          <Field label={individual ? t('auth.details.minInitial') : legal ? t('auth.details.minCompany') : t('auth.details.minProject')} htmlFor="dt-minimumFunds" error={err.minimumFunds} className="sm:col-span-2">
-            <input {...money('minimumFunds')} />
+        {(individual || foreignPerson) && <>
+          <Field label={t('auth.details.incomeStability')} htmlFor="dt-incomeStability" error={err.incomeStability}>
+            <select className="field" {...text('incomeStability')}><option value="">{t('auth.details.choose')}</option>{INCOME_STABILITY.map(option => <option key={option} value={option}>{t(`auth.details.incomeStabilityOptions.${option}`)}</option>)}</select>
           </Field>
-        )}
+          <Field label={t('auth.details.monthlyIncome')} htmlFor="dt-monthlyNetIncome" error={err.monthlyNetIncome}><input {...money('monthlyNetIncome')} /></Field>
+          <Field label={t('auth.details.currency')} htmlFor="dt-financialCurrency"><select className="field" {...text('financialCurrency')}>{CURRENCIES.map(currency => <option key={currency}>{currency}</option>)}</select></Field>
+          <Field label={t('auth.details.ownContribution')} htmlFor="dt-minimumFunds" error={err.minimumFunds}><input {...money('minimumFunds')} /></Field>
+        </>}
+        {foreignPerson && <>
+          {(['citizenshipCountry','residenceCountry'] as const).map(key => <Field key={key} label={t(`auth.details.${key}`)} htmlFor={`dt-${key}`} error={err[key]}>
+            <select className="field" {...text(key)}><option value="">{t('auth.details.chooseCountry')}</option>{countries.filter(c => key !== 'citizenshipCountry' || c.code !== 'AZ').map(c => <option key={c.code} value={c.code}>{c.name}</option>)}</select>
+          </Field>)}
+          <Field label={t('auth.details.residency')} htmlFor="dt-residencyStatus" error={err.residencyStatus} className="sm:col-span-2">
+            <select className="field" {...text('residencyStatus')}><option value="">{t('auth.details.choose')}</option>{RESIDENCY.map(r => <option key={r} value={r}>{t(`auth.details.residencyOptions.${r}`)}</option>)}</select>
+          </Field>
+        </>}
+        {(legal || foreignCompany) && <>
+          {foreignCompany && <Field label={t('auth.details.country')} htmlFor="dt-country" error={err.country}><select className="field" {...text('country')}><option value="">{t('auth.details.chooseCountry')}</option>{countries.filter(c => c.code !== 'AZ').map(c => <option key={c.code} value={c.code}>{c.name}</option>)}</select></Field>}
+          <Field label={t('auth.details.companyLegalName')} htmlFor="dt-companyName" error={err.companyName} className="sm:col-span-2"><input className="field" autoComplete="organization" {...text('companyName')} /></Field>
+          {legal ? <Field label={t('auth.details.taxId')} htmlFor="dt-taxIdentificationNumber" error={err.taxIdentificationNumber}><input className="field" inputMode="numeric" maxLength={10} {...text('taxIdentificationNumber')} /></Field>
+            : <Field label={t('auth.details.foreignTaxId')} htmlFor="dt-foreignTaxNumber" error={err.foreignTaxNumber}><input className="field" maxLength={40} {...text('foreignTaxNumber')} /></Field>}
+          <Field label={t('auth.details.legalForm')} htmlFor="dt-legalForm" error={err.legalForm}><input className="field" {...text('legalForm')} /></Field>
+          <Field label={t('auth.details.registrationDate')} htmlFor="dt-registrationDate" error={err.registrationDate}><input className="field" type="date" max={today} {...text('registrationDate')} /></Field>
+          <Field label={t('auth.details.address')} htmlFor="dt-address" error={err.address} className="sm:col-span-2"><input className="field" autoComplete="street-address" {...text('address')} /></Field>
+          <Field label={t('auth.details.mainActivity')} htmlFor="dt-mainActivity" error={err.mainActivity} className="sm:col-span-2"><input className="field" {...text('mainActivity')} /></Field>
+          <Field label={t('auth.details.representativeRole')} htmlFor="dt-representativeRole" error={err.representativeRole}><input className="field" {...text('representativeRole')} /></Field>
+          <Field label={t('auth.details.annualRevenue')} htmlFor="dt-annualRevenue" error={err.annualRevenue}><input {...money('annualRevenue')} /></Field>
+          <Field label={t('auth.details.ownContribution')} htmlFor="dt-minimumFunds" error={err.minimumFunds}><input {...money('minimumFunds')} /></Field>
+        </>}
         <button type="submit" className="btn btn-primary w-full sm:col-span-2" disabled={busy}>{busy && <Loader2 className="w-4 h-4 animate-spin" />}{t('auth.details.finish')}</button>
       </form>
     </>
@@ -560,12 +520,12 @@ const DetailsStep: React.FC<{ type: ApplicantType }> = ({ type }) => {
 };
 
 interface AccountState {
-  fullName: string; companyName: string; email: string; code: string; phone: string; voen: string; foreignTaxNumber: string;
+  firstName: string; lastName: string; email: string; code: string; phone: string;
   password: string; confirm: string; terms: boolean;
 }
 
 const emptyAccount = (): AccountState => ({
-  fullName: '', companyName: '', email: '', code: '+994', phone: '', voen: '', foreignTaxNumber: '',
+  firstName: '', lastName: '', email: '', code: '+994', phone: '',
   password: '', confirm: '', terms: false,
 });
 
@@ -590,7 +550,7 @@ export const SignupPage: React.FC = () => {
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const recaptchaRef = useRef<ReCAPTCHA>(null);
   const [deliveryFailed, setDeliveryFailed] = useState(false);
-  useEffect(() => { document.title = `${t('auth.signup')} · AGROInvest`; }, [t]);
+  useEffect(() => { document.title = `${t('auth.signup')} · AgroMatch`; }, [t]);
 
   const pending = authService.pendingSignup();
   // The last step works with the sign-up token from this browser, or for a signed-in applicant who has not finished.
@@ -600,21 +560,13 @@ export const SignupPage: React.FC = () => {
   if (step === 'details' && !detailsType) return <Navigate to={lp(user ? cabinetHome(user) : '/login')} replace />;
   if (step !== 'account' && step !== 'check-email' && step !== 'details') return <Navigate to={lp('/signup')} replace />;
 
-  const company = isCompany(type);
   const submitAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     const er: Record<string, string> = {};
-    if (company) {
-      if (v.companyName.trim().length < 2) er.companyName = t('auth.errors.company');
-      if (type === 'LEGAL_ENTITY' && !VOEN_RE.test(v.voen.trim())) er.voen = t('auth.errors.voen');
-      if (type === 'FOREIGN_ENTITY') {
-        if (!FOREIGN_TAX_RE.test(v.foreignTaxNumber.trim())) er.foreignTaxNumber = t('auth.errors.foreignTax');
-        if (v.voen.trim() && !VOEN_RE.test(v.voen.trim())) er.voen = t('auth.errors.voen');
-      }
-    } else if (v.fullName.trim().length < 3) er.fullName = t('form.minLength', { n: 3 });
-    else if (v.fullName.trim().split(/\s+/).length < 2) er.fullName = t('auth.errors.fullName');
+    if (v.firstName.trim().length < 1) er.firstName = t('form.required');
+    if (v.lastName.trim().length < 1) er.lastName = t('form.required');
     if (!EMAIL_RE.test(v.email.trim())) er.email = t('form.email');
-    if (type === 'INDIVIDUAL' && v.phone.replace(/\D/g, '').length < 7) er.phone = t('auth.errors.phone');
+    if (v.phone.replace(/\D/g, '').length < 7) er.phone = t('auth.errors.phone');
     if (v.password.length < 8) er.password = t('form.minLength', { n: 8 });
     if (v.confirm !== v.password) er.confirm = t('auth.errors.passwordMatch');
     if (!v.terms) er.terms = t('auth.errors.terms');
@@ -625,24 +577,22 @@ export const SignupPage: React.FC = () => {
     try {
       const r = await authService.signup({
         applicantType: type, email: v.email, password: v.password, confirmPassword: v.confirm, acceptTerms: v.terms, recaptchaToken: recaptchaToken!,
-        fullName: company ? undefined : v.fullName, phone: type === 'INDIVIDUAL' ? `${v.code} ${v.phone.trim()}` : undefined,
-        companyName: company ? v.companyName : undefined, voen: company ? v.voen : undefined,
-        foreignTaxNumber: type === 'FOREIGN_ENTITY' ? v.foreignTaxNumber : undefined,
+        firstName: v.firstName, lastName: v.lastName, phone: `${v.code} ${v.phone.trim()}`,
       });
       setDeliveryFailed(r.emailDeliveryFailed);
       go('check-email');
     } catch (x) {
       const text = errorText(t, x);
       const detail = x instanceof ApiError ? x.detail : '';
-      const field = x instanceof ApiError && x.status === 409 ? (/VÖEN/i.test(detail) ? 'voen' : 'email')
-        : /telefon/i.test(detail) ? 'phone' : /VÖEN/i.test(detail) ? 'voen' : 'form';
+      const field = x instanceof ApiError && x.status === 409 ? 'email'
+        : /telefon/i.test(detail) ? 'phone' : /ad/i.test(detail) ? 'firstName' : 'form';
       setErr({ [field]: text });
     }
     finally { setBusy(false); setRecaptchaToken(null); recaptchaRef.current?.reset(); }
   };
   const s = strength(v.password);
   const levels = t('auth.strengthLevels', { returnObjects: true }) as unknown as string[];
-  const bind = (k: 'fullName' | 'companyName' | 'email' | 'phone' | 'voen' | 'foreignTaxNumber') =>
+  const bind = (k: 'firstName' | 'lastName' | 'email' | 'phone') =>
     ({ id: `su-${k}`, value: v[k], 'aria-invalid': !!err[k], onChange: (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: e.target.value }) });
   const changeType = (next: ApplicantType) => { setType(next); setErr({}); };
 
@@ -656,30 +606,19 @@ export const SignupPage: React.FC = () => {
           <ApplicantTypePicker value={type} onChange={changeType} />
           {err.form && <div className="mb-5"><Alert>{err.form}</Alert></div>}
           <form onSubmit={submitAccount} noValidate className="grid gap-5">
-            {company ? (
-              <Field label={type === 'FOREIGN_ENTITY' ? t('auth.companyFullName') : t('auth.companyName')} htmlFor="su-companyName" error={err.companyName}><input className="field" autoComplete="organization" {...bind('companyName')} /></Field>
-            ) : (
-              <Field label={t('auth.fullName')} htmlFor="su-fullName" error={err.fullName}><input className="field" autoComplete="name" {...bind('fullName')} /></Field>
-            )}
-            {type === 'FOREIGN_ENTITY' && (
-              <Field label={t('auth.foreignTax')} htmlFor="su-foreignTaxNumber" error={err.foreignTaxNumber}><input className="field" {...bind('foreignTaxNumber')} /></Field>
-            )}
-            {company && (
-              <Field label={type === 'FOREIGN_ENTITY' ? t('auth.voenAz') : t('auth.voen')} htmlFor="su-voen" error={err.voen} optional={type === 'FOREIGN_ENTITY'} hint={t('auth.voenHint')}>
-                <input className="field" inputMode="numeric" maxLength={10} {...bind('voen')} />
-              </Field>
-            )}
-            <Field label={company ? t('auth.companyEmail') : t('auth.email')} htmlFor="su-email" error={err.email}><input className="field" type="email" autoComplete="email" {...bind('email')} /></Field>
-            {type === 'INDIVIDUAL' && (
-              <Field label={t('auth.phone')} htmlFor="su-phone" error={err.phone}>
-                <div className="flex gap-2">
-                  <select aria-label={t('auth.countryCode')} className="field !w-32 shrink-0" value={v.code} onChange={e => setV({ ...v, code: e.target.value })}>
-                    {COUNTRY_CODES.map(([c, l]) => <option key={c} value={c}>{l}</option>)}
-                  </select>
-                  <input className="field" type="tel" autoComplete="tel-national" placeholder="50 123 45 67" {...bind('phone')} />
-                </div>
-              </Field>
-            )}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label={t('auth.firstName')} htmlFor="su-firstName" error={err.firstName}><input className="field" autoComplete="given-name" {...bind('firstName')} /></Field>
+              <Field label={t('auth.lastName')} htmlFor="su-lastName" error={err.lastName}><input className="field" autoComplete="family-name" {...bind('lastName')} /></Field>
+            </div>
+            <Field label={t('auth.email')} htmlFor="su-email" error={err.email}><input className="field" type="email" autoComplete="email" {...bind('email')} /></Field>
+            <Field label={t('auth.phone')} htmlFor="su-phone" error={err.phone}>
+              <div className="flex gap-2">
+                <select aria-label={t('auth.countryCode')} className="field !w-32 shrink-0" value={v.code} onChange={e => setV({ ...v, code: e.target.value })}>
+                  {COUNTRY_CODES.map(([c, l]) => <option key={c} value={c}>{l}</option>)}
+                </select>
+                <input className="field" type="tel" autoComplete="tel-national" placeholder="50 123 45 67" {...bind('phone')} />
+              </div>
+            </Field>
             <Field label={t('auth.password')} htmlFor="su-pw" error={err.password}>
               <PasswordInput id="su-pw" value={v.password} onChange={x => setV({ ...v, password: x })} invalid={!!err.password} autoComplete="new-password" describedBy="pw-strength" />
               <div className="flex gap-1 mt-2" aria-hidden="true">{[0, 1, 2, 3].map(i => <span key={i} className={`h-1.5 flex-1 rounded-full ${i < s ? (s <= 1 ? 'bg-danger' : s === 2 ? 'bg-warn' : 'bg-leaf') : 'bg-line'}`} />)}</div>
@@ -726,7 +665,7 @@ export const ConfirmEmailPage: React.FC = () => {
   const [state, setState] = useState<'loading' | 'ok' | 'error'>(token ? 'loading' : 'error');
   const [msg, setMsg] = useState(token ? '' : t('auth.errors.noToken'));
   const started = useRef('');
-  useEffect(() => { document.title = `${t('auth.confirmTitle')} · AGROInvest`; }, [t]);
+  useEffect(() => { document.title = `${t('auth.confirmTitle')} · AgroMatch`; }, [t]);
   useEffect(() => {
     if (!token || started.current === token) return; // the token works once; avoid a second call in StrictMode
     started.current = token;
@@ -773,7 +712,7 @@ export const ResetPasswordPage: React.FC = () => {
   const [err, setErr] = useState<{ next?: string; confirm?: string; form?: string }>({});
   const [done, setDone] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { document.title = `${t('auth.resetTitle')} · AGROInvest`; }, [t]);
+  useEffect(() => { document.title = `${t('auth.resetTitle')} · AgroMatch`; }, [t]);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const er: typeof err = {};
@@ -791,6 +730,7 @@ export const ResetPasswordPage: React.FC = () => {
     catch (x) { setErr({ form: errorText(t, x) }); }
     finally { setBusy(false); }
   };
+
   return (
     <AuthLayout image="/images/site/photo-12.jpg" quote={t('auth.quoteLogin')}>
       {done ? (

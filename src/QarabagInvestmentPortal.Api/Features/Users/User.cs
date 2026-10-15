@@ -31,6 +31,8 @@ public sealed class User
     public DateTimeOffset? OnboardingCompletedAt { get; set; }
     public string PasswordHash { get; set; } = string.Empty;
     public DateTimeOffset? EmailConfirmedAt { get; set; }
+    /// <summary>Set only after an administrator reviews the applicant's identity evidence.</summary>
+    public bool IsVerified { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
@@ -69,6 +71,10 @@ public sealed class UserProfile
 
     // ---- people and companies
     public string? Address { get; set; }
+    public string? OperatingAddress { get; set; }
+    public string? LegalForm { get; set; }
+    public DateOnly? RegistrationDate { get; set; }
+    public string? RepresentativeRole { get; set; }
 
     // ---- individuals (local and foreign)
     public MaritalStatus? MaritalStatus { get; set; }
@@ -77,10 +83,34 @@ public sealed class UserProfile
     /// <summary>Foreign individual: living status in Azerbaijan (see <see cref="ApplicantSignupRules.ResidencyStatuses"/>).</summary>
     public string? ResidencyStatus { get; set; }
     public string? IncomeSource { get; set; }
+    public string? IncomeStability { get; set; }
+    public decimal? MonthlyNetIncome { get; set; }
+    public string? IncomePeriod { get; set; }
+    public string? FinancialCurrency { get; set; }
     public bool? HasCredit { get; set; }
     public decimal? MonthlyCreditPayment { get; set; }
+    public decimal? OutstandingDebt { get; set; }
+    public decimal? DebtRepaymentAmount { get; set; }
+    public string? DebtRepaymentFrequency { get; set; }
     public bool? HasFixedIncome { get; set; }
     public decimal? FixedMonthlyIncome { get; set; }
+    public decimal? AnnualRevenue { get; set; }
+    public decimal? NetProfitOrLoss { get; set; }
+    public decimal? OperatingCashFlow { get; set; }
+    public string? FinancialReportingPeriod { get; set; }
+    public decimal? LiquidFundsAvailable { get; set; }
+    public decimal? OwnContribution { get; set; }
+    public decimal? PostInvestmentReserve { get; set; }
+    public decimal? AdditionalFinancingRequired { get; set; }
+    public int? ExperienceYears { get; set; }
+    public string? ExperienceDescription { get; set; }
+    public string? OperationalCapacity { get; set; }
+    public string? PreviousProjects { get; set; }
+    public string? CitizenshipCountry { get; set; }
+    public string? ResidenceCountry { get; set; }
+    public DateOnly? DateOfBirth { get; set; }
+    public string? IdentityDocumentType { get; set; }
+    public string? IdentityDocumentNumber { get; set; }
 
     /// <summary>
     /// Minimum funds the applicant can put in, AZN: for individuals the minimum available for the initial payment,
@@ -89,4 +119,19 @@ public sealed class UserProfile
     public decimal? MinimumFunds { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+
+    public List<InvestorProfileDocument> Documents { get; set; } = [];
+}
+
+/// <summary>Private evidence attached to an investor profile; accessible only to its owner and administrators.</summary>
+public sealed class InvestorProfileDocument
+{
+    public string Id { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string ContentType { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
+    public string StorageKey { get; set; } = string.Empty;
+    public DateTimeOffset UploadedAt { get; set; }
 }

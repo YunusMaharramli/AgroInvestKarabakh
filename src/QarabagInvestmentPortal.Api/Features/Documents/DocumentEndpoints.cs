@@ -20,6 +20,14 @@ public static class DocumentEndpoints
     {
         var docs = api.MapGroup("/documents").RequireAuthorization(Policies.SignedIn);
 
+        docs.MapGet("/investor-profiles/{id}", async (string id, bool? download, ClaimsPrincipal user, AppDbContext db, PrivateFileStorage storage, HttpResponse response, CancellationToken ct) =>
+        {
+            var row = await db.InvestorProfileDocuments.AsNoTracking().FirstOrDefaultAsync(d => d.Id == id, ct);
+            if (row is null) return ApiResults.NotFound("Sənəd tapılmadı.");
+            if (!user.IsAdmin() && row.UserId != user.UserId()) return ApiResults.Forbidden("Bu sənədə baxmaq icazəniz yoxdur.");
+            return Serve(storage, row.StorageKey, row.ContentType, row.FileName, download == true, response);
+        });
+
         docs.MapGet("/lands/{id}", async (string id, bool? download, ClaimsPrincipal user, AppDbContext db, PrivateFileStorage storage, HttpResponse response, CancellationToken ct) =>
         {
             var row = await db.LandDocuments.AsNoTracking()

@@ -55,6 +55,7 @@ builder.Services.AddScoped<PasswordResetService>();
 builder.Services.AddSingleton<PrivateFileStorage>();
 
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<InvestorProfileService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<OpportunityQueries>();
 builder.Services.AddScoped<AdminLandService>();

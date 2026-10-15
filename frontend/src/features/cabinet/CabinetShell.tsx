@@ -185,7 +185,7 @@ export const CabinetShell: React.FC<{ role: CabinetRole; nav: NavItem[] }> = ({ 
 };
 
 export const PageTitle: React.FC<{ title: string; subtitle?: string; actions?: React.ReactNode }> = ({ title, subtitle, actions }) => {
-  useEffect(() => { document.title = `${title} · AGROInvest`; }, [title]);
+  useEffect(() => { document.title = `${title} · AgroMatch`; }, [title]);
   return (
     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
       <div>

@@ -16,12 +16,24 @@ export type ApplicantType = 'INDIVIDUAL' | 'LEGAL_ENTITY' | 'FOREIGN_INDIVIDUAL'
 
 /** Investor profile as the backend sends it (fields of the applicant's type are filled). */
 export interface InvestorProfile {
+  currentPassword?: string;
   companyName: string; taxIdentificationNumber: string; businessActivity: string;
   foreignTaxNumber: string | null; country: string | null; activityStatus: string | null; activityStartDate: string | null;
   ceoName: string | null; address: string | null; maritalStatus: 'SINGLE' | 'MARRIED' | null; incomeLast6Months: number | null;
   residencyStatus: string | null; incomeSource: string | null; hasCredit: boolean | null; monthlyCreditPayment: number | null;
   hasFixedIncome: boolean | null; fixedMonthlyIncome: number | null; minimumFunds: number | null;
+  operatingAddress: string | null; legalForm: string | null; registrationDate: string | null; representativeRole: string | null;
+  incomeStability: string | null; monthlyNetIncome: number | null; incomePeriod: string | null; financialCurrency: string | null;
+  outstandingDebt: number | null; debtRepaymentAmount: number | null; debtRepaymentFrequency: string | null;
+  annualRevenue: number | null; netProfitOrLoss: number | null; operatingCashFlow: number | null; financialReportingPeriod: string | null;
+  liquidFundsAvailable: number | null; ownContribution: number | null; postInvestmentReserve: number | null; additionalFinancingRequired: number | null;
+  experienceYears: number | null; experienceDescription: string | null; operationalCapacity: string | null; previousProjects: string | null;
+  citizenshipCountry: string | null; residenceCountry: string | null; dateOfBirth: string | null;
+  identityDocumentType: string | null; identityDocumentNumber: string | null;
+  documents: InvestorProfileDocument[];
 }
+
+export interface InvestorProfileDocument { id: string; fileName: string; category: string; contentType: string; sizeBytes: number; uploadedAt: string; url: string }
 
 export interface AppUser {
   id: string;
@@ -34,7 +46,7 @@ export interface AppUser {
   isAdmin?: boolean;
   /** Investor type from sign-up (null/undefined for admins and older accounts). */
   applicantType?: ApplicantType | null;
-  /** True until the applicant has sent the additional sign-up information. */
+  /** True if optional signup profile details are still incomplete. This never gates account access. */
   needsOnboarding?: boolean;
   investorProfile?: InvestorProfile | null;
   verified: boolean;
@@ -120,6 +132,8 @@ export interface InvestmentRequest {
   applicantType?: string;
   applicantName?: string;
   taxNumber?: string | null;
+  projectCosts?: number | null; fundingGap?: number | null; additionalFinancingRequested?: number | null;
+  expectedAnnualRevenue?: number | null; expectedProduction?: string | null;
   history?: { id: string; newStatus: string; changedBy: string; comment: string; createdAt: string }[];
   documents?: { id: string; fileName: string; url: string }[];
   createdAt: string;

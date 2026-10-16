@@ -65,5 +65,23 @@ public sealed class ArchitectureTests
         var priv = endpoints.Where(e => privatePrefixes.Any(p => e.RoutePattern.RawText?.StartsWith(p, StringComparison.Ordinal) == true)).ToList();
         Assert.NotEmpty(priv);
         Assert.All(priv, e => Assert.NotEmpty(e.Metadata.GetOrderedMetadata<IAuthorizeData>()));
+
+        Assert.Contains(admin, e => e.RoutePattern.RawText == "/api/admin/analytics" &&
+            e.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == Policies.Admin));
+        Assert.Contains(admin, e => e.RoutePattern.RawText == "/api/admin/lands/{landId}/proposal-analysis" &&
+            e.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == Policies.Admin));
+    }
+
+    [Fact]
+    public async Task Anonymous_users_cannot_read_admin_analytics_or_proposal_analysis()
+    {
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+        {
+            b.UseEnvironment("Testing");
+            b.UseSetting("Database:MigrateOnStartup", "false");
+        });
+        using var client = factory.CreateClient();
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, (await client.GetAsync("/api/admin/analytics")).StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, (await client.GetAsync("/api/admin/lands/land-x/proposal-analysis")).StatusCode);
     }
 }

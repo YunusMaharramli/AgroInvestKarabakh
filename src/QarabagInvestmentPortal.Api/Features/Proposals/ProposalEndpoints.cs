@@ -43,8 +43,9 @@ public static class ProposalEndpoints
             await service.GetAsync(id, ViewerOf(user), ct) is { } dto ? Results.Ok(dto) : ApiResults.NotFound("Təklif tapılmadı."));
 
         // ------------------------------------------------ admin: every proposal
-        api.MapGet("/admin/proposals", async (string? status, string? region, string? search, ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
-            Results.Ok(await service.AllAsync(ViewerOf(user), status, region, search, ct)))
+        api.MapGet("/admin/proposals", async (string? status, string? region, string? activity, string? competitionId,
+            DateOnly? from, DateOnly? to, string? month, string? search, ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>
+            Results.Ok(await service.AllAsync(ViewerOf(user), status, region, activity, competitionId, from, to, month, search, ct)))
             .RequireAuthorization(Policies.Admin);
 
         api.MapPost("/admin/proposals/{id}/reject", async (string id, RejectProposalRequest req, ClaimsPrincipal user, ProposalService service, CancellationToken ct) =>

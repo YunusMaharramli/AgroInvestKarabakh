@@ -61,7 +61,10 @@ builder.Services.AddScoped<OpportunityQueries>();
 builder.Services.AddScoped<AdminLandService>();
 builder.Services.AddScoped<EktisIntegrationService>();
 builder.Services.AddScoped<InvestorDirectoryService>();
+builder.Services.AddScoped<AdminAnalyticsService>();
 builder.Services.AddScoped<ProposalService>();
+builder.Services.AddScoped<ProposalAnalysisService>();
+builder.Services.AddHttpClient<IProposalAnalysisProvider, GeminiProposalAnalysisProvider>();
 builder.Services.AddScoped<LegacyJsonImporter>();
 builder.Services.AddScoped<DemoLandSeeder>();
 builder.Services.AddScoped<LoginAttemptService>();
@@ -79,6 +82,10 @@ if (args.Length > 0 && args[0] == "import-legacy")
 if (args.Length > 0 && args[0] == "seed-demo-lands")
 {
     return await DemoLandCommand.RunAsync(app);
+}
+if (args.Length > 0 && args[0] == "seed-demo-data")
+{
+    return await DemoDataCommand.RunAsync(app);
 }
 
 await app.MigrateIfConfiguredAsync();

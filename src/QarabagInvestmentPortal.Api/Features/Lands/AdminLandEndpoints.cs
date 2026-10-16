@@ -27,8 +27,9 @@ public static class AdminLandEndpoints
             AdminLandRules.HectaresPerSot,
         }));
 
-        lands.MapGet("", async (string? status, string? search, string? region, string? landUse, AdminLandService service, CancellationToken ct) =>
-            Results.Ok(await service.ListAsync(status, search, region, landUse, ct)));
+        lands.MapGet("", async (string? status, string? search, string? region, string? landUse, string? competitionId,
+            DateOnly? from, DateOnly? to, AdminLandService service, CancellationToken ct) =>
+            Results.Ok(await service.ListAsync(status, search, region, landUse, competitionId, from, to, ct)));
 
         lands.MapGet("/{id}", async (string id, ClaimsPrincipal user, AdminLandService service, CancellationToken ct) =>
             await service.GetAsync(id, user.RequiredUserId(), ct) is { } dto ? Results.Ok(dto) : ApiResults.NotFound("Torpaq sahəsi tapılmadı."));

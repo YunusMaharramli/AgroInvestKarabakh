@@ -370,12 +370,33 @@ public sealed class ProposalService(
     public async Task<List<ProposalDto>> SentAsync(Viewer viewer, CancellationToken ct) =>
         await ToDtosAsync(await BaseQuery().Where(p => p.InvestorId == viewer.UserId).OrderByDescending(p => p.SubmittedAt).ToListAsync(ct), viewer, ct);
 
-    public async Task<List<ProposalDto>> AllAsync(Viewer viewer, string? status, string? region, string? search, CancellationToken ct)
+    public async Task<List<ProposalDto>> AllAsync(Viewer viewer, string? status, string? region, string? activity,
+        string? competitionId, DateOnly? from, DateOnly? to, string? month, string? search, CancellationToken ct)
     {
         var query = BaseQuery().Where(p => p.Opportunity!.Source == OpportunitySource.Admin);
         if (!string.IsNullOrWhiteSpace(status) && status != "all" && Enum.TryParse<ProposalStatus>(status.Replace("_", ""), true, out var s))
             query = query.Where(p => p.Status == s);
         if (!string.IsNullOrWhiteSpace(region) && region != "all") query = query.Where(p => p.Opportunity!.Land!.Region == region);
+        if (activity == "unknown") query = query.Where(p => p.Opportunity!.Land!.LandUse == "");
+        else if (!string.IsNullOrWhiteSpace(activity)) query = query.Where(p => p.Opportunity!.Land!.LandUse == activity);
+        if (!string.IsNullOrWhiteSpace(competitionId)) query = query.Where(p => p.OpportunityId == competitionId);
+        if (from is { } startDate)
+        {
+            var start = new DateTimeOffset(startDate.Year, startDate.Month, startDate.Day, 0, 0, 0, TimeSpan.Zero);
+            query = query.Where(p => p.SubmittedAt >= start);
+        }
+        if (to is { } endDate && endDate != DateOnly.MaxValue)
+        {
+            var next = endDate.AddDays(1);
+            var end = new DateTimeOffset(next.Year, next.Month, next.Day, 0, 0, 0, TimeSpan.Zero);
+            query = query.Where(p => p.SubmittedAt < end);
+        }
+        if (month is { Length: 7 } && DateOnly.TryParseExact(month + "-01", "yyyy-MM-dd", out var monthDate))
+        {
+            var monthStart = new DateTimeOffset(monthDate.Year, monthDate.Month, 1, 0, 0, 0, TimeSpan.Zero);
+            var nextMonth = monthStart.AddMonths(1);
+            query = query.Where(p => p.SubmittedAt >= monthStart && p.SubmittedAt < nextMonth);
+        }
         if (!string.IsNullOrWhiteSpace(search))
         {
             var pattern = $"%{search.Trim().Replace("%", "").Replace("_", "")}%";

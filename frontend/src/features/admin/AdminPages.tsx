@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { Link, Navigate, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, NavLink, Outlet, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle, Archive, ArchiveRestore, CheckCircle2, ChevronRight, CircleSlash, ExternalLink, Eye, FileText, Globe, History, Landmark,
@@ -116,10 +116,20 @@ export const AdminLandsPage: React.FC = () => {
   const { t } = useTranslation();
   const f = useFormat();
   const lp = useLocalePath();
-  const [status, setStatus] = useState<'active' | 'draft' | 'approved' | 'archived'>('active');
+  const [urlFilters, setUrlFilters] = useSearchParams();
+  const filterQuery = urlFilters.toString();
+  const initialStatus = urlFilters.get('status');
+  const [status, setStatusState] = useState<'active' | 'draft' | 'approved' | 'archived'>(
+    initialStatus === 'draft' || initialStatus === 'approved' || initialStatus === 'archived' ? initialStatus : 'active');
+  const setStatus = (value: 'active' | 'draft' | 'approved' | 'archived') => {
+    setStatusState(value); const next = new URLSearchParams(urlFilters); next.set('status', value); setUrlFilters(next);
+  };
+  const setUrlFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(urlFilters); if (value) next.set(key, value); else next.delete(key); setUrlFilters(next);
+  };
   const [q, setQ] = useState('');
-  const [type, setType] = useState('');
-  const [region, setRegion] = useState('');
+  const [type, setType] = useState(urlFilters.get('activity') ?? '');
+  const [region, setRegion] = useState(urlFilters.get('region') ?? '');
   const [rows, setRows] = useState<AdminLandListItem[] | null>(null);
   const [error, setError] = useState('');
 
@@ -127,11 +137,13 @@ export const AdminLandsPage: React.FC = () => {
     let alive = true;
     const serverStatus = status === 'active' ? '' : status;
     const id = setTimeout(() => {
-      adminLands.list(serverStatus, q, region, type).then(r => { if (alive) { setRows(r); setError(''); } })
+      const extra = new URLSearchParams();
+      for (const key of ['from', 'to', 'competitionId']) { const value = urlFilters.get(key); if (value) extra.set(key, value); }
+      adminLands.list(serverStatus, q, region, type, extra.toString()).then(r => { if (alive) { setRows(r); setError(''); } })
         .catch((x: AdminError) => { if (alive) { setRows([]); setError(x.message || t('auth.errors.server')); } });
     }, 250);
     return () => { alive = false; clearTimeout(id); };
-  }, [status, q, region, type]);
+  }, [status, q, region, type, filterQuery]);
 
   const shown = rows ?? [];
   const place = (r: AdminLandListItem) => [t(`regions.${r.region}`, { defaultValue: r.region }), r.district, r.settlement].filter(Boolean).join(' · ');
@@ -140,8 +152,11 @@ export const AdminLandsPage: React.FC = () => {
     <>
       <PageTitle title={t('admin.lands.title')} subtitle={t('admin.lands.subtitle')}
         actions={<Link to={lp('/admin/lands/new')} className="btn btn-primary"><Plus className="w-4 h-4" />{t('admin.nav.add')}</Link>} />
-      <LandSearchBar value={q} onChange={setQ} type={type} onTypeChange={setType} className="mb-4" />
-      <select className="field mb-4 sm:!w-auto" aria-label={t('admin.form.region')} value={region} onChange={e => setRegion(e.target.value)}>
+      {filterQuery && <div className="flex flex-wrap gap-2 mb-4 text-sm text-muted" aria-label={t('admin.panel.filters')}>
+        {[...urlFilters].map(([key, value]) => <span key={key} className="rounded-full bg-sand px-3 py-1">{t(key === 'status' ? 'competition.review' : `admin.panel.${key === 'competitionId' ? 'competition' : key}`, { defaultValue: key })}: {key === 'region' ? t(`regions.${value}`, { defaultValue: value }) : key === 'activity' ? t(`fieldTypes.${value}`, { defaultValue: value }) : key === 'status' ? t(`admin.status.${value.toUpperCase()}`, { defaultValue: value }) : value}</span>)}
+      </div>}
+      <LandSearchBar value={q} onChange={setQ} type={type} onTypeChange={value => { setType(value); setUrlFilter('activity', value); }} className="mb-4" />
+      <select className="field mb-4 sm:!w-auto" aria-label={t('admin.form.region')} value={region} onChange={e => { setRegion(e.target.value); setUrlFilter('region', e.target.value); }}>
         <option value="">{t('admin.panel.allRegions', { defaultValue: 'All regions' })}</option>
         {INVESTMENT_REGIONS.map(r => <option key={r.key} value={r.key}>{t(`regions.${r.key}`)}</option>)}
       </select>

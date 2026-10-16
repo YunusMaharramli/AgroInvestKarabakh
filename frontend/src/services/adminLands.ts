@@ -73,8 +73,8 @@ const andSync = async <T,>(p: Promise<T>) => { const r = await p; void syncMinis
 export const adminLands = {
   options: () => call<AdminOptions>('GET', '/admin/lands/options'),
   landUses: () => call<{ types: LandUseType[] }>('GET', '/land-uses'),
-  list: (status: string, search: string, region = '', landUse = '') =>
-    call<AdminLandListItem[]>('GET', `/admin/lands?status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}&region=${encodeURIComponent(region)}&landUse=${encodeURIComponent(landUse)}`),
+  list: (status: string, search: string, region = '', landUse = '', filters = '') =>
+    call<AdminLandListItem[]>('GET', `/admin/lands?status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}&region=${encodeURIComponent(region)}&landUse=${encodeURIComponent(landUse)}${filters ? `&${filters}` : ''}`),
   get: (id: string) => call<AdminLandDetail>('GET', `/admin/lands/${encodeURIComponent(id)}`),
   create: (form: FormData) => call<AdminLandDetail>('POST', '/admin/lands', form),
   update: (id: string, form: FormData) => andSync(call<AdminLandDetail>('POST', `/admin/lands/${encodeURIComponent(id)}`, form)),

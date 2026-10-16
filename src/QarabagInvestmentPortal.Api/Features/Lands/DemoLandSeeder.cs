@@ -45,13 +45,16 @@ public sealed class DemoLandSeeder(AppDbContext db, TimeProvider clock)
 
     public sealed record SeedResult(int LandsCreated, int OpportunitiesCreated, int ExistingLands, int LandsUpdated, int OpportunitiesUpdated);
 
-    public async Task<SeedResult> SeedAsync(CancellationToken ct)
+    public async Task<SeedResult> SeedAsync(CancellationToken ct, int? requestedCount = null)
     {
+        var count = requestedCount ?? LandUseCatalog.All.Count * 2;
+        if (count < 1 || count > LandUseCatalog.All.Count * 2)
+            throw new ArgumentOutOfRangeException(nameof(requestedCount));
         var now = clock.GetUtcNow();
         var adminId = await db.Users.AsNoTracking().Where(u => u.Role == QarabagInvestmentPortal.Api.Features.Users.UserRole.Admin)
             .OrderBy(u => u.CreatedAt).Select(u => u.Id).FirstOrDefaultAsync(ct);
-        var landIds = Enumerable.Range(1, LandUseCatalog.All.Count * 2).Select(i => $"demo-land-{i:00}").ToArray();
-        var opportunityIds = Enumerable.Range(1, LandUseCatalog.All.Count * 2).Select(i => $"demo-opp-{i:00}").ToArray();
+        var landIds = Enumerable.Range(1, count).Select(i => $"demo-land-{i:00}").ToArray();
+        var opportunityIds = Enumerable.Range(1, count).Select(i => $"demo-opp-{i:00}").ToArray();
         var existingLands = await db.Lands.Where(l => landIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, ct);
         var existingOpportunities = await db.Opportunities.Where(o => opportunityIds.Contains(o.Id)).ToDictionaryAsync(o => o.Id, ct);
         // Never overwrite a real record that happens to reuse one of the fixture IDs.
@@ -64,7 +67,7 @@ public sealed class DemoLandSeeder(AppDbContext db, TimeProvider clock)
         var opportunitiesCreated = 0;
         var landsUpdated = 0;
         var opportunitiesUpdated = 0;
-        for (var index = 0; index < LandUseCatalog.All.Count * 2; index++)
+        for (var index = 0; index < count; index++)
         {
             var type = LandUseCatalog.All[index / 2];
             var variant = index % 2;

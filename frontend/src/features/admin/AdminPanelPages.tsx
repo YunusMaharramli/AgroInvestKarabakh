@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { backend, BackendError } from '../../services/backend';
 import { useFormat } from '../../app/i18n';
 import type { ApplicantType, InvestorProfile } from '../../types/agro';
-import { EmptyState, StatCard } from '../../components/ui/Bits';
+import { EmptyState } from '../../components/ui/Bits';
 import { PageTitle } from '../cabinet/CabinetShell';
+export { AdminStatisticsPage } from './AdminStatisticsPage';
 
 interface Investor {
   user: { id: string; firstName: string; lastName: string; email: string; phone: string | null; applicantType: ApplicantType | null; needsOnboarding: boolean; emailConfirmed: boolean; isVerified: boolean; createdAt: string };
@@ -13,13 +14,6 @@ interface Investor {
   proposedInvestment: number;
 }
 interface InvestorPage { items: Investor[]; total: number; page: number; pageSize: number }
-interface StatItem { region?: string; sector?: string; status?: string; count: number; investment?: number }
-interface Analytics {
-  totalApplications: number; activeCompetitions: number; publishedLands: number; openProposals: number;
-  selectedProposals: number; totalProposedInvestment: number; applicationsByRegion: StatItem[];
-  applicationsBySector: StatItem[]; applicationsByStatus: StatItem[];
-  timeline: { month: string; applications: number; investment: number }[];
-}
 
 const profileFields: (keyof InvestorProfile)[] = [
   'companyName', 'taxIdentificationNumber', 'businessActivity', 'foreignTaxNumber', 'country', 'activityStatus',
@@ -83,35 +77,5 @@ export function AdminInvestorsPage() {
       <span className="text-sm">{page} / {Math.ceil(data.total / data.pageSize)}</span>
       <button className="btn btn-outline btn-sm" disabled={page * data.pageSize >= data.total} onClick={() => setPage(p => p + 1)}>{t('admin.panel.next')}</button>
     </div>}
-  </>;
-}
-
-export function AdminStatisticsPage() {
-  const { t } = useTranslation(); const f = useFormat();
-  const [data, setData] = useState<Analytics | null>(null); const [error, setError] = useState('');
-  useEffect(() => { backend<Analytics>('GET', '/admin/analytics').then(setData)
-    .catch((x: unknown) => setError(x instanceof BackendError && x.message ? x.message : t('auth.errors.server'))); }, [t]);
-  const group = (title: string, rows: { name: string; count: number; amount?: number }[]) =>
-    <section className="card p-5"><h2 className="font-display text-xl text-brand mb-3">{title}</h2>
-      {rows.length ? <ul className="divide-y divide-line">{rows.map((r, i) =>
-        <li key={i} className="flex justify-between gap-3 py-2 text-sm"><span>{r.name}</span><strong>{r.count}{r.amount !== undefined ? ` · ${f.azn(r.amount)}` : ''}</strong></li>)}</ul> : <p className="text-sm text-muted">{t('admin.panel.noData')}</p>}
-    </section>;
-  return <>
-    <PageTitle title={t('admin.panel.statistics')} subtitle={t('admin.panel.statisticsHint')} />
-    {error && <p role="alert" className="text-danger">{error}</p>}
-    {!data ? <div className="skeleton h-40" /> : <>
-      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={null} label={t('competition.applications')} value={String(data.totalApplications)} />
-        <StatCard icon={null} label={t('competition.competitions')} value={String(data.activeCompetitions)} />
-        <StatCard icon={null} label={t('admin.panel.publishedLands')} value={String(data.publishedLands)} />
-        <StatCard icon={null} label={t('competition.proposedInvestment')} value={f.azn(data.totalProposedInvestment)} />
-      </div>
-      <div className="grid lg:grid-cols-2 gap-4">
-        {group(t('admin.panel.byRegion'), data.applicationsByRegion.map(r => ({ name: t(`regions.${r.region}`, { defaultValue: r.region }), count: r.count, amount: r.investment })))}
-        {group(t('admin.panel.byActivity'), data.applicationsBySector.map(r => ({ name: t(`fieldTypes.${r.sector}`, { defaultValue: r.sector }), count: r.count })))}
-        {group(t('admin.panel.byStatus'), data.applicationsByStatus.map(r => ({ name: t(`competition.status.${r.status}`, { defaultValue: r.status }), count: r.count })))}
-        {group(t('admin.panel.byMonth'), data.timeline.map(r => ({ name: r.month, count: r.applications, amount: r.investment })))}
-      </div>
-    </>}
   </>;
 }

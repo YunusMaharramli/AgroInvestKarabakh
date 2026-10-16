@@ -42,7 +42,8 @@ public sealed class AdminLandService(
 
     // ------------------------------------------------------------------ queries
 
-    public async Task<List<AdminLandListItemDto>> ListAsync(string? status, string? search, string? region, string? landUse, CancellationToken ct)
+    public async Task<List<AdminLandListItemDto>> ListAsync(string? status, string? search, string? region, string? landUse,
+        string? competitionId, DateOnly? from, DateOnly? to, CancellationToken ct)
     {
         var query = Managed().AsNoTracking();
         if (!string.IsNullOrWhiteSpace(status) && status != "all" && Enum.TryParse<LandStatus>(status.Replace("_", ""), true, out var s))
@@ -50,7 +51,20 @@ public sealed class AdminLandService(
         else if (status != "all")
             query = query.Where(l => l.Status != LandStatus.Archived);
         if (!string.IsNullOrWhiteSpace(region)) query = query.Where(l => l.Region == region);
-        if (!string.IsNullOrWhiteSpace(landUse)) query = query.Where(l => l.LandUse == landUse);
+        if (landUse == "unknown") query = query.Where(l => l.LandUse == "");
+        else if (!string.IsNullOrWhiteSpace(landUse)) query = query.Where(l => l.LandUse == landUse);
+        if (!string.IsNullOrWhiteSpace(competitionId)) query = query.Where(l => db.Opportunities.Any(o => o.Id == competitionId && o.LandId == l.Id));
+        if (from is { } startDate)
+        {
+            var start = new DateTimeOffset(startDate.Year, startDate.Month, startDate.Day, 0, 0, 0, TimeSpan.Zero);
+            query = query.Where(l => l.CreatedAt >= start);
+        }
+        if (to is { } endDate && endDate != DateOnly.MaxValue)
+        {
+            var next = endDate.AddDays(1);
+            var end = new DateTimeOffset(next.Year, next.Month, next.Day, 0, 0, 0, TimeSpan.Zero);
+            query = query.Where(l => l.CreatedAt < end);
+        }
         if (search?.Trim() is { Length: > 0 } q)
         {
             var pattern = $"%{q.Replace("%", "").Replace("_", "")}%";

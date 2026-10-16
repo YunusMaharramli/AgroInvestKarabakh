@@ -30,6 +30,10 @@ In VS Code, open the project folder and choose **Terminal → Run Task → Start
 
 The API uses `ConnectionStrings:Portal` or the `POSTGRES_*` settings. `Storage:RootPath` selects the private document folder. `Gemini:ApiKey` is optional for the assistant. Keep secrets in environment variables or `.env`, never in source control.
 
+## Local demo data
+
+For a populated development portal, set `DemoData:Password` in .NET user secrets for the API project, then run `dotnet run --project src/QarabagInvestmentPortal.Api -- seed-demo-data`. This repeatable command adds 25 clearly marked demo lands, five synthetic investor accounts, and 25 applications through the normal proposal service. It also exercises review, rejection, winner selection, and competition closure. Re-running it skips existing fixtures; it does not delete existing records. The command refuses to run outside Development.
+
 ## Competition workflow
 
 1. An admin creates a farm area, adds its geographic and agricultural details, sets competition conditions and a deadline, and publishes it.
@@ -38,6 +42,14 @@ The API uses `ConnectionStrings:Portal` or the `POSTGRES_*` settings. `Storage:R
 4. An admin reviews applications, rejects one with a reason, or selects a winner. Selecting a winner closes the competition and records outcomes for the other pending applications. Archiving or withdrawing a competition cancels its pending applications and notifies applicants.
 
 The EKTİS endpoint is an admin-only **simulation**. It exports a versioned payload and records a local simulation receipt. It sends nothing to the government system.
+
+## Admin proposal analysis and statistics
+
+Admins can request advisory analysis for a land from the applications page. The analysis covers all still-open proposals for the land and never records a decision. The provider receives proposal aliases, numeric fields, and server-generated evidence statements only; applicant names, contact details, business-plan text, and private document contents are excluded. Provider reasons and risks are accepted only when they exactly match that evidence. The server computes first-year sensitivity scenarios from the applicant's stated annual revenue and project costs (revenue at 80%/100%/120%, costs at 120%/100%/80%). Project costs are treated as a one-time first-year cost. No profit probability is estimated. Eligibility conditions and document contents still require manual review. If Gemini is unavailable or the input exceeds 30,000 characters, the endpoint returns deterministic evidence, comparisons, and projections without an AI recommendation.
+
+The analysis uses separate configuration keys from the public assistant. Set `GeminiAnalysis:ApiKey` through `dotnet user-secrets` or the `GeminiAnalysis__ApiKey` environment variable. Optional keys: `GeminiAnalysis:Model` (default `gemini-3.8-flash`), `GeminiAnalysis:Endpoint` (default `https://generativelanguage.googleapis.com/v1beta`), and `GeminiAnalysis:TimeoutSeconds` (default `15`, clamped to 2–60). Do not put the key in committed configuration. The existing public assistant still uses `Gemini:ApiKey` or `GEMINI_API_KEY`.
+
+Statistics filters are applied on the server. Date range means proposal submission date for applications, land creation date for land counts, and competition creation date for active competitions; all dates use UTC boundaries. "Proposed investment" is the sum of applicant offers, not received money. Chart drilldowns carry these filters to the corresponding admin list.
 
 ## Checks
 

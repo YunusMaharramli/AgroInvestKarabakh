@@ -131,7 +131,7 @@ export const InvestorSearch: React.FC = () => {
       </div>
       <div><p className="field-label">{t('investor.search.risk')}</p><Segmented label={t('investor.search.risk')} value={draft.riskTolerance} onChange={v => D('riskTolerance', v)} options={(['low', 'medium', 'high'] as const).map(r => ({ value: r, label: t(`risk.${r}`) }))} /></div>
       <Toggle id="s-irr" checked={draft.irrigationOnly} onChange={v => D('irrigationOnly', v)} label={t('investor.search.irrigation')} />
-      <div className="flex gap-3 sticky bottom-0 bg-white pt-3 pb-1">
+      <div className="flex gap-3 sticky bottom-0 bg-white pt-3 pb-1 pr-16 xl:pr-0">
         <button type="button" className="btn btn-primary flex-1" onClick={apply}><Search className="w-4 h-4" />{t('form.search')}</button>
         <button type="button" className="btn btn-outline" onClick={reset}>{t('form.reset')}</button>
       </div>
@@ -141,14 +141,14 @@ export const InvestorSearch: React.FC = () => {
   return (
     <>
       <PageTitle title={t('investor.search.title')} />
-      <div className="grid lg:grid-cols-[320px_1fr] gap-6 items-start">
-        <aside className="hidden lg:block card p-5 sticky top-24 max-h-[calc(100svh-7rem)] overflow-y-auto" aria-label={t('investor.search.filters')}>
+      <div className="grid xl:grid-cols-[320px_minmax(0,1fr)] gap-6 xl:gap-8 items-start">
+        <aside className="hidden xl:block card p-5 sticky top-24 max-h-[calc(100svh-7rem)] overflow-y-auto xl:-translate-x-3" aria-label={t('investor.search.filters')}>
           <h2 className="font-display text-xl text-brand mb-5">{t('investor.search.filters')}</h2>{panel}
         </aside>
         <div className="min-w-0">
           <LandSearchBar value={q} onChange={v => { setQ(v); setShown(9); }} type={qType} onTypeChange={v => { setQType(v); setShown(9); }} className="mb-4" />
           <div className="flex flex-wrap items-center gap-3 mb-5">
-            <button type="button" className="lg:hidden btn btn-outline btn-sm" onClick={() => setSheet(true)}><SlidersHorizontal className="w-4 h-4" />{t('investor.search.showFilters')}</button>
+            <button type="button" className="xl:hidden btn btn-outline btn-sm" onClick={() => setSheet(true)}><SlidersHorizontal className="w-4 h-4" />{t('investor.search.showFilters')}</button>
             <p className="font-bold" aria-live="polite">{t('investor.search.found', { count: results.length })}</p>
             <div className="ml-auto flex items-center gap-3">
               <label className="flex items-center gap-2 text-sm"><span className="text-muted font-semibold hidden sm:inline">{t('investor.search.sort')}</span>
@@ -176,7 +176,7 @@ export const InvestorSearch: React.FC = () => {
         </div>
       </div>
       {sheet && (
-        <div className="lg:hidden fixed inset-0 z-[70] bg-forest/50" onMouseDown={e => { if (e.target === e.currentTarget) setSheet(false); }}>
+        <div className="xl:hidden fixed inset-0 z-[70] bg-forest/50" onMouseDown={e => { if (e.target === e.currentTarget) setSheet(false); }}>
           <div role="dialog" aria-modal="true" aria-label={t('investor.search.filters')} className="absolute bottom-0 inset-x-0 max-h-[88svh] overflow-y-auto rounded-t-3xl bg-white p-5">
             <div className="flex items-center justify-between mb-4"><h2 className="font-display text-xl text-brand">{t('investor.search.filters')}</h2><button type="button" onClick={() => setSheet(false)} className="p-2 rounded-full hover:bg-sand" aria-label={t('form.close')} autoFocus><X className="w-5 h-5" /></button></div>
             {panel}

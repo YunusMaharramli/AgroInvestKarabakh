@@ -40,7 +40,9 @@ export async function backend<T>(method: 'GET' | 'POST' | 'DELETE' | 'PATCH', pa
   // No JSON (e.g. the dev proxy's 502/504, or index.html) means the API is not running.
   if (!type.includes('json')) throw new BackendError(res.ok || res.status >= 500 ? 0 : res.status, '');
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new BackendError(res.status, typeof data?.error === 'string' ? data.error : '', data && typeof data === 'object' ? data : {});
+  if (!res.ok) throw new BackendError(res.status,
+    typeof data?.error === 'string' ? data.error : typeof data?.detail === 'string' ? data.detail : '',
+    data && typeof data === 'object' ? data : {});
   return data as T;
 }
 

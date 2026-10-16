@@ -113,12 +113,18 @@ public interface IProposalAnalysisProvider
 
 public sealed class GeminiProposalAnalysisProvider(HttpClient http, IConfiguration config) : IProposalAnalysisProvider
 {
-    public string ModelVersion => config["GeminiAnalysis:Model"] ?? "gemini-3.8-flash";
+    public string ModelVersion => NonBlank(config["GeminiAnalysis:Model"])
+        ?? NonBlank(config["Gemini:Model"])
+        ?? "gemini-3.8-flash";
+
+    private static string? NonBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     public async Task<GeminiAnalysis?> AnalyzeAsync(AnalysisPrompt prompt, CancellationToken ct)
     {
-        var key = config["GeminiAnalysis:ApiKey"];
-        if (string.IsNullOrWhiteSpace(key)) return null;
+        var key = NonBlank(config["GeminiAnalysis:ApiKey"])
+            ?? NonBlank(config["Gemini:ApiKey"])
+            ?? NonBlank(Environment.GetEnvironmentVariable("GEMINI_API_KEY"));
+        if (key is null) return null;
         var endpoint = (config["GeminiAnalysis:Endpoint"] ?? "https://generativelanguage.googleapis.com/v1beta").TrimEnd('/');
         var seconds = int.TryParse(config["GeminiAnalysis:TimeoutSeconds"], out var n) ? Math.Clamp(n, 2, 60) : 15;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);

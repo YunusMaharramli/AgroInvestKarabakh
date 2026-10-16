@@ -89,6 +89,25 @@ public sealed class AdminAnalysisAndAnalyticsTests
     }
 
     [Fact]
+    public async Task Admin_analysis_can_reuse_the_investor_Gemini_key_and_model()
+    {
+        var handler = new RecordingHandler();
+        using var client = new HttpClient(handler);
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Gemini:ApiKey"] = "shared-test-key", ["Gemini:Model"] = "shared-test-model",
+            ["GeminiAnalysis:Endpoint"] = "https://unit.test/v1beta"
+        }).Build();
+        var provider = new GeminiProposalAnalysisProvider(client, config);
+        var prompt = new AnalysisPrompt("crops", "aghdam", 10, 1000,
+            [new AnalysisPromptProposal("Proposal A", 1500, 1, 1, 0, 500, 200, null, null, ProposalAnalysisRules.Project(500, 200), [], [])]);
+
+        Assert.NotNull(await provider.AnalyzeAsync(prompt, CancellationToken.None));
+        Assert.Equal("shared-test-key", handler.ApiKey);
+        Assert.Equal("/v1beta/models/shared-test-model:generateContent", handler.Path);
+    }
+
+    [Fact]
     public void Analytics_filters_validate_and_aggregate_only_selected_rows()
     {
         var from = new DateOnly(2026, 10, 1); var to = new DateOnly(2026, 10, 31);
@@ -125,10 +144,12 @@ public sealed class AdminAnalysisAndAnalyticsTests
     {
         public string Body { get; private set; } = "";
         public string Path { get; private set; } = "";
+        public string? ApiKey { get; private set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Body = await request.Content!.ReadAsStringAsync(cancellationToken);
             Path = request.RequestUri!.AbsolutePath;
+            ApiKey = request.Headers.GetValues("x-goog-api-key").Single();
             var answer = System.Text.Json.JsonSerializer.Serialize(new
             {
                 recommendedAlias = "Proposal A",

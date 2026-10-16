@@ -11,6 +11,7 @@ import { TypeBadge } from './LandCard';
 import { Photo, ProgressBar, RiskBadge, ScoreGauge, VerifiedBadge, StatusBadge, Field, EmptyState } from '../../components/ui/Bits';
 import { Modal, useToast } from '../../components/ui/Overlay';
 import { SingleLandMap } from '../../components/map/LandsMap';
+import { LandAnalysis } from './LandAnalysis';
 import { useCompare } from '../compare/CompareContext';
 import type { InvestmentModel, Land } from '../../types/agro';
 
@@ -134,6 +135,7 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [invest, setInvest] = useState(false);
   const [why, setWhy] = useState(false);
+  const [selectedAreaHa, setSelectedAreaHa] = useState<number | null>(null);
 
   useEffect(() => { if (land && mode !== 'owner') landService.addView(land.id); }, [id]);
   const score = useMemo(() => (land ? scoreLand(land, me?.preferences ?? {}) : null), [land, me?.preferences]);
@@ -260,8 +262,9 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
           {land.description && <section className="mt-8"><h2 className="font-display text-2xl text-brand mb-3">{t('land.description')}</h2><p className="text-ink/80 leading-relaxed whitespace-pre-line">{land.description}</p></section>}
           <section className="mt-8">
             <h2 className="font-display text-2xl text-brand mb-4">{t('land.location')}</h2>
-            <SingleLandMap land={land} />
+            <SingleLandMap land={land} onSelectedArea={setSelectedAreaHa} />
           </section>
+          {mode !== 'owner' && !isOwn && <LandAnalysis land={land} user={me} selectedAreaHa={selectedAreaHa ?? undefined} />}
         </div>
         <aside className="hidden lg:block"><div className="sticky top-28">{box}</div></aside>
       </div>

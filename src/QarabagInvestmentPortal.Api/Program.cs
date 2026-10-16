@@ -20,7 +20,37 @@ using QarabagInvestmentPortal.Api.Infrastructure.Persistence;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+static void LoadLocalEnvironment(string path)
+{
+    if (!File.Exists(path)) return;
+    foreach (var line in File.ReadLines(path))
+    {
+        var valueLine = line.Trim();
+        if (valueLine.Length == 0 || valueLine.StartsWith('#')) continue;
+        var separator = valueLine.IndexOf('=');
+        if (separator <= 0) continue;
+        var name = valueLine[..separator].Trim();
+        var value = valueLine[(separator + 1)..].Trim().Trim('"', '\'');
+        if (name.Length > 0 && Environment.GetEnvironmentVariable(name) is null)
+            Environment.SetEnvironmentVariable(name, value);
+    }
+}
+
+static string? FindRepositoryRoot(string start)
+{
+    for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
+        if (File.Exists(Path.Combine(dir.FullName, "frontend", "package.json"))) return dir.FullName;
+    return null;
+}
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Local, git-ignored development secrets are loaded from the repository root.
+var repositoryRoot = FindRepositoryRoot(builder.Environment.ContentRootPath);
+var localEnvironmentFile = repositoryRoot is null
+    ? Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "../../.env"))
+    : Path.Combine(repositoryRoot, ".env");
+LoadLocalEnvironment(localEnvironmentFile);
 
 // Local administrator list (git-ignored); see Features/Users/AdminAccounts.cs.
 builder.Configuration.AddJsonFile("admins.local.json", optional: true, reloadOnChange: false);
@@ -101,6 +131,7 @@ api.MapAuthEndpoints()
     .MapNotificationEndpoints()
     .MapAdminEndpoints()
     .MapRecommendationEndpoints()
+    .MapLandAnalysisEndpoints()
     .MapAssistantEndpoints();
 
 

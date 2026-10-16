@@ -396,19 +396,39 @@ export const PinPicker: React.FC<PinPickerProps> = ({ value, onChange, center, e
 };
 
 /** Single marker map for detail pages. */
-export const SingleLandMap: React.FC<{ land: Land }> = ({ land }) => {
+export const SingleLandMap: React.FC<{ land: Land; onSelectedArea?: (areaHa: number | null) => void }> = ({ land, onSelectedArea }) => {
   const { t } = useTranslation();
+  const [selecting, setSelecting] = useState(false);
+  const [selection, setSelection] = useState<BoundaryPath>([]);
+  const [selectionError, setSelectionError] = useState('');
+  const parcel = land.boundary?.coordinates?.[0] as BoundaryPath | undefined;
+  const finishSelection = () => {
+    if (selection.length < 3 || !isSimplePolygon(selection) || !parcel || !polygonContainedByRing(selection, parcel)) {
+      setSelectionError(t('analysis.invalidArea'));
+      return;
+    }
+    onSelectedArea?.(polygonAreaHa(selection)); setSelecting(false); setSelectionError('');
+  };
   if (!MAPS_KEY) {
     return <div className="rounded-2xl bg-sage p-5 text-sm"><MapPin className="inline w-4 h-4 mr-1 text-brand" aria-hidden="true" />{t(`regions.${land.region}`)} · {land.lat}, {land.lng}<p className="text-muted text-xs mt-1">{t('map.noKey')}</p></div>;
   }
   return (
+    <div>
+    <div className="mb-2 flex flex-wrap gap-2">
+      <button type="button" className={`btn ${selecting ? 'btn-primary' : 'btn-outline'} btn-sm`} disabled={!parcel} onClick={() => { setSelecting(v => !v); setSelection([]); setSelectionError(''); }}>{selecting ? t('analysis.cancelArea') : t('analysis.selectArea')}</button>
+      {selecting && <><span className="self-center text-xs text-muted">{t('analysis.clickArea')}</span><button type="button" className="btn btn-outline btn-sm" onClick={() => setSelection(p => p.slice(0, -1))}>{t('analysis.undoPoint')}</button><button type="button" className="btn btn-primary btn-sm" onClick={finishSelection}>{t('analysis.useArea')}</button></>}
+      {!parcel && <span className="self-center text-xs text-muted">{t('analysis.areaBoundaryRequired')}</span>}
+    </div>
+    {selectionError && <p role="alert" className="mb-2 text-sm text-red-700">{selectionError}</p>}
     <div className="h-72 rounded-2xl overflow-hidden border border-line">
       <APIProvider apiKey={MAPS_KEY}>
-        <Map defaultCenter={{ lat: land.lat, lng: land.lng }} defaultZoom={land.boundary?.coordinates?.[0] ? parcelZoom(land.areaHa) : 11} styles={MAP_STYLE} gestureHandling="cooperative" streetViewControl={false} mapTypeControl mapTypeControlOptions={MAP_TYPE_CONTROL_OPTIONS}>
+        <Map defaultCenter={{ lat: land.lat, lng: land.lng }} defaultZoom={parcel ? parcelZoom(land.areaHa) : 11} styles={MAP_STYLE} gestureHandling="cooperative" streetViewControl={false} mapTypeControl mapTypeControlOptions={MAP_TYPE_CONTROL_OPTIONS} onClick={selecting ? e => { if (e.detail.latLng) setSelection(p => [...p, [+e.detail.latLng!.lng.toFixed(6), +e.detail.latLng!.lat.toFixed(6)]]); } : undefined} draggableCursor={selecting ? 'crosshair' : undefined}>
           {(land.status === 'active' || land.status === 'closed') && land.boundary?.coordinates?.[0] && <BoundaryShape path={land.boundary.coordinates[0] as BoundaryPath} showVertices={false} strokeColor={groupColor(land.fieldType)} fillColor={groupColor(land.fieldType)} />}
+          {selection.length > 0 && <BoundaryShape path={selection} strokeColor="#D99A24" fillColor="#F2C14E" fillOpacity={0.32} />}
           <Marker position={{ lat: land.lat, lng: land.lng }} icon={markerIcon(groupColor(land.fieldType), land.isSpecial)} />
         </Map>
       </APIProvider>
+    </div>
     </div>
   );
 };

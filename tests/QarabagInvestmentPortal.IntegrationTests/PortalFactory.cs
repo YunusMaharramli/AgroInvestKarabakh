@@ -3,7 +3,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using QarabagInvestmentPortal.Api.Features.Users;
 using QarabagInvestmentPortal.Api.Infrastructure.Persistence;
+using System.Threading.RateLimiting;
 
 namespace QarabagInvestmentPortal.IntegrationTests;
 
@@ -52,6 +55,10 @@ public sealed class PortalFactory : WebApplicationFactory<Program>, IAsyncLifeti
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<AppDbContext>();
             services.AddDbContext<AppDbContext>(o => DatabaseSetup.Configure(o, _connectionString));
+            // Functional tests make many requests as the same admin; limiter behavior has separate unit tests.
+            services.PostConfigure<RateLimiterOptions>(options =>
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+                    _ => RateLimitPartition.GetNoLimiter<string>("tests")));
         });
     }
 

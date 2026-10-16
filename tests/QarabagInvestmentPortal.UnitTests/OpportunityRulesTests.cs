@@ -16,10 +16,10 @@ public sealed class OpportunityRulesTests
         new() { Id = "o", LandId = "land-x", Source = source, Status = status, ContactPhone = "+994 50 111 22 33", ApplicationDeadline = deadline };
 
     [Fact]
-    public void Owner_is_responsible_for_owner_listings_and_admins_for_admin_listings()
+    public void Admins_manage_legacy_owner_and_admin_listings()
     {
-        Assert.True(OpportunityMapping.IsResponsibleParty(Opp(OpportunitySource.Owner), OwnerLand(), new Viewer("owner", false)));
-        Assert.False(OpportunityMapping.IsResponsibleParty(Opp(OpportunitySource.Owner), OwnerLand(), new Viewer("admin", true)));
+        Assert.False(OpportunityMapping.IsResponsibleParty(Opp(OpportunitySource.Owner), OwnerLand(), new Viewer("owner", false)));
+        Assert.True(OpportunityMapping.IsResponsibleParty(Opp(OpportunitySource.Owner), OwnerLand(), new Viewer("admin", true)));
         Assert.False(OpportunityMapping.IsResponsibleParty(Opp(OpportunitySource.Owner), OwnerLand(), new Viewer("someone", false)));
         Assert.True(OpportunityMapping.IsResponsibleParty(Opp(OpportunitySource.Admin), LegacyLand(), new Viewer("admin", true)));
         Assert.False(OpportunityMapping.IsResponsibleParty(Opp(OpportunitySource.Admin), LegacyLand(), new Viewer("someone", false)));
@@ -27,7 +27,7 @@ public sealed class OpportunityRulesTests
     }
 
     [Fact]
-    public void Contact_phone_is_shown_only_to_proposers_the_responsible_party_and_admins()
+    public void Contact_phone_is_shown_only_to_proposers_and_admins()
     {
         var opp = Opp(OpportunitySource.Owner);
         var land = OwnerLand();
@@ -36,7 +36,7 @@ public sealed class OpportunityRulesTests
         Assert.Null(OpportunityMapping.ToDto(opp, land, Viewer.Anonymous, 0, null, Now).ContactPhone);
         Assert.Null(OpportunityMapping.ToDto(opp, land, new Viewer("investor", false), 0, null, Now).ContactPhone);
         Assert.Equal("+994 50 111 22 33", OpportunityMapping.ToDto(opp, land, new Viewer("investor", false), 1, mine, Now).ContactPhone);
-        Assert.Equal("+994 50 111 22 33", OpportunityMapping.ToDto(opp, land, new Viewer("owner", false), 1, null, Now).ContactPhone);
+        Assert.Null(OpportunityMapping.ToDto(opp, land, new Viewer("owner", false), 1, null, Now).ContactPhone);
         Assert.Equal("+994 50 111 22 33", OpportunityMapping.ToDto(opp, land, new Viewer("admin", true), 1, null, Now).ContactPhone);
     }
 

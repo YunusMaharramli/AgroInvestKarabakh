@@ -6,138 +6,162 @@ public sealed class ApplicantSignupRulesTests
 {
     private static readonly DateOnly Today = new(2026, 10, 15);
 
-    private static RegisterRequest Req(ApplicantType? type, string? fullName = "Əli Məmmədov", string? phone = "050 123 45 67",
-        string? company = null, string? voen = null, string? foreignTax = null, bool? terms = true, string password = "Parol-2026",
+    private static RegisterRequest Req(ApplicantType? type, string? fullName = "Ali Mammadov",
+        string? phone = "050 123 45 67", string? company = null, string? voen = null,
+        string? foreignTax = null, bool? terms = true, string password = "Parol-2026",
         string? confirm = null) =>
         new(null, null, "Test@Example.az", phone, password, confirm ?? password, company, voen, null,
             ApplicantType: type, FullName: fullName, ForeignTaxNumber: foreignTax, AcceptTerms: terms);
 
     [Fact]
-    public void Individual_needs_full_name_phone_and_terms()
+    public void Individual_registration_requires_name_phone_and_terms()
     {
         var (ok, error) = ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.Individual));
         Assert.Null(error);
         Assert.Equal(ApplicantType.Individual, ok!.Type);
-        Assert.Equal(("Əli", "Məmmədov"), (ok.FirstName, ok.LastName));
+        Assert.Equal(("Ali", "Mammadov"), (ok.FirstName, ok.LastName));
         Assert.Equal("test@example.az", ok.Email);
         Assert.Equal("+994 50 123 45 67", ok.Phone);
 
-        Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.Individual, fullName: "Əli")).Error);
+        Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.Individual, fullName: "Ali")).Error);
         Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.Individual, phone: null)).Error);
         Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.Individual, phone: "+7 912 345 67 89")).Error);
         Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.Individual, terms: false)).Error);
         Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.Individual, password: "short1")).Error);
-        Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.Individual, confirm: "Başqa-2026")).Error);
+        Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.Individual, confirm: "Other-2026")).Error);
     }
 
     [Fact]
-    public void Requests_without_a_type_keep_the_older_individual_form()
+    public void Requests_without_a_type_keep_the_legacy_individual_form()
     {
-        var legacy = new RegisterRequest("Test", "İstifadəçi", "a@b.az", "050 123 45 67", "Parol-2026", "Parol-2026", null, null, null);
+        var legacy = new RegisterRequest("Test", "User", "a@b.az", "050 123 45 67",
+            "Parol-2026", "Parol-2026", null, null, null);
         var (ok, error) = ApplicantSignupRules.ValidateRegistration(legacy);
         Assert.Null(error);
         Assert.Equal(ApplicantType.Individual, ok!.Type);
-        Assert.Equal("İstifadəçi", ok.LastName);
+        Assert.Equal("User", ok.LastName);
     }
 
     [Fact]
-    public void Legal_entity_needs_company_name_and_a_10_digit_voen()
+    public void Legal_entity_registration_retains_company_data_and_requires_contact_name()
     {
-        var (ok, error) = ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.LegalEntity, fullName: null, phone: null, company: "Aqro MMC", voen: "1234567890"));
+        var (ok, error) = ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.LegalEntity,
+            fullName: "Rashad Aliyev", company: "Aqro MMC", voen: "1234567890"));
         Assert.Null(error);
-        Assert.Equal("Aqro MMC", ok!.CompanyName);
-        Assert.Equal("Aqro MMC", ok.FirstName);
+        Assert.Equal("Rashad", ok!.FirstName);
+        Assert.Equal("Aqro MMC", ok.CompanyName);
         Assert.Equal("1234567890", ok.Voen);
-        Assert.Null(ok.Phone);
+        Assert.NotNull(ok.Phone);
 
+        Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.LegalEntity, fullName: null)).Error);
         Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.LegalEntity, company: "Aqro MMC", voen: "12345")).Error);
-        Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.LegalEntity, company: "", voen: "1234567890")).Error);
     }
 
     [Fact]
-    public void Foreign_individual_needs_no_phone()
+    public void Foreign_individual_registration_requires_an_international_phone()
     {
-        var (ok, error) = ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.ForeignIndividual, fullName: "John Smith", phone: null));
+        var (ok, error) = ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.ForeignIndividual,
+            fullName: "John Smith", phone: "+49 30 1234 5678"));
         Assert.Null(error);
-        Assert.Equal(ApplicantType.ForeignIndividual, ok!.Type);
-        Assert.Null(ok.Phone);
+        Assert.Equal("+493012345678", ok!.Phone);
+        Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.ForeignIndividual,
+            fullName: "John Smith", phone: null)).Error);
+        Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.ForeignIndividual,
+            fullName: "John Smith", phone: "030 1234 5678")).Error);
     }
 
     [Fact]
-    public void Foreign_entity_needs_a_foreign_tax_number_and_the_voen_is_optional()
+    public void Foreign_entity_registration_keeps_its_foreign_tax_number()
     {
-        var withoutVoen = ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.ForeignEntity, company: "Agro GmbH", foreignTax: "DE-123456789"));
-        Assert.Null(withoutVoen.Error);
-        Assert.Equal("DE-123456789", withoutVoen.Value!.ForeignTaxNumber);
-        Assert.Equal(string.Empty, withoutVoen.Value.Voen);
-
-        Assert.Null(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.ForeignEntity, company: "Agro GmbH", foreignTax: "DE123456789", voen: "9876543210")).Error);
-        Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.ForeignEntity, company: "Agro GmbH", foreignTax: "")).Error);
-        Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.ForeignEntity, company: "Agro GmbH", foreignTax: "DE1", voen: "12")).Error);
+        var valid = ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.ForeignEntity,
+            fullName: "Hans Muller", phone: "+49 30 1234 5678", company: "Agro GmbH", foreignTax: "DE-123456789"));
+        Assert.Null(valid.Error);
+        Assert.Equal("DE-123456789", valid.Value!.ForeignTaxNumber);
+        Assert.Equal(string.Empty, valid.Value.Voen);
+        Assert.NotNull(ApplicantSignupRules.ValidateRegistration(Req(ApplicantType.ForeignEntity,
+            fullName: "Hans Muller", phone: "+49 30 1234 5678", foreignTax: "D")).Error);
     }
 
     [Fact]
-    public void Individual_details_open_the_credit_and_fixed_income_amounts_only_when_answered_yes()
+    public void Individual_details_use_only_individual_capacity_fields()
     {
-        var noCredit = new InvestorDetailsRequest(MaritalStatus: MaritalStatus.Single, IncomeLast6Months: 12000, HasCredit: false,
-            MonthlyCreditPayment: 500, HasFixedIncome: false, FixedMonthlyIncome: 900, MinimumFunds: 20000);
-        var (d, error) = ApplicantSignupRules.ValidateDetails(ApplicantType.Individual, noCredit, Today);
+        var req = new InvestorDetailsRequest(MinimumFunds: 20000, IncomeStability: "stable",
+            MonthlyNetIncome: 1200, HasCredit: true, MonthlyCreditPayment: 500);
+        var (details, error) = ApplicantSignupRules.ValidateDetails(ApplicantType.Individual, req, Today);
         Assert.Null(error);
-        Assert.Null(d!.MonthlyCreditPayment);   // ignored when there is no credit
-        Assert.Null(d.FixedMonthlyIncome);      // ignored when there is no fixed income
+        Assert.Equal("STABLE", details!.IncomeStability);
+        Assert.Equal(1200m, details.MonthlyNetIncome);
+        Assert.Equal(20000m, details.MinimumFunds);
+        Assert.Null(details.HasCredit);
+        Assert.Null(details.MonthlyCreditPayment);
+        Assert.Null(details.Country);
 
-        var withCredit = noCredit with { HasCredit = true, MonthlyCreditPayment = null };
-        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.Individual, withCredit, Today).Error);
-        var withFixed = noCredit with { HasFixedIncome = true, FixedMonthlyIncome = 1500 };
-        Assert.Equal(1500, ApplicantSignupRules.ValidateDetails(ApplicantType.Individual, withFixed, Today).Value!.FixedMonthlyIncome);
-
-        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.Individual, noCredit with { MaritalStatus = null }, Today).Error);
-        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.Individual, noCredit with { MinimumFunds = -1 }, Today).Error);
+        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.Individual,
+            req with { IncomeStability = null }, Today).Error);
+        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.Individual,
+            req with { MonthlyNetIncome = null }, Today).Error);
+        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.Individual,
+            req with { MinimumFunds = -1 }, Today).Error);
     }
 
     [Fact]
-    public void Foreign_individual_details()
+    public void Foreign_individual_details_require_own_countries_and_residency()
     {
-        var req = new InvestorDetailsRequest(ResidencyStatus: "temporary_resident", Address: "Bakı, Nizami küç. 1", IncomeSource: "Maaş",
-            HasCredit: true, MonthlyCreditPayment: 300, MinimumFunds: 50000);
-        var (d, error) = ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignIndividual, req, Today);
+        var req = new InvestorDetailsRequest(MinimumFunds: 50000, IncomeStability: "SEASONAL",
+            MonthlyNetIncome: 2000, CitizenshipCountry: "US", ResidenceCountry: "AZ",
+            ResidencyStatus: "temporary_resident");
+        var (details, error) = ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignIndividual, req, Today);
         Assert.Null(error);
-        Assert.Equal("TEMPORARY_RESIDENT", d!.ResidencyStatus);
-        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignIndividual, req with { ResidencyStatus = "TOURIST" }, Today).Error);
-        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignIndividual, req with { IncomeSource = " " }, Today).Error);
+        Assert.Equal("TEMPORARY_RESIDENT", details!.ResidencyStatus);
+        Assert.Equal("US", details.CitizenshipCountry);
+        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignIndividual,
+            req with { ResidencyStatus = "TOURIST" }, Today).Error);
+        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignIndividual,
+            req with { CitizenshipCountry = "AZ" }, Today).Error);
     }
 
     [Fact]
-    public void Foreign_entity_details_need_a_country_from_the_list()
+    public void Foreign_entity_details_require_company_identity_and_finances()
     {
-        var req = new InvestorDetailsRequest(Country: "de", ActivityStatus: "BRANCH", Address: "Berlin", MainActivity: "Taxılçılıq", CeoName: "Hans Müller");
-        var (d, error) = ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignEntity, req, Today);
+        var req = new InvestorDetailsRequest(CompanyName: "Agro GmbH", LegalForm: "GmbH",
+            Address: "Berlin", MainActivity: "Agriculture", RepresentativeRole: "Director",
+            RegistrationDate: new DateOnly(2015, 3, 1), AnnualRevenue: 500000, MinimumFunds: 100000,
+            Country: "de", ForeignTaxNumber: "DE-123456789");
+        var (details, error) = ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignEntity, req, Today);
         Assert.Null(error);
-        Assert.Equal("DE", d!.Country);
-        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignEntity, req with { Country = "Germany" }, Today).Error);
-        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignEntity, req with { Country = "AZ" }, Today).Error);
-        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignEntity, req with { CeoName = null }, Today).Error);
+        Assert.Equal("DE", details!.Country);
+        Assert.Equal("DE-123456789", details.ForeignTaxNumber);
+        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignEntity,
+            req with { Country = "AZ" }, Today).Error);
+        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.ForeignEntity,
+            req with { ForeignTaxNumber = null }, Today).Error);
     }
 
     [Fact]
-    public void Legal_entity_details_need_a_past_start_date()
+    public void Legal_entity_details_require_past_registration_and_voen()
     {
-        var req = new InvestorDetailsRequest(Address: "Ağdam", MainActivity: "Pambıqçılıq", ActivityStartDate: new DateOnly(2015, 3, 1),
-            CeoName: "Rəşad Əliyev", MinimumFunds: 250000);
+        var req = new InvestorDetailsRequest(CompanyName: "Aqro MMC", TaxIdentificationNumber: "1234567890",
+            LegalForm: "MMC", Address: "Aghdam", MainActivity: "Crops", RepresentativeRole: "Director",
+            RegistrationDate: new DateOnly(2015, 3, 1), AnnualRevenue: 500000, MinimumFunds: 250000);
         Assert.Null(ApplicantSignupRules.ValidateDetails(ApplicantType.LegalEntity, req, Today).Error);
-        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.LegalEntity, req with { ActivityStartDate = Today.AddDays(1) }, Today).Error);
-        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.LegalEntity, req with { MinimumFunds = null }, Today).Error);
+        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.LegalEntity,
+            req with { RegistrationDate = Today.AddDays(1) }, Today).Error);
+        Assert.NotNull(ApplicantSignupRules.ValidateDetails(ApplicantType.LegalEntity,
+            req with { TaxIdentificationNumber = "12" }, Today).Error);
     }
 
     [Fact]
-    public void Applying_details_clears_fields_of_other_types()
+    public void Applying_details_clears_fields_of_other_applicant_types()
     {
         var profile = new UserProfile { HasFixedIncome = true, FixedMonthlyIncome = 999, Country = "TR" };
-        var (d, _) = ApplicantSignupRules.ValidateDetails(ApplicantType.LegalEntity,
-            new InvestorDetailsRequest(Address: "Şuşa", MainActivity: "Bağçılıq", ActivityStartDate: new DateOnly(2020, 1, 1), CeoName: "X Y", MinimumFunds: 1), Today);
-        ApplicantSignupRules.Apply(profile, d!);
+        var req = new InvestorDetailsRequest(CompanyName: "Aqro MMC", TaxIdentificationNumber: "1234567890",
+            LegalForm: "MMC", Address: "Shusha", MainActivity: "Orchards", RepresentativeRole: "Director",
+            RegistrationDate: new DateOnly(2020, 1, 1), AnnualRevenue: 500000, MinimumFunds: 1);
+        var (details, error) = ApplicantSignupRules.ValidateDetails(ApplicantType.LegalEntity, req, Today);
+        Assert.Null(error);
+        ApplicantSignupRules.Apply(profile, details!);
         Assert.Null(profile.FixedMonthlyIncome);
         Assert.Null(profile.Country);
-        Assert.Equal("Bağçılıq", profile.BusinessActivity);
+        Assert.Equal("Orchards", profile.BusinessActivity);
     }
 }

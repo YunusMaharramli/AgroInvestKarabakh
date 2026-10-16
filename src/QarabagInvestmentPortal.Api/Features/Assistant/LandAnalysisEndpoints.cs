@@ -63,10 +63,9 @@ public static class LandAnalysisEndpoints
             if (body.Criteria is { } criteria && ((criteria.PreferredUses?.Count ?? 0) > 30 || (criteria.PreferredRegions?.Count ?? 0) > 30
                 || criteria.RiskTolerance?.Length > 30))
                 return Results.BadRequest(new { error = "İnvestor meyarlarının həcmi icazə verilən həddi aşır." });
-            if (!Allow(userId)) return Results.StatusCode(StatusCodes.Status429TooManyRequests);
-
             var user = await db.Users.AsNoTracking().Include(x => x.Profile).SingleOrDefaultAsync(x => x.Id == userId, ct);
             if (user is null || user.Role != UserRole.User) return Results.Forbid();
+            if (!Allow(userId)) return Results.StatusCode(StatusCodes.Status429TooManyRequests);
             var key = NonBlank(config["Gemini:ApiKey"])
                 ?? NonBlank(config["GeminiAnalysis:ApiKey"])
                 ?? NonBlank(Environment.GetEnvironmentVariable("GEMINI_API_KEY"));

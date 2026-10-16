@@ -37,7 +37,8 @@ public sealed class InvestorSignupTests(PortalFactory factory)
 
         var register = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            applicantType = "LEGAL_ENTITY", companyName = "Qarabağ Aqro MMC", email, taxIdentificationNumber = voen,
+            applicantType = "LEGAL_ENTITY", fullName = "Rashad Aliyev", phone = "+994 50 123 45 67",
+            companyName = "Qarabağ Aqro MMC", email, taxIdentificationNumber = voen,
             password = Password, confirmPassword = Password, acceptTerms = true,
         });
         Assert.Equal(HttpStatusCode.Created, register.StatusCode);
@@ -46,7 +47,8 @@ public sealed class InvestorSignupTests(PortalFactory factory)
         // Same VÖEN cannot be used twice.
         var duplicate = await client.PostAsJsonAsync("/api/auth/register", new
         {
-            applicantType = "LEGAL_ENTITY", companyName = "Başqa MMC", email = $"other-{Guid.NewGuid():N}@test.az", taxIdentificationNumber = voen,
+            applicantType = "LEGAL_ENTITY", fullName = "Other Director", phone = "+994 50 123 45 67",
+            companyName = "Başqa MMC", email = $"other-{Guid.NewGuid():N}@test.az", taxIdentificationNumber = voen,
             password = Password, confirmPassword = Password, acceptTerms = true,
         });
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
@@ -57,8 +59,10 @@ public sealed class InvestorSignupTests(PortalFactory factory)
         Assert.Equal("LEGAL_ENTITY", status.GetProperty("applicantType").GetString());
         var details = new
         {
-            signupToken, address = "Ağdam r., Quzanlı", mainActivity = "Taxılçılıq", activityStartDate = "2018-04-01",
-            ceoName = "Rəşad Əliyev", minimumFunds = 250000,
+            signupToken, companyName = "Qarabağ Aqro MMC", taxIdentificationNumber = voen,
+            legalForm = "MMC", address = "Ağdam r., Quzanlı", mainActivity = "Taxılçılıq",
+            registrationDate = "2018-04-01", representativeRole = "Director",
+            annualRevenue = 700000, minimumFunds = 250000,
         };
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/auth/signup/details", details)).StatusCode);
 
@@ -71,7 +75,7 @@ public sealed class InvestorSignupTests(PortalFactory factory)
         var early = await Read(await client.PostAsJsonAsync("/api/auth/login", new { email, password = Password }));
         Assert.True(early.GetProperty("user").GetProperty("needsOnboarding").GetBoolean());
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/auth/signup/details", details with { ceoName = "" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/auth/signup/details", details with { representativeRole = "" })).StatusCode);
         var done = await client.PostAsJsonAsync("/api/auth/signup/details", details);
         Assert.Equal(HttpStatusCode.OK, done.StatusCode);
         var body = await Read(done);
@@ -80,7 +84,7 @@ public sealed class InvestorSignupTests(PortalFactory factory)
         Assert.Equal("LEGAL_ENTITY", user.GetProperty("applicantType").GetString());
         Assert.False(user.GetProperty("needsOnboarding").GetBoolean());
         Assert.Equal(voen, body.GetProperty("profile").GetProperty("taxIdentificationNumber").GetString());
-        Assert.Equal("Rəşad Əliyev", body.GetProperty("profile").GetProperty("ceoName").GetString());
+        Assert.Equal("Director", body.GetProperty("profile").GetProperty("representativeRole").GetString());
 
         // The sign-up token is used up and the profile is visible to the signed-in investor.
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/api/auth/signup/status", new { signupToken })).StatusCode);
@@ -106,15 +110,15 @@ public sealed class InvestorSignupTests(PortalFactory factory)
         var client = await factory.LoginAsync(email, Password);
         var details = new
         {
-            maritalStatus = "MARRIED", incomeLast6Months = 18000, hasCredit = true, monthlyCreditPayment = 0,
-            hasFixedIncome = false, minimumFunds = 30000,
+            incomeStability = "STABLE", monthlyNetIncome = 0,
+            minimumFunds = 30000,
         };
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/auth/signup/details", details)).StatusCode);
-        var done = await client.PostAsJsonAsync("/api/auth/signup/details", details with { monthlyCreditPayment = 450 });
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/auth/signup/details", details with { incomeStability = "" })).StatusCode);
+        var done = await client.PostAsJsonAsync("/api/auth/signup/details", details with { monthlyNetIncome = 1450 });
         Assert.Equal(HttpStatusCode.OK, done.StatusCode);
         var profile = (await Read(done)).GetProperty("profile");
-        Assert.Equal("MARRIED", profile.GetProperty("maritalStatus").GetString());
-        Assert.Equal(450m, profile.GetProperty("monthlyCreditPayment").GetDecimal());
+        Assert.Equal("STABLE", profile.GetProperty("incomeStability").GetString());
+        Assert.Equal(1450m, profile.GetProperty("monthlyNetIncome").GetDecimal());
     }
 
     [Fact]

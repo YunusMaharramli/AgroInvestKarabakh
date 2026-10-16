@@ -248,7 +248,13 @@ export const LandsMap: React.FC<{ lands: Land[]; height?: string; detailHref?: (
               <h3 className="mt-1 font-display text-xl text-brand">{name(selectionResult.land)}</h3>
               <p className="text-sm text-muted mt-1">{t(`fieldTypes.${selectionResult.land.fieldType}`)} · {t(`regions.${selectionResult.land.region}`)}</p>
             </div>
-            <Link to={href(selectionResult.land)} className="btn btn-primary btn-sm">{t('map.details')} →</Link>
+            <div className="flex flex-wrap gap-2">
+              <Link to={href(selectionResult.land)} className="btn btn-outline btn-sm">{t('map.details')} →</Link>
+              {selectionResult.land.acceptingApplications && selectionResult.land.opportunityId && <Link
+                to={`${href(selectionResult.land)}?${new URLSearchParams({ apply: '1', areaHa: selectionResult.areaHa.toFixed(2), amount: String(Math.round(selectionResult.amount)) })}`}
+                className="btn btn-primary btn-sm"
+              >{t('map.applyCompetition')}</Link>}
+            </div>
           </div>
           <div className="grid sm:grid-cols-3 gap-3 mt-4">
             <div className="rounded-xl bg-white p-3"><p className="text-xs text-muted">{t('map.selectedArea')}</p><p className="font-bold text-brand mt-1">{t('land.ha', { n: f.num(selectionResult.areaHa, 2) })}</p></div>

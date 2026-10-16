@@ -72,7 +72,7 @@ const EGOV_ICONS: Record<EGovMethod, React.ReactNode> = {
   visitor: <Globe2 className="w-5 h-5" aria-hidden="true" />,
 };
 
-/** State e-service sign-in options (myGov ID, ASAN İmza, SİMA, e-qanun.az). Shown in the design; not connected yet. */
+/** State e-service sign-in options (myGov ID, ASAN İmza, SİMA, e-qanun.az). */
 const EGovOptions: React.FC<{ methods: EGovMethod[] }> = ({ methods }) => {
   const { t } = useTranslation();
   const toast = useToast();
@@ -80,9 +80,27 @@ const EGovOptions: React.FC<{ methods: EGovMethod[] }> = ({ methods }) => {
     <ul className="grid gap-3" aria-label={t('auth.egov.title')}>
       {methods.map(m => (
         <li key={m} className="relative">
-          <button type="button" onClick={() => toast(t('auth.egov.soon'), 'info')}
+          <button type="button" onClick={() => {
+            if (m === 'mygov') {
+              window.location.assign('https://mygovid.gov.az/auth');
+              return;
+            }
+            if (m === 'asan') {
+              window.location.assign('https://asanimza.az/wp-login.php');
+              return;
+            }
+            toast(t('auth.egov.soon'), 'info');
+          }}
             className="w-full flex items-center gap-4 rounded-2xl border border-line bg-white pl-4 pr-14 py-4 text-left transition hover:border-brand hover:shadow-sm focus-visible:border-brand">
-            <span className="w-10 h-10 shrink-0 rounded-xl bg-sage text-brand grid place-items-center">{EGOV_ICONS[m]}</span>
+            <span className={`shrink-0 rounded-xl grid place-items-center ${m === 'mygov' || m === 'asan' || m === 'sima' ? 'w-12 h-12 bg-white' : 'w-10 h-10 bg-sage text-brand'}`}>
+              {m === 'mygov'
+                ? <img src="/brand/mygov-id.png" alt="" aria-hidden="true" className="w-full h-full rounded-xl object-contain" />
+                : m === 'asan'
+                  ? <img src="/brand/asan-imza.png" alt="" aria-hidden="true" className="w-full h-full rounded-xl object-contain" />
+                  : m === 'sima'
+                    ? <img src="/brand/sima-imza.png" alt="" aria-hidden="true" className="w-full h-full rounded-xl object-contain" />
+                    : EGOV_ICONS[m]}
+            </span>
             <span className="font-bold text-brand">{t(`auth.egov.${m}`)}</span>
           </button>
           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted" title={t(`auth.egov.info.${m}`)}>

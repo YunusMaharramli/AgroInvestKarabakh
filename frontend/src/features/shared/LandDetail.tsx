@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronLeft, ChevronRight, Eye, Heart, Inbox, Info, Landmark, MapPin, ShieldAlert, ShieldCheck, Star, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
@@ -38,17 +38,19 @@ const Lightbox: React.FC<{ photos: string[]; index: number; onClose: () => void;
   );
 };
 
-const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> = ({ land, open, onClose }) => {
+const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void; initialAmount?: number; selectedAreaHa?: number }> = ({ land, open, onClose, initialAmount, selectedAreaHa }) => {
   const { t } = useTranslation();
   const f = useFormat();
   const toast = useToast();
-  const [amount, setAmount] = useState(String(land.investmentMin));
+  const [amount, setAmount] = useState(String(initialAmount ?? land.investmentMin));
   const [model, setModel] = useState<InvestmentModel>(land.investmentModel);
   const me = useCurrentUser();
+  const profile = me?.investorProfile;
+  const isCompany = me?.applicantType === 'LEGAL_ENTITY' || me?.applicantType === 'FOREIGN_ENTITY';
   const [duration, setDuration] = useState(String(land.durationMonths || 24));
-  const [applicantType, setApplicantType] = useState('individual');
-  const [applicantName, setApplicantName] = useState(me?.fullName ?? '');
-  const [taxNumber, setTaxNumber] = useState('');
+  const [applicantType, setApplicantType] = useState(isCompany ? 'company' : 'individual');
+  const [applicantName, setApplicantName] = useState(isCompany ? profile?.companyName || me?.fullName || '' : me?.fullName ?? '');
+  const [taxNumber, setTaxNumber] = useState(profile?.taxIdentificationNumber ?? '');
   const [contactPhone, setContactPhone] = useState(me?.phone ?? '');
   const [documents, setDocuments] = useState<File[]>([]);
   const [message, setMessage] = useState('');
@@ -70,7 +72,8 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
     if (Object.keys(er).length) return;
     setBusy(true);
     try {
-      await requestService.create({ landId: land.id, amount: a, investmentModel: model, durationMonths: Number(duration), message: message.trim(), applicantType, applicantName, taxNumber, contactPhone, documents,
+      const selectedAreaNote = selectedAreaHa ? t('investor.detail.selectedAreaNote', { area: f.num(selectedAreaHa, 2) }) : '';
+      await requestService.create({ landId: land.id, amount: a, investmentModel: model, durationMonths: Number(duration), message: [selectedAreaNote, message.trim()].filter(Boolean).join('\n\n'), applicantType, applicantName, taxNumber, contactPhone, documents,
         projectCosts: projectCosts ? Number(projectCosts) : null, fundingGap: fundingGap ? Number(fundingGap) : null,
         additionalFinancingRequested: additionalFinancing ? Number(additionalFinancing) : null, expectedAnnualRevenue: expectedRevenue ? Number(expectedRevenue) : null, expectedProduction });
       toast(t('investor.detail.sentToast'));
@@ -82,6 +85,7 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
   return (
     <Modal open={open} onClose={onClose} title={t('investor.detail.modalTitle')}>
       <form onSubmit={submit} className="grid gap-4">
+        {selectedAreaHa && <p className="rounded-xl bg-sage p-3 text-sm text-brand">{t('investor.detail.selectedAreaNote', { area: f.num(selectedAreaHa, 2) })}</p>}
         <Field label={t('competition.applicantType')} htmlFor="inv-type"><select id="inv-type" className="field" value={applicantType} onChange={e => setApplicantType(e.target.value)}><option value="individual">{t('competition.individual')}</option><option value="company">{t('competition.company')}</option></select></Field>
         <Field label={t('competition.applicantName')} htmlFor="inv-name"><input id="inv-name" className="field" value={applicantName} onChange={e => setApplicantName(e.target.value)} required minLength={3} maxLength={200} /></Field>
         <Field label={t('competition.taxNumber')} htmlFor="inv-tax"><input id="inv-tax" className="field" value={taxNumber} onChange={e => setTaxNumber(e.target.value)} required={applicantType === 'company'} pattern="[0-9]{10}" maxLength={10} /></Field>
@@ -122,6 +126,7 @@ const InvestModal: React.FC<{ land: Land; open: boolean; onClose: () => void }> 
 /** Land detail (Part 2, 4.3). mode: public website, investor cabinet, or owner cabinet (owner-only stats). */
 export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = ({ mode }) => {
   const { id = '' } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
   const f = useFormat();
   const lp = useLocalePath();
@@ -134,8 +139,27 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
   const { has, toggle } = useCompare();
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [invest, setInvest] = useState(false);
+  const [applicationPrefill, setApplicationPrefill] = useState<{ areaHa: number; amount: number } | null>(null);
   const [why, setWhy] = useState(false);
   const [selectedAreaHa, setSelectedAreaHa] = useState<number | null>(null);
+  const applyRequested = searchParams.get('apply') === '1';
+  const applicationArea = Number(searchParams.get('areaHa'));
+  const applicationAmount = Number(searchParams.get('amount'));
+
+  useEffect(() => {
+    if (!applyRequested || !land || !me) return;
+    const validSelection = Number.isFinite(applicationArea) && applicationArea > 0 && applicationArea <= land.areaHa * 1.005
+      && Number.isFinite(applicationAmount) && applicationAmount > 0;
+    if (validSelection && land.status === 'active' && land.acceptingApplications && !me.isAdmin && land.ownerId !== me.id && !myRequest) {
+      setApplicationPrefill({ areaHa: applicationArea, amount: applicationAmount });
+      setInvest(true);
+    }
+    setSearchParams(current => {
+      const next = new URLSearchParams(current);
+      next.delete('apply'); next.delete('areaHa'); next.delete('amount');
+      return next;
+    }, { replace: true });
+  }, [applyRequested, applicationArea, applicationAmount, land?.id, me?.id, myRequest?.id, setSearchParams]);
 
   useEffect(() => { if (land && mode !== 'owner') landService.addView(land.id); }, [id]);
   const score = useMemo(() => (land ? scoreLand(land, me?.preferences ?? {}) : null), [land, me?.preferences]);
@@ -268,7 +292,7 @@ export const LandDetail: React.FC<{ mode: 'public' | 'investor' | 'owner' }> = (
         </div>
         <aside className="hidden lg:block"><div className="sticky top-28">{box}</div></aside>
       </div>
-      {invest && <InvestModal land={land} open={invest} onClose={() => setInvest(false)} />}
+      {invest && <InvestModal land={land} open={invest} initialAmount={applicationPrefill?.amount} selectedAreaHa={applicationPrefill?.areaHa} onClose={() => { setInvest(false); setApplicationPrefill(null); }} />}
     </div>
   );
 };

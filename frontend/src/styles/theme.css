@@ -91,6 +91,131 @@
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 
+/* Investor and admin workspaces: a warmer, softer extension of the public home-page palette. */
+.agro-cabinet-investor,
+.agro-admin-shell {
+  background-color: #f6f4ec;
+  background-image:
+    radial-gradient(ellipse at 8% 0%, rgba(201, 165, 76, 0.11), transparent 34rem),
+    radial-gradient(ellipse at 92% 8%, rgba(94, 140, 58, 0.08), transparent 38rem),
+    linear-gradient(180deg, #faf8f3 0%, #f4f3eb 100%);
+}
+
+.agro-cabinet-investor .agro-panel-header,
+.agro-admin-shell .agro-panel-header {
+  background: rgba(250, 248, 243, 0.9);
+  border-color: rgba(226, 221, 208, 0.9);
+  box-shadow: 0 6px 24px rgba(20, 54, 33, 0.045);
+}
+
+.agro-cabinet-investor .agro-panel-sidebar,
+.agro-admin-shell .agro-panel-sidebar {
+  background: linear-gradient(180deg, #1f4d2e 0%, #143621 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 8px 0 28px rgba(20, 54, 33, 0.12);
+}
+
+.agro-cabinet-investor .agro-panel-sidebar nav a,
+.agro-admin-shell .agro-panel-sidebar nav a {
+  color: rgba(250, 248, 243, 0.86);
+  border: 1px solid transparent;
+}
+
+.agro-cabinet-investor .agro-panel-sidebar nav a[aria-current="page"],
+.agro-admin-shell .agro-panel-sidebar nav a[aria-current="page"] {
+  color: #173b23;
+  background: linear-gradient(110deg, #fffdf7, #f4ecd6);
+  border-color: rgba(201, 165, 76, 0.7);
+  box-shadow: 0 5px 16px rgba(10, 29, 17, 0.2);
+}
+
+.agro-cabinet-investor .agro-panel-sidebar nav a:not([aria-current="page"]):hover,
+.agro-admin-shell .agro-panel-sidebar nav a:not([aria-current="page"]):hover {
+  color: #fffdf7;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.agro-cabinet-investor .agro-panel-sidebar > p,
+.agro-admin-shell .agro-panel-sidebar > p {
+  color: rgba(250, 248, 243, 0.72);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.agro-cabinet-investor .agro-panel-sidebar button,
+.agro-admin-shell .agro-panel-sidebar button {
+  color: rgba(250, 248, 243, 0.86);
+}
+
+.agro-cabinet-investor .agro-panel-sidebar button:hover,
+.agro-admin-shell .agro-panel-sidebar button:hover {
+  color: #fffdf7;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.agro-cabinet-investor .agro-panel-main .card,
+.agro-admin-shell .agro-panel-main .card {
+  background-color: rgba(255, 255, 255, 0.97);
+  border-color: rgba(201, 165, 76, 0.2);
+  border-radius: 1.4rem;
+  box-shadow: 0 2px 5px rgba(20, 54, 33, 0.035), 0 14px 34px rgba(20, 54, 33, 0.09);
+}
+
+.agro-cabinet-investor .agro-panel-main a.card,
+.agro-admin-shell .agro-panel-main a.card {
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.agro-cabinet-investor .agro-panel-main a.card:hover,
+.agro-admin-shell .agro-panel-main a.card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(201, 165, 76, 0.55);
+  box-shadow: 0 6px 12px rgba(20, 54, 33, 0.05), 0 18px 36px rgba(20, 54, 33, 0.1);
+}
+
+.agro-cabinet-investor .agro-panel-main .field,
+.agro-admin-shell .agro-panel-main .field {
+  border-color: #ded8c8;
+  border-radius: 0.9rem;
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.agro-cabinet-investor .agro-panel-main .field:focus,
+.agro-admin-shell .agro-panel-main .field:focus {
+  border-color: #5e8c3a;
+  box-shadow: 0 0 0 4px rgba(94, 140, 58, 0.13);
+}
+
+.agro-cabinet-investor .agro-panel-main .btn-primary,
+.agro-admin-shell .agro-panel-main .btn-primary {
+  box-shadow: 0 5px 14px rgba(31, 77, 46, 0.16);
+}
+
+.agro-cabinet-investor .agro-panel-main .btn-primary:hover:not(:disabled),
+.agro-admin-shell .agro-panel-main .btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(31, 77, 46, 0.2);
+}
+
+.agro-cabinet-investor .agro-panel-mobile-nav,
+.agro-admin-shell .agro-panel-mobile-nav {
+  background: rgba(250, 248, 243, 0.96);
+  border-color: rgba(226, 221, 208, 0.95);
+  box-shadow: 0 -8px 24px rgba(20, 54, 33, 0.07);
+  backdrop-filter: blur(16px);
+}
+
+.agro-cabinet-investor .agro-panel-mobile-nav a[aria-current="page"],
+.agro-admin-shell .agro-panel-mobile-nav a[aria-current="page"] {
+  color: #1f4d2e;
+  background: linear-gradient(180deg, rgba(232, 239, 228, 0.8), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agro-cabinet-investor .agro-panel-main a.card,
+  .agro-admin-shell .agro-panel-main a.card { transition: none; }
+}
+
 input[type=range].range-thumb { pointer-events: none; -webkit-appearance: none; appearance: none; background: transparent; }
 input[type=range].range-thumb::-webkit-slider-thumb { pointer-events: auto; -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 3px solid var(--color-brand); cursor: pointer; }
 input[type=range].range-thumb::-moz-range-thumb { pointer-events: auto; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 3px solid var(--color-brand); cursor: pointer; }

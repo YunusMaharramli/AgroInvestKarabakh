@@ -273,6 +273,7 @@
     "selectedArea": "Seçilmiş sahə",
     "remainingArea": "Torpaq sahəsinin qalan hissəsi",
     "estimatedInvestment": "Təxmini investisiya ehtiyacı",
+    "applyCompetition": "Müsabiqəyə müraciət",
     "investmentEstimateNote": "Məbləğ elandakı ümumi investisiya ehtiyacının sahəyə uyğun proporsional hesablanmasıdır. Torpağın alış qiyməti və ya məcburi təklif deyil."
   },
   "groups": {
@@ -944,6 +945,7 @@
       "alreadySent": "Bu torpaq üçün artıq müraciət göndərmisiniz.",
       "modalTitle": "Müraciətlər",
       "amount": "Məbləğ (AZN)",
+      "selectedAreaNote": "Xəritədə seçilmiş sahə: {{area}} ha. Bu sahə və məbləğ müraciətə əlavə olunacaq.",
       "message": "İnvestisiya və biznes planı",
       "sentToast": "Müraciət göndərildi! Onu “İnvestisiyalarım”da izləyə bilərsiniz.",
       "goal": "Hədəf: {{amount}}",

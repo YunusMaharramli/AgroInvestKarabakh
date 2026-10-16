@@ -273,6 +273,7 @@
     "selectedArea": "Selected area",
     "remainingArea": "Area remaining in parcel",
     "estimatedInvestment": "Indicative investment estimate",
+    "applyCompetition": "Apply to competition",
     "investmentEstimateNote": "This estimate is proportional to the listing’s investment requirement by area. It is not a land purchase price or a binding offer."
   },
   "groups": {
@@ -944,6 +945,7 @@
       "alreadySent": "You have already sent a request for this land.",
       "modalTitle": "Applications",
       "amount": "Amount (AZN)",
+      "selectedAreaNote": "Selected map area: {{area}} ha. This area and its estimate will be included in your application.",
       "message": "Investment and business plan",
       "sentToast": "Request sent! You can follow it in My Investments.",
       "goal": "Goal: {{amount}}",

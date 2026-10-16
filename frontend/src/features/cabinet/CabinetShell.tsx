@@ -124,9 +124,9 @@ export const CabinetShell: React.FC<{ role: CabinetRole; nav: NavItem[] }> = ({ 
   const accent = investor ? '#C9A54C' : '#1F4D2E';
 
   return (
-    <div className="min-h-[100svh] bg-cream" style={{ ['--accent' as string]: accent }}>
+    <div className={`agro-cabinet ${investor ? 'agro-cabinet-investor' : 'agro-cabinet-owner'} min-h-[100svh] bg-cream`} style={{ ['--accent' as string]: accent }}>
       {/* Top bar */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-line">
+      <header className="agro-panel-header sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-line">
         <div className="flex items-center gap-3 h-16 px-4 lg:px-6">
           <Link to={lp(investor ? '/investor' : '/owner')} aria-label={t(investor ? 'cabinet.investorBadge' : 'cabinet.ownerBadge')} className="flex items-center gap-3 min-w-0">
             <span className="sm:hidden"><Logo compact /></span><span className="hidden sm:inline"><Logo /></span>
@@ -143,7 +143,7 @@ export const CabinetShell: React.FC<{ role: CabinetRole; nav: NavItem[] }> = ({ 
 
       <div className="flex">
         {/* Sidebar (desktop) */}
-        <aside className={`hidden lg:flex flex-col sticky top-16 h-[calc(100svh-4rem)] border-r border-line bg-white transition-all ${collapsed ? 'w-[76px]' : 'w-64'}`}>
+        <aside className={`agro-panel-sidebar hidden lg:flex flex-col sticky top-16 h-[calc(100svh-4rem)] border-r border-line bg-white transition-all ${collapsed ? 'w-[76px]' : 'w-64'}`}>
           <nav aria-label={investor ? t('cabinet.investorBadge') : t('cabinet.ownerBadge')} className="flex-1 p-3 flex flex-col gap-1">
             {nav.map(n => (
               <NavLink key={n.to} to={n.to} end={n.end} title={collapsed ? n.label : undefined}
@@ -163,13 +163,13 @@ export const CabinetShell: React.FC<{ role: CabinetRole; nav: NavItem[] }> = ({ 
           </div>
         </aside>
 
-        <main id="main" className={`flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-8 ${investor ? 'pb-44 lg:pb-32' : 'pb-28 lg:pb-12'}`}>
+        <main id="main" className={`agro-panel-main flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-8 ${investor ? 'pb-44 lg:pb-32' : 'pb-28 lg:pb-12'}`}>
           <Suspense fallback={<div className="grid gap-4" aria-busy="true"><div className="skeleton h-10 w-72" /><div className="skeleton h-40" /><div className="skeleton h-40" /></div>}><Outlet /></Suspense>
         </main>
       </div>
 
       {/* Bottom tab bar (mobile) */}
-      <nav aria-label={investor ? t('cabinet.investorBadge') : t('cabinet.ownerBadge')} className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-line grid" style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0,1fr))` }}>
+      <nav aria-label={investor ? t('cabinet.investorBadge') : t('cabinet.ownerBadge')} className="agro-panel-mobile-nav lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-line grid" style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0,1fr))` }}>
         {nav.map(n => (
           <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `flex flex-col items-center gap-0.5 py-2 text-[0.6rem] font-bold leading-tight text-center ${isActive ? (investor ? 'text-gold-dark' : 'text-brand') : 'text-muted'}`}>
             <span aria-hidden="true">{n.icon}</span><span className="line-clamp-2 px-0.5 break-words hyphens-auto">{n.label}</span>

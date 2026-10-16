@@ -70,8 +70,8 @@ export const AdminShell: React.FC = () => {
     { to: lp('/admin/lands/new'), label: t('admin.nav.add'), icon: <Plus className="w-5 h-5" /> },
   ];
   return (
-    <div className="min-h-[100svh] bg-cream">
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-line">
+    <div className="agro-admin-shell min-h-[100svh] bg-cream">
+      <header className="agro-panel-header sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-line">
         <div className="flex items-center gap-3 h-16 px-4 lg:px-6">
           <Link to={lp('/admin')} className="flex items-center gap-3 min-w-0"><span className="sm:hidden"><Logo compact /></span><span className="hidden sm:inline"><Logo /></span></Link>
           <span className="hidden md:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold bg-brand text-white"><Landmark className="w-3.5 h-3.5" aria-hidden="true" />{t('admin.badge')}</span>
@@ -85,7 +85,7 @@ export const AdminShell: React.FC = () => {
         </div>
       </header>
       <div className="flex">
-        <aside className="hidden lg:flex flex-col sticky top-16 h-[calc(100svh-4rem)] w-60 border-r border-line bg-white">
+        <aside className="agro-panel-sidebar hidden lg:flex flex-col sticky top-16 h-[calc(100svh-4rem)] w-60 border-r border-line bg-white">
           <nav aria-label={t('admin.badge')} className="flex-1 p-3 flex flex-col gap-1">
             {nav.map(n => (
               <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${isActive ? 'bg-brand text-white' : 'text-ink hover:bg-sage'}`}>
@@ -95,11 +95,11 @@ export const AdminShell: React.FC = () => {
           </nav>
           <p className="p-4 text-xs text-muted border-t border-line">{t('admin.disclaimer')}</p>
         </aside>
-        <main id="main" className="flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-8 pb-28 lg:pb-12">
+        <main id="main" className="agro-panel-main flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-8 pb-28 lg:pb-12">
           <Suspense fallback={<div className="skeleton h-40" />}><Outlet /></Suspense>
         </main>
       </div>
-      <nav aria-label={t('admin.badge')} className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-line grid grid-cols-5">
+      <nav aria-label={t('admin.badge')} className="agro-panel-mobile-nav lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-line grid grid-cols-5">
         {nav.map(n => (
           <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `flex flex-col items-center gap-0.5 py-2 text-xs font-bold ${isActive ? 'text-brand' : 'text-muted'}`}>
             <span aria-hidden="true">{n.icon}</span>{n.label}

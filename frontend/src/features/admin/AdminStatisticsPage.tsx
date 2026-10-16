@@ -17,8 +17,8 @@ interface Analytics {
   applicationsBySector: { sector: string; count: number }[];
   applicationsByStatus: { status: string; count: number }[];
   timeline: { month: string; applications: number }[];
-  landPipeline: { draft: number; published: number; archived: number };
-  competitions: { id: string; title: string }[];
+  landPipeline?: { draft: number; published: number; archived: number };
+  competitions?: { id: string; title: string }[];
 }
 
 type Datum = { key: string; name: string; value: number };
@@ -87,13 +87,15 @@ export function AdminStatisticsPage() {
         </ul>
       </>}
     </section>;
-  const status = data?.applicationsByStatus.map(r => ({ key: r.status, name: t(`competition.status.${r.status}`), value: r.count })) ?? [];
-  const regions = data?.applicationsByRegion.map(r => ({ key: r.region, name: t(`regions.${r.region}`, { defaultValue: r.region }), value: regionAmount ? r.investment : r.count })) ?? [];
-  const activities = data?.applicationsBySector.map(r => ({ key: r.sector, name: r.sector === 'unknown' ? t('admin.panel.unknownActivity') : t(`fieldTypes.${r.sector}`, { defaultValue: r.sector }), value: r.count })) ?? [];
+  const status = (Array.isArray(data?.applicationsByStatus) ? data.applicationsByStatus : []).map(r => ({ key: r.status, name: t(`competition.status.${r.status}`), value: r.count }));
+  const regions = (Array.isArray(data?.applicationsByRegion) ? data.applicationsByRegion : []).map(r => ({ key: r.region, name: t(`regions.${r.region}`, { defaultValue: r.region }), value: regionAmount ? r.investment : r.count }));
+  const activities = (Array.isArray(data?.applicationsBySector) ? data.applicationsBySector : []).map(r => ({ key: r.sector, name: r.sector === 'unknown' ? t('admin.panel.unknownActivity') : t(`fieldTypes.${r.sector}`, { defaultValue: r.sector }), value: r.count }));
   const monthLabel = (month: string) => i18n.language === 'az' ? `${month.slice(5)}.${month.slice(0, 4)}`
     : new Intl.DateTimeFormat(f.locale, { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${month}-01T00:00:00Z`));
-  const timeline = data?.timeline.map(r => ({ key: r.month, name: monthLabel(r.month), value: r.applications })) ?? [];
-  const pipeline = data ? [{ name: t('admin.panel.landPipeline'), ...data.landPipeline }] : [];
+  const timeline = (Array.isArray(data?.timeline) ? data.timeline : []).map(r => ({ key: r.month, name: monthLabel(r.month), value: r.applications }));
+  const landPipeline = data?.landPipeline ?? { draft: 0, published: 0, archived: 0 };
+  const competitions = Array.isArray(data?.competitions) ? data.competitions : [];
+  const pipeline = data ? [{ name: t('admin.panel.landPipeline'), ...landPipeline }] : [];
   return <>
     <PageTitle title={t('admin.panel.statistics')} subtitle={t('admin.panel.statisticsHint')} />
     <section className="card p-5 mb-5" aria-labelledby="admin-ai-title">
@@ -117,7 +119,7 @@ export function AdminStatisticsPage() {
       <label className="text-sm font-semibold">{t('admin.panel.to')}<input type="date" className="field mt-1" value={params.get('to') ?? ''} min={params.get('from') ?? undefined} onChange={e => setFilter('to', e.target.value)} /></label>
       <label className="text-sm font-semibold">{t('admin.form.region')}<select className="field mt-1" value={params.get('region') ?? ''} onChange={e => setFilter('region', e.target.value)}><option value="">{t('admin.panel.allRegions')}</option>{INVESTMENT_REGIONS.map(r => <option key={r.key} value={r.key}>{t(`regions.${r.key}`)}</option>)}</select></label>
       <label className="text-sm font-semibold">{t('admin.panel.activity')}<select className="field mt-1" value={params.get('activity') ?? ''} onChange={e => setFilter('activity', e.target.value)}><option value="">{t('competition.all')}</option>{CATEGORIES.map(c => <option key={c.key} value={c.key}>{t(`fieldTypes.${c.key}`)}</option>)}</select></label>
-      <label className="text-sm font-semibold">{t('admin.panel.competition')}<select className="field mt-1" value={params.get('competitionId') ?? ''} onChange={e => setFilter('competitionId', e.target.value)}><option value="">{t('competition.all')}</option>{data?.competitions.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label>
+      <label className="text-sm font-semibold">{t('admin.panel.competition')}<select className="field mt-1" value={params.get('competitionId') ?? ''} onChange={e => setFilter('competitionId', e.target.value)}><option value="">{t('competition.all')}</option>{competitions.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label>
     </div>
     {error && <p role="alert" className="text-danger mb-4">{error}</p>}
     {!data ? <div className="skeleton h-40" /> : <>
@@ -138,8 +140,8 @@ export function AdminStatisticsPage() {
         <section className="min-w-0"><div className="flex items-center justify-between mb-2"><h2 className="sr-only">{t('admin.panel.byRegion')}</h2><button type="button" className="btn btn-outline btn-sm" aria-pressed={regionAmount} onClick={() => setRegionAmount(v => !v)}>{regionAmount ? t('competition.applications') : t('competition.proposedInvestment')}</button></div>{chart(t('admin.panel.byRegion'), regions, 'applications', 'region', regionAmount)}</section>
         {chart(t('admin.panel.byActivity'), activities, 'applications', 'activity')}
         <section className="card p-5 lg:col-span-2"><h2 className="font-display text-xl text-brand mb-3">{t('admin.panel.landPipeline')}</h2>
-          {data.landPipeline.draft + data.landPipeline.published + data.landPipeline.archived === 0 ? <p className="text-sm text-muted">{t('admin.panel.noData')}</p> : <div className="h-48" role="img" aria-label={t('admin.panel.landPipeline')}><ResponsiveContainer width="100%" height="100%"><BarChart data={pipeline} layout="vertical"><XAxis type="number" allowDecimals={false} /><YAxis type="category" dataKey="name" width={110} /><Tooltip /><Legend />{(['draft', 'published', 'archived'] as const).map((key, i) => <Bar key={key} dataKey={key} name={t(`admin.panel.pipeline.${key}`)} stackId="pipeline" fill={['#CFAF66', '#4F7F2C', '#8D9A91'][i]} cursor="pointer" onClick={() => drill('lands', { status: key === 'published' ? 'approved' : key })} />)}</BarChart></ResponsiveContainer></div>}
-          <div className="flex flex-wrap gap-2 mt-3">{(['draft', 'published', 'archived'] as const).map(key => <button type="button" key={key} className="btn btn-outline btn-sm" onClick={() => drill('lands', { status: key === 'published' ? 'approved' : key })}>{t(`admin.panel.pipeline.${key}`)}: {f.num(data.landPipeline[key])}</button>)}</div>
+          {landPipeline.draft + landPipeline.published + landPipeline.archived === 0 ? <p className="text-sm text-muted">{t('admin.panel.noData')}</p> : <div className="h-48" role="img" aria-label={t('admin.panel.landPipeline')}><ResponsiveContainer width="100%" height="100%"><BarChart data={pipeline} layout="vertical"><XAxis type="number" allowDecimals={false} /><YAxis type="category" dataKey="name" width={110} /><Tooltip /><Legend />{(['draft', 'published', 'archived'] as const).map((key, i) => <Bar key={key} dataKey={key} name={t(`admin.panel.pipeline.${key}`)} stackId="pipeline" fill={['#CFAF66', '#4F7F2C', '#8D9A91'][i]} cursor="pointer" onClick={() => drill('lands', { status: key === 'published' ? 'approved' : key })} />)}</BarChart></ResponsiveContainer></div>}
+          <div className="flex flex-wrap gap-2 mt-3">{(['draft', 'published', 'archived'] as const).map(key => <button type="button" key={key} className="btn btn-outline btn-sm" onClick={() => drill('lands', { status: key === 'published' ? 'approved' : key })}>{t(`admin.panel.pipeline.${key}`)}: {f.num(landPipeline[key])}</button>)}</div>
         </section>
       </div>
     </>}

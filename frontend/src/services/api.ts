@@ -1,5 +1,5 @@
 import { useSyncExternalStore, useCallback, useRef } from 'react';
-import type { AppNotification, AppUser, ApplicantType, CabinetRole, InvestmentRequest, InvestorProfile, Land, UserPreferences } from '../types/agro';
+import type { AppNotification, AppUser, ApplicantType, CabinetRole, InvestmentRequest, InvestorProfile, InvestorProfileDocument, Land, UserPreferences } from '../types/agro';
 import { db, mutate, subscribe } from './db';
 import { syncMinistryLands } from './ministryLands';
 import { backend, BackendError, TOKEN_KEY, type AuthResponse, type BackendUser, type MessageResponse, type RegistrationResponse, type SignupStatus } from './backend';

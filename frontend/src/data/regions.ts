@@ -18,6 +18,7 @@ export const REGIONS: Region[] = [
   { key: 'khojavend', lat: 39.79, lng: 47.0, climateRisk: 0.45 },
   { key: 'shusha', lat: 39.76, lng: 46.75, climateRisk: 0.25 },
   { key: 'khankendi', lat: 39.82, lng: 46.76, climateRisk: 0.3 },
+  { key: 'khojaly', lat: 39.913611, lng: 46.791667, climateRisk: 0.3 },
   { key: 'tartar', lat: 40.34, lng: 46.93, climateRisk: 0.5 },
   { key: 'ganja', lat: 40.68, lng: 46.36, climateRisk: 0.35 },
   { key: 'shamakhi', lat: 40.63, lng: 48.64, climateRisk: 0.3 },
@@ -30,7 +31,7 @@ export const REGIONS: Region[] = [
 
 /** Areas offered for admin-entered Qarabağ investment listings. */
 export const INVESTMENT_REGIONS = REGIONS.filter(r => [
-  'aghdam', 'fuzuli', 'jabrayil', 'zangilan', 'gubadli', 'lachin', 'kalbajar', 'khojavend', 'shusha', 'khankendi', 'tartar',
+  'aghdam', 'fuzuli', 'jabrayil', 'zangilan', 'gubadli', 'lachin', 'kalbajar', 'khojavend', 'shusha', 'khankendi', 'khojaly',
 ].includes(r.key));
 
 export const regionByKey = (key: string) => REGIONS.find(r => r.key === key);

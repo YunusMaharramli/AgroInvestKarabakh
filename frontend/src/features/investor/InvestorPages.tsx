@@ -164,7 +164,7 @@ export const InvestorSearch: React.FC = () => {
           </div>
           {loading ? <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-5">{[0, 1, 2, 3].map(i => <SkeletonCard key={i} rows={4} />)}</div>
             : results.length === 0 ? <EmptyState title={t('investor.search.empty')} action={<button type="button" className="btn btn-outline" onClick={reset}>{t('form.reset')}</button>} />
-            : view === 'map' ? <LandsMap lands={results.map(r => r.land)} height="h-[620px]" detailHref={l => lp(`/investor/lands/${l.id}`)} />
+            : view === 'map' ? <LandsMap lands={results.map(r => r.land)} height="h-[620px]" detailHref={l => lp(`/investor/lands/${l.id}`)} allowAreaSelection />
             : (
               <>
                 <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-5">

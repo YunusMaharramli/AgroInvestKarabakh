@@ -63,6 +63,7 @@ builder.Services.AddScoped<EktisIntegrationService>();
 builder.Services.AddScoped<InvestorDirectoryService>();
 builder.Services.AddScoped<ProposalService>();
 builder.Services.AddScoped<LegacyJsonImporter>();
+builder.Services.AddScoped<DemoLandSeeder>();
 builder.Services.AddScoped<LoginAttemptService>();
 builder.Services.Configure<AdminAccountsOptions>(
     builder.Configuration.GetSection(AdminAccountsOptions.SectionName));
@@ -74,6 +75,10 @@ var app = builder.Build();
 if (args.Length > 0 && args[0] == "import-legacy")
 {
     return await ImportCommand.RunAsync(app, args);
+}
+if (args.Length > 0 && args[0] == "seed-demo-lands")
+{
+    return await DemoLandCommand.RunAsync(app);
 }
 
 await app.MigrateIfConfiguredAsync();

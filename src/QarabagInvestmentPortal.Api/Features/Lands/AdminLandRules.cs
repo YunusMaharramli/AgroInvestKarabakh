@@ -19,7 +19,7 @@ public sealed record LandPublicationCheck(bool CanPublish, IReadOnlyList<LandIss
 public static partial class AdminLandRules
 {
     public const double HectaresPerSot = 0.01;
-    public static readonly string[] InvestmentRegions = ["aghdam", "fuzuli", "jabrayil", "zangilan", "gubadli", "lachin", "kalbajar", "khojavend", "shusha", "khankendi", "tartar"];
+    public static readonly string[] InvestmentRegions = ["aghdam", "fuzuli", "jabrayil", "zangilan", "gubadli", "lachin", "kalbajar", "khojavend", "shusha", "khankendi", "khojaly"];
 
     /// <summary>Water availability (core field): includes "rain_fed" and "none_known" (no known water access).</summary>
     public static readonly string[] WaterAccessOptions = ["irrigation_canal", "well", "river", "reservoir", "spring", "mains", "rain_fed", "none_known"];

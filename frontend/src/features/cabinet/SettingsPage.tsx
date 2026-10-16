@@ -14,6 +14,7 @@ import type { CabinetRole, InvestorProfile, RiskTolerance } from '../../types/ag
 /** Editable, applicant-specific profile; values remain private and are self-declared. */
 const InvestorProfileCard: React.FC = () => {
   const { t } = useTranslation();
+  const toast = useToast();
   const me = useCurrentUser()!;
   const [documentCategory, setDocumentCategory] = useState('OTHER');
   const [currentPassword, setCurrentPassword] = useState('');

@@ -7,3 +7,8 @@
 **/App_Data/
 **/.env.local
 **/admins.local.json
+
+# Local crash logs and Vite cache
+hs_err_pid*.log
+replay_pid*.log
+.vite/

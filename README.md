@@ -1,5 +1,7 @@
 # AgroInvest Qarabağ
 
+[![CI](https://github.com/YunusMaharramli/AgroInvestKarabakh/actions/workflows/ci.yml/badge.svg)](https://github.com/YunusMaharramli/AgroInvestKarabakh/actions/workflows/ci.yml)
+
 **An agricultural investment competition portal for the Qarabağ region.**
 
 The ministry publishes farm areas as investment competitions. Entrepreneurs browse and compare them, apply with a proposed amount, a business plan and documents, and follow their application by reference number. Ministry administrators review the applications, talk to applicants in real time and record decisions.
